@@ -369,18 +369,25 @@ function SenatePanel({players,D}){
   );
 }
 
-function VotingPanel({motions,players,user,onRefresh}){
+function VotingPanel({motions,players,user,game,onRefresh}){
   const [form,setForm]=useState({title:"",body:""});
   const [err,setErr]=useState("");const [ok,setOk]=useState("");
   const [selMotion,setSelMotion]=useState(null);
+  const gForTurnLabel = game || DEF_GAME;
+  const currSessionLabel = (()=>{try{return sLab(gForTurnLabel);}catch{return "";}})();
+  const myMotionThisTurn=motions.find(m=>m.byId===user.id&&m.session===currSessionLabel);
+  const motionLocked=!!myMotionThisTurn;
   const propose=async()=>{
+    if(motionLocked){setErr(`You have already proposed one motion this turn (${currSessionLabel}). Wait until the GM advances the turn.`);return;}
     if(!form.title.trim()||!form.body.trim()){setErr("Title and motion text are required.");return;}
     const g=await db.get("spqr_g")||DEF_GAME;
     const all=await db.get("spqr_m")||[];
-    const nm={id:Date.now().toString(),byId:user.id,byName:user.latinName,title:form.title,body:form.body,status:"pending",votes:{},created:new Date().toISOString(),session:sLab(g)};
+    const liveSession=sLab(g);
+    if(all.find(m=>m.byId===user.id&&m.session===liveSession)){setErr(`You have already proposed one motion this turn (${liveSession}).`);return;}
+    const nm={id:Date.now().toString(),byId:user.id,byName:user.latinName,title:form.title,body:form.body,status:"pending",votes:{},created:new Date().toISOString(),session:liveSession};
     await db.set("spqr_m",[...all,nm]);
     await pushN("Motion Proposed",`${user.latinName} has proposed: "${form.title}"` ,"gm");
-    setForm({title:"",body:""});setErr("");setOk("Motion submitted — awaiting GM approval.");
+    setForm({title:"",body:""});setErr("");setOk("Motion submitted — awaiting GM approval. You cannot propose another motion until the next turn.");
     onRefresh();setTimeout(()=>setOk(""),4000);
   };
   const vote=async(motionId,choice)=>{
@@ -398,12 +405,15 @@ function VotingPanel({motions,players,user,onRefresh}){
   return(
     <div>
       <Card>
-        <STit c="Propose a Motion"/>
-        <Inp label="Motion Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Raise Legio VII immediately"/>
-        <Inp label="Motion Text — be specific and persuasive" value={form.body} onChange={v=>setForm(f=>({...f,body:v}))} rows={3}/>
-        {err&&<div style={{color:T.rhi,fontSize:"0.85rem",marginBottom:"0.5rem"}}>{err}</div>}
-        {ok&&<div style={{color:T.gre,fontSize:"0.85rem",marginBottom:"0.5rem"}}>{ok}</div>}
-        <Btn onClick={propose}>Submit to GM for Approval</Btn>
+        <STit c="Propose a Motion" sub={`Limit: one motion per senator per turn. Current turn: ${currSessionLabel}`}/>
+        {motionLocked&&<div style={{padding:"0.65rem 0.8rem",background:"#1a1000",border:`1px solid ${T.gold}`,color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.82rem",marginBottom:"0.75rem",lineHeight:1.5}}>
+          ⚖ Motion already submitted this turn: <span style={{color:T.text}}>{myMotionThisTurn.title}</span>. You may propose another motion after the GM advances to the next turn.
+        </div>}
+        <Inp label="Motion Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Raise Legio VII immediately" disabled={motionLocked}/>
+        <Inp label="Motion Text — be specific and persuasive" value={form.body} onChange={v=>setForm(f=>({...f,body:v}))} rows={3} disabled={motionLocked}/>
+        {err&&<div style={{color:T.rhi,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{err}</div>}
+        {ok&&<div style={{color:T.gre,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{ok}</div>}
+        <Btn onClick={propose} disabled={motionLocked}>{motionLocked?"Motion Already Submitted This Turn":"Submit to GM for Approval"}</Btn>
       </Card>
       {/* Active votes */}
       {voting.length>0&&<div>
@@ -803,7 +813,7 @@ function PlayerApp({user:initUser,onLogout}){
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
         {tab==="senate"    &&<SenatePanel players={D.players} D={D}/>}
-        {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} onRefresh={refresh}/>}
+        {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
         {tab==="orders"    &&<OrdersPanel orders={D.orders} game={D.game} players={D.players}/>}
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} players={D.players} orders={D.orders} deadline={D.deadline} onRefresh={refresh}/>}
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
@@ -847,6 +857,7 @@ function AOverview({D}){
 
 function ASenators({D,onRefresh}){
   const [loginOpen,setLoginOpen]=useState(D.cfg?.loginOpen!==false);
+  const [selected,setSelected]=useState(null);
   const assign=async(playerId,role)=>{
     const players=await db.get("spqr_p")||[];
     const updated=players.map(p=>{
@@ -882,6 +893,10 @@ function ASenators({D,onRefresh}){
           <Btn v={loginOpen?"red":"green"} sm onClick={toggleLogin}>{loginOpen?"🔒 Close Registrations":"🔓 Open Registrations"}</Btn>
         </Row>
       </Card>
+      <Card>
+        <STit c="Curia Julia — Senate Seating" sub="GM view: click any occupied seat to open the senator profile."/>
+        <SenateMap players={D.players||[]} onSelectPlayer={setSelected}/>
+      </Card>
       <STit c={`Senator Roster (${(D.players||[]).length})`}/>
       {(D.players||[]).map(p=>{
         const pos=p.role?POS[p.role]:null;
@@ -913,6 +928,7 @@ function ASenators({D,onRefresh}){
         );
       })}
       {(D.players||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No senators have enrolled.</div>}
+      {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
     </div>
   );
 }
