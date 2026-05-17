@@ -27,3 +27,10 @@ Start Command:
 ```bash
 npm run start
 ```
+
+## Latest update
+
+- Bigger Senate header image display: responsive, not cropped, and easier to see on phone/desktop.
+- Added Game Master Backup / Restore tools in the Resources tab.
+- Export a JSON backup before uploading new changes to GitHub/Railway.
+- Import the JSON backup if local browser data ever needs restoring.

@@ -339,7 +339,7 @@ function SenatePanel({players,D}){
   const [selected,setSelected]=useState(null);
   return(
     <div>
-      {cfg.senateImage&&<div style={{marginBottom:"1rem",border:`1px solid ${T.bhi}`,overflow:"hidden",maxHeight:340}}><img src={cfg.senateImage} style={{width:"100%",objectFit:"cover"}} alt="The Senate of Rome"/></div>}
+      {cfg.senateImage&&<div style={{marginBottom:"1rem",border:`1px solid ${T.bhi}`,overflow:"auto",maxHeight:"75vh",background:T.bg,borderRadius:8}}><img src={cfg.senateImage} style={{width:"100%",maxHeight:"75vh",objectFit:"contain",display:"block"}} alt="The Senate of Rome"/></div>}
       {!cfg.senateImage&&<div style={{marginBottom:"1rem",padding:"1.5rem",background:T.surf,border:`1px solid ${T.border}`,textAlign:"center",color:T.mut,fontStyle:"italic",fontSize:"1rem"}}>The Game Master has not yet posted a senate image.</div>}
       <Card>
         <STit c="Curia Julia — Senate Seating" sub="Click a senator to open his profile. On mobile, scroll the seating map sideways."/>
@@ -996,6 +996,65 @@ function ALegions({D,onRefresh}){
   );
 }
 
+
+function ABackupRestore({onRefresh}){
+  const [msg,setMsg]=useState("");
+  const fileRef=useRef();
+  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n"];
+  const exportData=async()=>{
+    const data={version:1,exportedAt:new Date().toISOString(),keys:{}};
+    for(const k of keys){data.keys[k]=await db.get(k);}
+    const label=data.keys.spqr_g?sLab({...DEF_GAME,...data.keys.spqr_g}).replace(/[^a-zA-Z0-9]+/g,"-"):"game";
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=`rome-yes-backup-${label}-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setMsg("Backup exported. Keep the JSON file safe before updating GitHub/Railway.");
+    setTimeout(()=>setMsg(""),5000);
+  };
+  const importData=async(e)=>{
+    const f=e.target.files?.[0];
+    if(!f)return;
+    try{
+      const text=await f.text();
+      const data=JSON.parse(text);
+      const payload=data.keys||data;
+      if(!payload.spqr_g&&!payload.spqr_p&&!payload.spqr_m)throw new Error("This does not look like a ROME-YES backup file.");
+      if(!confirm("Import this backup? This will replace the current saved game data in this browser."))return;
+      for(const k of keys){
+        if(Object.prototype.hasOwnProperty.call(payload,k))await db.set(k,payload[k]);
+      }
+      setMsg("Backup imported successfully. Refreshing game data...");
+      onRefresh&&onRefresh();
+      setTimeout(()=>setMsg(""),5000);
+    }catch(err){
+      setMsg(`Import failed: ${err.message||err}`);
+      setTimeout(()=>setMsg(""),6000);
+    }finally{
+      if(fileRef.current)fileRef.current.value="";
+    }
+  };
+  return(
+    <Card style={{borderLeft:`3px solid ${T.blue}`}}>
+      <STit c="Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects senators, motions, orders, laws, legions, resources, map and settings."/>
+      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"0.95rem"}}>{msg}</div>}
+      <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
+        Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the game.
+      </div>
+      <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
+      <Row gap="0.5rem" wrap>
+        <Btn v="blue" onClick={exportData}>⬇ Export Backup</Btn>
+        <Btn v="dark" onClick={()=>fileRef.current.click()}>⬆ Import Backup</Btn>
+      </Row>
+    </Card>
+  );
+}
+
 function AResources({D,onRefresh}){
   const [g,setG]=useState(null);
   const [confirmAdv,setConfirmAdv]=useState(false);
@@ -1087,6 +1146,7 @@ function AResources({D,onRefresh}){
         </div>
         <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
       </Card>
+      <ABackupRestore onRefresh={onRefresh}/>
       {confirmAdv&&(
         <Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}>
           <div style={{marginBottom:"1rem"}}>
@@ -1384,7 +1444,7 @@ function ASetup({D,onRefresh}){
         <STit c="Senate Tab — Header Image"/>
         <div style={{fontSize:"1rem",color:T.mut,marginBottom:"0.75rem"}}>Paste a public image URL. Players will see this image at the top of the Senate tab.</div>
         <Inp label="Senate Image URL" value={cfg.senateImage||""} onChange={v=>setCfg(c=>({...c,senateImage:v}))} placeholder="https://… (a painting of the Roman Senate)"/>
-        {cfg.senateImage&&<div style={{marginBottom:"0.75rem",border:`1px solid ${T.bhi}`,overflow:"hidden",maxHeight:240}}><img src={cfg.senateImage} style={{width:"100%",objectFit:"cover"}} alt="Preview" onError={()=>{}}/></div>}
+        {cfg.senateImage&&<div style={{marginBottom:"0.75rem",border:`1px solid ${T.bhi}`,overflow:"auto",maxHeight:"60vh",background:T.bg,borderRadius:8}}><img src={cfg.senateImage} style={{width:"100%",maxHeight:"60vh",objectFit:"contain",display:"block"}} alt="Preview" onError={()=>{}}/></div>}
       </Card>
       <Card>
         <STit c="Campaign Map" sub="Upload an actual map image for the Map tab. You can also keep a Legendkeeper link."/>
