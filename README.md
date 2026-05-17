@@ -1,36 +1,72 @@
-# SPQR Railway App — Fixed V4
+# ROME-YES — Railway + Supabase Shared Game App
 
-This version includes:
+This version uses Supabase for shared game data, so all players can see the same senators, motions, votes, orders, laws, legions, map and GM updates.
 
-- Bigger typography across the app.
-- Mobile responsive improvements.
-- Clickable senators in the Senate tab, opening a profile modal.
-- Larger profile images.
-- GM-editable laws under the new Laws tab in the GM panel.
-- Uploaded campaign map support in GM Setup, visible in the player Map tab.
-- Legions default to 5,000 soldiers.
-- No hard cap on legion recruitment.
-- Editable legion names and IDs.
-- GM controls to go back one turn and restart the campaign.
-- Magistrates can see GM outcomes/resolutions for their own orders in their office panel.
+## Railway variables required
 
-Railway:
+Add these in Railway → Service → Variables:
 
-Build Command:
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-publishable-or-anon-key
+```
+
+## Supabase table required
+
+Run this in Supabase SQL Editor:
+
+```sql
+create table if not exists public.game_state (
+  id text primary key,
+  value jsonb not null,
+  updated_at timestamptz default now()
+);
+
+alter table public.game_state enable row level security;
+
+drop policy if exists "Allow public read game_state" on public.game_state;
+drop policy if exists "Allow public insert game_state" on public.game_state;
+drop policy if exists "Allow public update game_state" on public.game_state;
+drop policy if exists "Allow public delete game_state" on public.game_state;
+
+create policy "Allow public read game_state"
+on public.game_state
+for select
+to anon
+using (true);
+
+create policy "Allow public insert game_state"
+on public.game_state
+for insert
+to anon
+with check (true);
+
+create policy "Allow public update game_state"
+on public.game_state
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow public delete game_state"
+on public.game_state
+for delete
+to anon
+using (true);
+```
+
+## Railway build settings
+
+Build command:
 
 ```bash
 npm install && npm run build
 ```
 
-Start Command:
+Start command:
 
 ```bash
 npm run start
 ```
 
-## Latest update
-
-- Bigger Senate header image display: responsive, not cropped, and easier to see on phone/desktop.
-- Added Game Master Backup / Restore tools in the Resources tab.
-- Export a JSON backup before uploading new changes to GitHub/Railway.
-- Import the JSON backup if local browser data ever needs restoring.
+Do not upload `package-lock.json` if Railway gets stuck on `npm ci`.

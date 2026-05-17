@@ -1025,7 +1025,7 @@ function ABackupRestore({onRefresh}){
       const data=JSON.parse(text);
       const payload=data.keys||data;
       if(!payload.spqr_g&&!payload.spqr_p&&!payload.spqr_m)throw new Error("This does not look like a ROME-YES backup file.");
-      if(!confirm("Import this backup? This will replace the current saved game data in this browser."))return;
+      if(!confirm("Import this backup? This will replace the current shared game data for all players."))return;
       for(const k of keys){
         if(Object.prototype.hasOwnProperty.call(payload,k))await db.set(k,payload[k]);
       }
@@ -1044,7 +1044,7 @@ function ABackupRestore({onRefresh}){
       <STit c="Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects senators, motions, orders, laws, legions, resources, map and settings."/>
       {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"0.95rem"}}>{msg}</div>}
       <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
-        Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the game.
+        Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the shared game.
       </div>
       <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
       <Row gap="0.5rem" wrap>
