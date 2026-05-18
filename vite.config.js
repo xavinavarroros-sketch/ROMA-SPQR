@@ -26,3 +26,6 @@ npm run start
 ```
 
 Do not upload `node_modules`, `dist`, `.env`, `.env.local` or `package-lock.json`.
+
+
+Update: added naval magistrate, one default fleet of triremes, cavalry auxiliary units, cavalry/fleet maintenance, improved province cards with capitals/population, and fixed card margins.

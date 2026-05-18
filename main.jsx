@@ -10,6 +10,7 @@ img{max-width:100%}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#F6EFE4}::-webkit-scrollbar-thumb{background:#A32020}
 input,select,textarea,button{outline:none;font-size:1rem}
 button{cursor:pointer}
+.spqr-card{overflow:hidden}.spqr-region-card{min-width:0}.spqr-region-head{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap}.spqr-region-title{min-width:0;overflow-wrap:anywhere}.spqr-badge-wrap{max-width:100%;white-space:normal!important;overflow-wrap:anywhere;text-align:center}.spqr-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem}.spqr-military-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:.7rem}@media(max-width:900px){.spqr-military-grid{grid-template-columns:1fr}.spqr-field-grid{grid-template-columns:1fr}}
 @media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
 `;
 const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A32020",
@@ -63,26 +64,30 @@ const POS={
     desc:"Master of Horse. Deputy to an emergency command, focused on cavalry, mobility and rapid military operations.",
     can:["🐎 Submit one cavalry or rapid response order","⚔️ Organize scouts, cavalry and mobile detachments","🛡️ Support the Dictator or Consuls in campaign logistics","📍 React to fast-moving threats"],
     cannot:["👑 Override the supreme magistrate","💰 Spend freely without approval","🏛️ Rule the Senate","♾️ Keep emergency command forever"]},
+
+  praefectus_classis_1:{emoji:"🚢",title:"Praefectus Classis",abbr:"PR CL",color:"#0E7490",bg:"#ECFEFF",
+    desc:"Commander and administrator of the Roman fleet. Oversees triremes, naval bases, coastal defence and sea supply.",
+    can:["🚢 Submit one naval order per turn","⚓ Manage fleets, triremes and naval bases","🛡️ Protect sea routes and coastal provinces","📦 Support supply movement by sea"],
+    cannot:["👑 Override the Consuls or Dictator","⚔️ Command land legions without appointment","💰 Spend the treasury freely","♾️ Hold naval authority permanently"]},
 };
 
 // Physical senate seating positions (col 0-8, row 0-6 on 9×7 grid)
-const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},dictator_1:{c:4,r:2},magister_equitum_1:{c:4,r:3},praetor_1:{c:2,r:2},praetor_2:{c:6,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},aedile_1:{c:4,r:5},tribune_1:{c:2,r:6},tribune_2:{c:6,r:6}};
+const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},dictator_1:{c:4,r:2},magister_equitum_1:{c:4,r:3},praefectus_classis_1:{c:4,r:4},praetor_1:{c:2,r:2},praetor_2:{c:6,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},aedile_1:{c:4,r:5},tribune_1:{c:2,r:6},tribune_2:{c:6,r:6}};
 
 /* ══ GAME DATA ════════════════════════════════════════════════════════════ */
 const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
-  gold:1800,food:2800,pop:175000,legionUpkeep:125,legionFood:110,fleetUpkeep:2,fleetFood:1,lgold:650,lfood:550,lpop:5000,lturns:2};
+  gold:1800,food:2800,pop:175000,legionUpkeep:125,legionFood:110,cavalryUpkeep:180,cavalryFood:140,fleetUpkeep:2,fleetFood:1,lgold:650,lfood:550,lpop:5000,lturns:2};
 
 const DEF_LEGIONS=["I","II","III","IV"].map((id)=>
   ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Italian Field Army"}));
 
 const DEF_CAVALRY=[
-  {id:"eq_1",name:"Equites Consulares",str:1200,max:1200,status:"active",location:"Roma",commander:"Unassigned",armyCommand:"Italian Field Army"},
-  {id:"eq_2",name:"Socii Equites",str:900,max:900,status:"active",location:"Capua",commander:"Unassigned",armyCommand:"Campanian Reserve"},
+  {id:"eq_1",name:"Equites Consulares",str:2000,max:2000,status:"active",location:"Roma",commander:"Unassigned",armyCommand:"Italian Field Army"},
+  {id:"eq_2",name:"Socii Equites",str:2000,max:2000,status:"active",location:"Capua",commander:"Unassigned",armyCommand:"Campanian Reserve"},
 ];
 
 const DEF_FLEETS=[
-  {id:"classis_ostia",name:"Classis Ostiensis",triremes:45,status:"active",location:"Ostia",commander:"Unassigned",mission:"Defend the Tiber and Tyrrhenian coast"},
-  {id:"classis_sicilia",name:"Classis Siciliensis",triremes:60,status:"active",location:"Syracusae",commander:"Unassigned",mission:"Secure Sicily and watch Carthaginian movements"},
+  {id:"classis_romana",name:"Classis Romana",triremes:80,status:"active",location:"Ostia",commander:"Unassigned",mission:"Defend Roman sea lanes, Sicily and the Tyrrhenian coast"},
 ];
 
 const DEF_REGIONS=[
@@ -139,18 +144,22 @@ const pushN=async(title,body,forId="all")=>{const all=await db.get("spqr_n")||[]
 const activeLegions=legs=>(legs||[]).filter(l=>l.status==="active");
 const activeFleets=fleets=>(fleets||[]).filter(f=>f.status==="active");
 const fleetTriremes=fleets=>activeFleets(fleets).reduce((sum,f)=>sum+Number(f.triremes??f.ships??0),0);
-const economySnapshot=(game,regions,legions,fleets=DEF_FLEETS)=>{
-  const g={...DEF_GAME,...(game||{})};
+const activeCavalry=cavalry=>(cavalry||[]).filter(c=>c.status==="active");
+const economySnapshot=(game,regions,legions,cavalry=DEF_CAVALRY,fleets=DEF_FLEETS)=>{
+  const g={...DEF_GAME,...game};
   const inc=calcInc(regions||DEF_REGIONS);
   const act=activeLegions(legions||DEF_LEGIONS);
+  const cav=activeCavalry(cavalry||DEF_CAVALRY);
   const triremes=fleetTriremes(fleets||DEF_FLEETS);
   const legionGoldUpkeep=act.length*(g.legionUpkeep||0);
   const legionFoodUpkeep=act.length*(g.legionFood||0);
+  const cavalryGoldUpkeep=cav.length*(g.cavalryUpkeep||0);
+  const cavalryFoodUpkeep=cav.length*(g.cavalryFood||0);
   const fleetGoldUpkeep=triremes*(g.fleetUpkeep||0);
   const fleetFoodUpkeep=triremes*(g.fleetFood||0);
-  const upkeepG=legionGoldUpkeep+fleetGoldUpkeep;
-  const upkeepF=legionFoodUpkeep+fleetFoodUpkeep;
-  return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,legionGoldUpkeep,legionFoodUpkeep,fleetGoldUpkeep,fleetFoodUpkeep,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,activeTriremes:triremes,ts:Date.now()};
+  const upkeepG=legionGoldUpkeep+cavalryGoldUpkeep+fleetGoldUpkeep;
+  const upkeepF=legionFoodUpkeep+cavalryFoodUpkeep+fleetFoodUpkeep;
+  return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,legionGoldUpkeep,legionFoodUpkeep,cavalryGoldUpkeep,cavalryFoodUpkeep,fleetGoldUpkeep,fleetFoodUpkeep,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,activeCavalry:cav.length,activeTriremes:triremes,ts:Date.now()};
 };
 const roleEntries=()=>Object.entries(POS).map(([key,pos])=>({key,...pos}));
 const getPlayerName=(players,id)=>players.find(p=>p.id===id)?.latinName||"Unknown Senator";
@@ -167,7 +176,7 @@ function Btn({children,onClick,v="gold",sm,full,disabled}){
   const {bg,c}=vc[v]||vc.gold;
   return(<button onClick={onClick} disabled={disabled} style={{padding:sm?"0.26rem 0.55rem":"0.48rem 1rem",background:bg,color:c,border:`1px solid ${T.border}`,fontFamily:"'Cinzel',serif",fontSize:sm?"0.65rem":"0.74rem",letterSpacing:"0.08em",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.45:1,width:full?"100%":"auto",fontWeight:600,whiteSpace:"nowrap"}}>{children}</button>);
 }
-const Card=({children,style={}})=><div style={{background:T.card,border:`1px solid ${T.border}`,padding:"0.9rem",marginBottom:"0.6rem",...style}}>{children}</div>;
+const Card=({children,style={}})=><div className="spqr-card" style={{background:T.card,border:`1px solid ${T.border}`,padding:"0.9rem",marginBottom:"0.6rem",...style}}>{children}</div>;
 const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",background:`${color}22`,border:`1px solid ${color}`,color,padding:sm?"0.05rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{c}</span>;
 const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.9rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
 const Row=({children,gap="0.4rem",wrap})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:wrap?"wrap":"nowrap"}}>{children}</div>;
@@ -381,7 +390,7 @@ function SenatePanel({players,D}){
       </Card>
       <Card>
         <STit c={`Enrolled Senators (${players.length})`}/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:"0.6rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.6rem"}}>
           {players.map(p=>{
             const pos=p.role?POS[p.role]:null;
             return(
@@ -628,7 +637,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
       {(isQuaestor)&&(
         <Card>
           <STit c="Treasury"/>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.4rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.4rem"}}>
             <Stat label="Gold" value={`${fmt(game.gold)}T`}/>
             <Stat label="Legion Upkeep" value={`-${fmt(legions.filter(l=>l.status==="active").length*game.legionUpkeep)}T`} color={T.rhi}/>
             <Stat label="Net / Session" value={`${legions.filter(l=>l.status==="active").length*game.legionUpkeep>0?"—":"+"}${fmt(Math.abs(0))}`} color={T.mut}/>
@@ -638,7 +647,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
       {(isAedile||(role==="quaestor_2"))&&(
         <Card>
           <STit c="Food Supply"/>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.4rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.4rem"}}>
             <Stat label="Food" value={`${fmt(game.food)}M`} color="#A0D060"/>
             <Stat label="Legion Consumption" value={`-${fmt(legions.filter(l=>l.status==="active").length*game.legionFood)}M`} color={T.rhi}/>
             <Stat label="Population" value={fmt(game.pop)} color={T.mut}/>
@@ -834,7 +843,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   const g={...DEF_GAME,...(D.game||{})};
   const regs=D.regions||DEF_REGIONS;
   const legs=D.legions||DEF_LEGIONS;
-  const snap=economySnapshot(g,regs,legs,D.fleets||DEF_FLEETS);
+  const snap=economySnapshot(g,regs,legs,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS);
   return(
     <div>
       <Card style={{borderLeft:`4px solid ${T.red}`}}>
@@ -845,7 +854,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
           <Stat label="Gold Income" value={`+${fmt(snap.goldIncome)}T`} color={T.gre}/>
           <Stat label="Food Income" value={`+${fmt(snap.foodIncome)}M`} color={T.gre}/>
           <Stat label="Legion Gold Cost" value={`-${fmt(snap.legionGoldUpkeep||0)}T`} color={T.rhi}/>
-          <Stat label="Legion Food Cost" value={`-${fmt(snap.legionFoodUpkeep||0)}M`} color={T.rhi}/>
+          <Stat label="Legion Food Cost" value={`-${fmt(snap.legionFoodUpkeep||0)}M`} color={T.rhi}/><Stat label="Cavalry Gold Cost" value={`-${fmt(snap.cavalryGoldUpkeep||0)}T`} color={T.rhi}/><Stat label="Cavalry Food Cost" value={`-${fmt(snap.cavalryFoodUpkeep||0)}M`} color={T.rhi}/>
           <Stat label="Fleet Gold Cost" value={`-${fmt(snap.fleetGoldUpkeep||0)}T`} color={T.rhi}/>
           <Stat label="Fleet Food Cost" value={`-${fmt(snap.fleetFoodUpkeep||0)}M`} color={T.rhi}/>
           <Stat label="Net Gold / Turn" value={`${snap.netGold>=0?"+":""}${fmt(snap.netGold)}T`} color={snap.netGold>=0?T.gre:T.rhi}/>
@@ -860,10 +869,10 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
       </Card>
       <Card>
         <STit c="Provinces and Regional Income" sub="Control status changes effective income."/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:"0.55rem"}}>
-          {regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <div key={r.id||i} style={{background:T.surf,border:`1px solid ${st.c}`,padding:"0.65rem"}}>
-            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}>
-              <div style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:T.text}}>{r.name}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>
+          {regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <div className="spqr-region-card" key={r.id||i} style={{background:T.surf,border:`1px solid ${st.c}`,padding:"0.8rem",minWidth:0}}>
+            <div className="spqr-region-head" style={{marginBottom:"0.45rem"}}>
+              <div className="spqr-region-title" style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:T.text,fontSize:"1.05rem",lineHeight:1.15}}>{r.name}</div>
               <Badge c={st.l} color={st.c} sm/>
             </div>
             <div style={{fontSize:"1rem",color:T.mut}}>🏛️ Capital: <span style={{color:T.text}}>{r.capital||"Unknown"}</span></div>
@@ -889,7 +898,7 @@ function LegionsPublicPanel({D}){
         <Stat label="Active Legions" value={legions.filter(l=>l.status==="active").length}/>
         <Stat label="Cavalry Units" value={cavalry.length} color={T.blue}/>
         <Stat label="Fleets" value={fleets.length} color={T.ghi}/><Stat label="Active Triremes" value={fmt(fleetTriremes(fleets))} color={T.gold}/>
-        <Stat label="Cost to Raise Legion" value={`${fmt(game?.lgold||DEF_GAME.lgold)}T`} color={T.rhi}/>
+        <Stat label="Cavalry Upkeep" value={`-${fmt(activeCavalry(cavalry).length*(game.cavalryUpkeep||0))}T / ${fmt(activeCavalry(cavalry).length*(game.cavalryFood||0))}M`} color={T.rhi}/><Stat label="Fleet Upkeep" value={`-${fmt(fleetTriremes(fleets)*(game.fleetUpkeep||0))}T / ${fmt(fleetTriremes(fleets)*(game.fleetFood||0))}M`} color={T.rhi}/><Stat label="Cost to Raise Legion" value={`${fmt(game?.lgold||DEF_GAME.lgold)}T`} color={T.rhi}/>
       </div>
     </Card>
     <Card><STit c="Legions" sub="Each legion shows its commander, army command and stationed location."/>
@@ -911,7 +920,7 @@ function LegionsPublicPanel({D}){
           <div style={{fontSize:"1.05rem",color:T.mut}}>Strength: <span style={{color:T.text}}>{fmt(c.str||0)} / {fmt(c.max||0)}</span></div>
           <div style={{fontSize:"1.05rem",color:T.mut}}>📍 Location: <span style={{color:T.text}}>{c.location||"Unknown"}</span></div>
           <div style={{fontSize:"1.05rem",color:T.mut}}>🎖️ Commander: <span style={{color:T.text}}>{c.commander||"Unassigned"}</span></div>
-          <div style={{fontSize:"1.05rem",color:T.mut}}>🏕️ Army Command: <span style={{color:T.text}}>{c.armyCommand||"Independent"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🏕️ Army Command: <span style={{color:T.text}}>{c.armyCommand||"Independent"}</span></div><div style={{fontSize:"1.05rem",color:T.mut}}>💰 Maintenance: <span style={{color:T.text}}>{fmt((game.cavalryUpkeep||0))}T / {fmt((game.cavalryFood||0))}M per turn</span></div>
         </div>)}
       </div>
     </Card>
@@ -1073,8 +1082,8 @@ function AOverview({D}){
   const [, setR]=useState(0);
   const activeLegs=(D.legions||[]).filter(l=>l.status==="active");
   const inc=D.regions?calcInc(D.regions):{gold:0,food:0};
-  const upkeepG=activeLegs.length*(D.game?.legionUpkeep||80)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetUpkeep||DEF_GAME.fleetUpkeep);
-  const upkeepF=activeLegs.length*(D.game?.legionFood||60)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetFood||DEF_GAME.fleetFood);
+  const upkeepG=activeLegs.length*(D.game?.legionUpkeep||80)+activeCavalry(D.cavalry||DEF_CAVALRY).length*(D.game?.cavalryUpkeep||DEF_GAME.cavalryUpkeep)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetUpkeep||DEF_GAME.fleetUpkeep);
+  const upkeepF=activeLegs.length*(D.game?.legionFood||60)+activeCavalry(D.cavalry||DEF_CAVALRY).length*(D.game?.cavalryFood||DEF_GAME.cavalryFood)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetFood||DEF_GAME.fleetFood);
   const pendingMotions=(D.motions||[]).filter(m=>m.status==="pending");
   const newOrders=(D.orders||[]).filter(o=>o.status==="pending");
   const vacant=Object.keys(POS).filter(k=>!(D.players||[]).find(p=>p.role===k));
@@ -1213,10 +1222,10 @@ function ALegions({D,onRefresh}){
         <Row gap="0.5rem" wrap><Btn v="green" onClick={recruitNew}>＋ Recruit New Legion</Btn><Btn v="dark" onClick={addLegion}>＋ Add Legion</Btn><Btn v="blue" onClick={addCav}>＋ Add Cavalry</Btn><Btn onClick={addFleet}>＋ Add Fleet</Btn><Btn onClick={save}>💾 Save Military Data</Btn></Row>
       </Card>
       <Card><STit c="Legions" sub="Assign commanders and army commands here."/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:"0.6rem"}}>
           {legs.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {l.name}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>
               {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander",l.commander,v=>updLeg(i,"commander",v))}{field("Army Command",l.armyCommand,v=>updLeg(i,"armyCommand",v))}{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
               <div><Lbl c="Status"/><select value={l.status} onChange={e=>updLeg(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.35rem 0.5rem",fontFamily:"'Cinzel',serif"}}><option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option></select></div>
             </div>
@@ -1224,18 +1233,18 @@ function ALegions({D,onRefresh}){
         </div>
       </Card>
       <Card><STit c="Cavalry" sub="Extra mobile units for reconnaissance, pursuit and Magister Equitum operations."/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:"0.6rem"}}>
           {cav.map((c,i)=><div key={`${c.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.blue}`,padding:"0.75rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.blue}}>🐎 {c.name}</b><Btn v="red" sm onClick={()=>remove(setCav,i,"cavalry unit")}>Remove</Btn></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>{field("Unit ID",c.id,v=>updCav(i,"id",v))}{field("Unit Name",c.name,v=>updCav(i,"name",v))}{field("Strength",c.str,v=>updCav(i,"str",v),"number")}{field("Max Riders",c.max,v=>updCav(i,"max",v),"number")}{field("Location",c.location,v=>updCav(i,"location",v))}{field("Commander",c.commander,v=>updCav(i,"commander",v))}{field("Army Command",c.armyCommand,v=>updCav(i,"armyCommand",v))}</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>{field("Unit ID",c.id,v=>updCav(i,"id",v))}{field("Unit Name",c.name,v=>updCav(i,"name",v))}{field("Strength",c.str,v=>updCav(i,"str",v),"number")}{field("Max Riders",c.max,v=>updCav(i,"max",v),"number")}{field("Location",c.location,v=>updCav(i,"location",v))}{field("Commander",c.commander,v=>updCav(i,"commander",v))}{field("Army Command",c.armyCommand,v=>updCav(i,"armyCommand",v))}</div>
           </div>)}
         </div>
       </Card>
       <Card><STit c="Fleets" sub="Manage Roman naval forces: triremes, bases, commanders, missions and maintenance."/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:"0.6rem"}}>
           {fleets.map((f,i)=><div key={`${f.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.gold}`,padding:"0.75rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.ghi}}>🚢 {f.name}</b><Btn v="red" sm onClick={()=>remove(setFleets,i,"fleet")}>Remove</Btn></div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>{field("Fleet ID",f.id,v=>updFleet(i,"id",v))}{field("Fleet Name",f.name,v=>updFleet(i,"name",v))}{field("Triremes",f.triremes??f.ships??0,v=>updFleet(i,"triremes",v),"number")}{field("Base / Location",f.location,v=>updFleet(i,"location",v))}{field("Commander",f.commander,v=>updFleet(i,"commander",v))}<div><Lbl c="Status"/><select value={f.status} onChange={e=>updFleet(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,padding:"0.35rem 0.5rem"}}><option value="active">Active</option><option value="repairing">Repairing</option><option value="destroyed">Destroyed</option></select></div></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>{field("Fleet ID",f.id,v=>updFleet(i,"id",v))}{field("Fleet Name",f.name,v=>updFleet(i,"name",v))}{field("Triremes",f.triremes??f.ships??0,v=>updFleet(i,"triremes",v),"number")}{field("Base / Location",f.location,v=>updFleet(i,"location",v))}{field("Commander",f.commander,v=>updFleet(i,"commander",v))}<div><Lbl c="Status"/><select value={f.status} onChange={e=>updFleet(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,padding:"0.35rem 0.5rem"}}><option value="active">Active</option><option value="repairing">Repairing</option><option value="destroyed">Destroyed</option></select></div></div>
             <div style={{marginTop:"0.45rem"}}>{field("Mission",f.mission,v=>updFleet(i,"mission",v))}</div><div style={{fontSize:"0.95rem",color:T.mut,marginTop:"0.35rem"}}>💰 Maintenance: {fmt((f.triremes??f.ships??0)*((D.game||DEF_GAME).fleetUpkeep||0))}T / {fmt((f.triremes??f.ships??0)*((D.game||DEF_GAME).fleetFood||0))}M per turn</div>
           </div>)}
         </div>
@@ -1313,9 +1322,9 @@ function AResources({D,onRefresh}){
   if(!g||!regs)return null;
   const inc=calcInc(regs);
   const activeLegs=activeLegions(D.legions||[]);
-  const upkeepG=activeLegs.length*g.legionUpkeep+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetUpkeep||0);
-  const upkeepF=activeLegs.length*g.legionFood+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetFood||0);
-  const snap=economySnapshot(g,regs,D.legions||DEF_LEGIONS,D.fleets||DEF_FLEETS);
+  const upkeepG=activeLegs.length*g.legionUpkeep+activeCavalry(D.cavalry||DEF_CAVALRY).length*(g.cavalryUpkeep||0)+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetUpkeep||0);
+  const upkeepF=activeLegs.length*g.legionFood+activeCavalry(D.cavalry||DEF_CAVALRY).length*(g.cavalryFood||0)+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetFood||0);
+  const snap=economySnapshot(g,regs,D.legions||DEF_LEGIONS,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS);
   const updReg=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:k==="s"?v:(k==="name"||k==="id"||k==="capital"?v:Number(v))}:r));
   const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",capital:"New Capital",pop:50000,bG:50,bF:50,s:"roman"}]);
   const delRegion=i=>{if(confirm("Delete this province/region?"))setRegs(rs=>rs.filter((_,j)=>j!==i));};
@@ -1333,7 +1342,7 @@ function AResources({D,onRefresh}){
     await db.set("spqr_l",nl);
     const ng={...g,gold:Math.max(0,gold),food:Math.max(0,food),pop,year:newYear,season:newSeason,sessionInSeason:newSess,session};
     const hist=await db.get("spqr_econ")||[];
-    await db.set("spqr_econ",[...hist,economySnapshot(ng,regs,nl)].slice(-24));
+    await db.set("spqr_econ",[...hist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)].slice(-24));
     await db.set("spqr_g",ng);
     await db.set("spqr_deadline",null);
     setG(ng);setConfirmAdv(false);setMsg("Session advanced.");
@@ -1348,13 +1357,13 @@ function AResources({D,onRefresh}){
   };
   const restartGame=async()=>{
     if(!confirm("Restart the campaign? This will reset resources, legions, regions, motions, orders, deadlines, elections and notifications. Senators and setup images/links are kept."))return;
-    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);
+    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_CAVALRY,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);
     setG(DEF_GAME);setRegs(DEF_REGIONS.map(r=>({...r})));setMsg("Game restarted.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   return <div>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem",fontSize:"1rem"}}>{msg}</div>}
     <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are integrated. One campaign year has five seasons: Spring, Early Summer, High Summer, Autumn and Winter."/>
-      <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
+      <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
         <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
       </div>
       <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
@@ -1363,7 +1372,7 @@ function AResources({D,onRefresh}){
     {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(SEASONS.indexOf(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${inc.gold}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${inc.food}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+inc.gold-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+inc.food-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
     <Card><STit c="Edit Stockpile and Legion Costs"/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"],["fleetUpkeep","Gold Upkeep / Trireme"],["fleetFood","Food Upkeep / Trireme"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"1.05rem"}}/></div>)}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"],["cavalryUpkeep","Gold Upkeep / Cavalry Unit"],["cavalryFood","Food Upkeep / Cavalry Unit"],["fleetUpkeep","Gold Upkeep / Trireme"],["fleetFood","Food Upkeep / Trireme"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"1.05rem"}}/></div>)}</div>
       <Btn onClick={save}>💾 Save Resources and Regions</Btn>
     </Card>
     <Card><STit c="Edit Provinces / Regions"/><Row gap="0.5rem" wrap><Btn v="green" onClick={addRegion}>＋ Add Province</Btn><Btn onClick={save}>💾 Save</Btn></Row></Card>
