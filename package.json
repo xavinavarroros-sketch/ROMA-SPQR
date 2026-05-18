@@ -1,23 +1,12 @@
-{
-  "name": "spqr-railway-app",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "start": "serve -s dist -l tcp://0.0.0.0:$PORT"
-  },
-  "dependencies": {
-    "@vitejs/plugin-react": "4.3.4",
-    "vite": "5.4.11",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "serve": "14.2.4"
-  },
-  "devDependencies": {},
-  "engines": {
-    "node": ">=18.20.0"
-  }
-}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SPQR Webapp</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

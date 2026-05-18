@@ -4,96 +4,105 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-size:18px;-webkit-text-size-adjust:100%}
-body{background:#F6EFE4;color:#26160F;font-family:'EB Garamond',serif;font-size:1rem;line-height:1.45}
+html{font-size:20px;-webkit-text-size-adjust:100%}
+body{background:#F6EFE4;color:#26160F;font-family:'EB Garamond',serif;font-size:1.05rem;line-height:1.55}
 img{max-width:100%}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#F6EFE4}::-webkit-scrollbar-thumb{background:#A32020}
 input,select,textarea,button{outline:none;font-size:1rem}
 button{cursor:pointer}
-@media(max-width:720px){html{font-size:17px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
+@media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
 `;
 const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A32020",
   gold:"#B9872B",ghi:"#8C5F16",red:"#A32020",rhi:"#D63A2E",
   green:"#2F7D32",gre:"#46A04A",blue:"#284B7A",
-  text:"#26160F",mut:"#6B5948",fnt:"#BFAE99"};
+  text:"#26160F",mut:"#4A382B",fnt:"#BFAE99"};
 
 /* ══ POSITIONS ════════════════════════════════════════════════════════════ */
 const POS={
-  consul_1:{title:"Consul I",abbr:"COS I",color:"#E05050",bg:"#1a0505",
-    desc:"Supreme magistrate of Rome. Commands all legions and presides over the Senate with imperium maius.",
-    can:["Submit one military order per session","Propose any Senate motion","Command all active legions","Declare war (requires Senate vote)","Veto any lesser magistrate's decision"],
-    cannot:["Declare war alone without Senate","Serve more than one year","Raise legions without Senate vote","Re-take office for 10 years"]},
-  consul_2:{title:"Consul II",abbr:"COS II",color:"#E05050",bg:"#1a0505",
-    desc:"Co-equal supreme magistrate sharing command and authority with Consul I.",
-    can:["Submit one military order per session","Propose any Senate motion","Command all active legions"],
-    cannot:["Overrule Consul I without Senate","Serve more than one year","Re-take office for 10 years"]},
-  praetor_1:{title:"Praetor Urbanus",abbr:"PR I",color:"#B060F0",bg:"#150820",
-    desc:"Chief judicial magistrate. Governs Rome in the Consuls' absence. Administers law over citizens.",
-    can:["Submit one administrative order per session","Govern Rome when Consuls are absent","Propose legal and civic motions","Command a legion if assigned by Consuls"],
-    cannot:["Override Consular decisions","Declare war independently","Spend treasury without Senate authorization"]},
-  praetor_2:{title:"Praetor Peregrinus",abbr:"PR II",color:"#B060F0",bg:"#150820",
-    desc:"Oversees non-citizen affairs and outlying territories at the Senate's direction.",
-    can:["Submit one provincial order per session","Propose foreign affairs motions","Manage non-citizen disputes"],
-    cannot:["Override senior magistrates","Command legions without Consular authorization"]},
-  censor_1:{title:"Censor I",abbr:"CEN I",color:"#9050D0",bg:"#120818",
-    desc:"Guardian of the Roman census. Controls citizen rolls, social class, and the military levy.",
-    can:["Submit one census order per session","Propose levy and recruitment motions","View full population data","Authorize raising legions (Senate vote required)"],
-    cannot:["Raise legions unilaterally","Command armies in the field","Spend gold directly"]},
-  censor_2:{title:"Censor II",abbr:"CEN II",color:"#9050D0",bg:"#120818",
-    desc:"Co-censor overseeing public contracts, construction, and citizen conduct.",
-    can:["Submit one civic order per session","Propose public works motions","Assist in levy and recruitment"],
-    cannot:["Act alone on census matters","Command armies","Override Censor I"]},
-  quaestor_1:{title:"Quaestor I",abbr:"Q I",color:"#D09020",bg:"#140e00",
-    desc:"Keeper of the Treasury (Aerarium Saturni). No major expense moves without the Quaestor's seal.",
-    can:["Submit one treasury order per session","Propose financial and tax motions","View full treasury and income data","Flag or challenge major expenditures"],
-    cannot:["Spend gold without Senate authorization","Command legions","Override any senior magistrate"]},
-  quaestor_2:{title:"Quaestor II",abbr:"Q II",color:"#D09020",bg:"#140e00",
-    desc:"Military paymaster managing legion supply, payroll, and military expenditures.",
-    can:["Submit one supply order per session","Propose military expenditure motions","View legion upkeep and supply costs"],
-    cannot:["Command legions","Override Quaestor I","Access civilian treasury directly"]},
-  aedile_1:{title:"Aedile Curule",abbr:"AED",color:"#40A030",bg:"#061406",
-    desc:"Manager of Rome's grain supply and city logistics. If the grain runs out, Rome starves — the Aedile prevents that.",
-    can:["Submit one logistics order per session","Propose food supply and market motions","Monitor food consumption across legions","Manage grain distribution to the city"],
-    cannot:["Command legions","Access the gold treasury independently","Override financial magistrates"]},
-  tribune_1:{title:"Tribune I",abbr:"TR I",color:"#4080C0",bg:"#060e18",
-    desc:"Sacred protector of the plebs. Possesses absolute veto over any Senate motion. Their person is sacrosanct — inviolable.",
-    can:["VETO any Senate motion — absolute, no override possible","Propose plebeian motions","Submit one order per session","Intercede to protect any citizen from magistrate abuse"],
-    cannot:["Command armies in the field","Be overridden by any magistrate — not even Consuls","Be prosecuted or physically harmed while in office"]},
-  tribune_2:{title:"Tribune II",abbr:"TR II",color:"#4080C0",bg:"#060e18",
-    desc:"Co-tribune sharing the absolute veto power. Two tribunes acting together cannot be overridden by any force.",
-    can:["VETO any Senate motion — absolute, no override possible","Propose plebeian motions","Submit one order per session","Protect any plebeian citizen"],
-    cannot:["Command armies","Be overridden by any magistrate","Be prosecuted or harmed while in office"]},
+  consul_1:{emoji:"🦅",title:"Consul I",abbr:"COS I",color:"#B91C1C",bg:"#FFF1F1",
+    desc:"Supreme magistrate of Rome. Commands the legions, leads the Senate and directs the Republic during war.",
+    can:["🛡️ Submit one military order per turn","🏛️ Lead Senate policy and emergency debate","⚔️ Command active legions in the field","📜 Propose major war measures","🚫 Veto lesser magistrates when justified by office"],
+    cannot:["👑 Act as king or ignore the Senate forever","⚖️ Declare war without political authority","💰 Spend the treasury without approval","♾️ Hold power permanently"]},
+  consul_2:{emoji:"🦅",title:"Consul II",abbr:"COS II",color:"#B91C1C",bg:"#FFF1F1",
+    desc:"Co-equal Consul sharing supreme authority with Consul I. Rome divides power to prevent tyranny.",
+    can:["🛡️ Submit one military order per turn","⚔️ Command active legions","🏛️ Lead Senate debate with Consul I","🤝 Check or support the other Consul"],
+    cannot:["👑 Rule alone","⚖️ Overrule the Senate by personal will","💰 Spend the treasury without approval","♾️ Hold power permanently"]},
+  praetor_1:{emoji:"⚖️",title:"Praetor Urbanus",abbr:"PR I",color:"#7C3AED",bg:"#F5F0FF",
+    desc:"Chief judicial magistrate of Rome. Oversees law, courts, civic order and administration inside the city.",
+    can:["⚖️ Submit one legal or administrative order","🏛️ Govern Rome when Consuls are absent","📜 Propose legal and civic motions","🛡️ Command troops only if assigned"],
+    cannot:["🦅 Override Consuls in military command","⚔️ Declare war independently","💰 Spend gold without authority"]},
+  praetor_2:{emoji:"🌍",title:"Praetor Peregrinus",abbr:"PR II",color:"#7C3AED",bg:"#F5F0FF",
+    desc:"Handles foreign citizens, allied disputes, provincial administration and matters beyond Rome itself.",
+    can:["🌍 Submit one foreign or provincial order","🤝 Manage allied and non-citizen disputes","📜 Propose foreign affairs motions","🛡️ Command troops only if assigned"],
+    cannot:["🦅 Override senior magistrates","⚔️ Command legions without authorization","💰 Spend provincial funds freely"]},
+  quaestor_1:{emoji:"💰",title:"Quaestor I",abbr:"Q I",color:"#B7791F",bg:"#FFF7E6",
+    desc:"Financial magistrate of the Republic. Shares responsibility for treasury, payments, supplies and military expenses.",
+    can:["💰 Submit one treasury or supply order","📊 View income, stockpiles and costs","🧾 Propose taxes, payments and funding plans","⚔️ Organize legion pay and supply spending"],
+    cannot:["⚔️ Command armies","👑 Override elected senior magistrates","💸 Spend unlimited gold without Senate authority"]},
+  quaestor_2:{emoji:"💰",title:"Quaestor II",abbr:"Q II",color:"#B7791F",bg:"#FFF7E6",
+    desc:"Financial magistrate of the Republic. Shares responsibility for treasury, payments, supplies and military expenses.",
+    can:["💰 Submit one treasury or supply order","📊 View income, stockpiles and costs","🧾 Propose taxes, payments and funding plans","⚔️ Organize legion pay and supply spending"],
+    cannot:["⚔️ Command armies","👑 Override elected senior magistrates","💸 Spend unlimited gold without Senate authority"]},
+  aedile_1:{emoji:"🌾",title:"Aedile Curule",abbr:"AED",color:"#2F7D32",bg:"#F0FFF4",
+    desc:"Manager of grain, food supply, public markets, city logistics and public order in Rome.",
+    can:["🌾 Submit one food or logistics order","🏪 Regulate markets and grain distribution","👥 Manage city stability and public order","📜 Propose food and infrastructure motions"],
+    cannot:["⚔️ Command legions","💰 Spend treasury independently","🌍 Decide foreign policy alone"]},
+  tribune_1:{emoji:"🛡️",title:"Tribune I",abbr:"TR I",color:"#2563EB",bg:"#EFF6FF",
+    desc:"Sacred protector of the plebs. Possesses veto power and protects citizens from abuse.",
+    can:["🚫 Veto Senate motions when defending the plebs","🛡️ Intercede for citizens against abuse","📣 Propose plebeian motions","👥 Mobilize popular pressure"],
+    cannot:["⚔️ Command armies in the field","👑 Act as king of the people","💰 Spend the treasury"]},
+  tribune_2:{emoji:"🛡️",title:"Tribune II",abbr:"TR II",color:"#2563EB",bg:"#EFF6FF",
+    desc:"Co-tribune sharing the sacred duty to protect the plebs and resist abusive power.",
+    can:["🚫 Veto Senate motions when defending the plebs","🛡️ Protect plebeian citizens","📣 Propose plebeian motions","👥 Mobilize popular pressure"],
+    cannot:["⚔️ Command armies","👑 Rule outside the law","💰 Spend the treasury"]},
+  dictator_1:{emoji:"⚡",title:"Dictator",abbr:"DICT",color:"#7F1D1D",bg:"#FFF1F2",
+    desc:"Emergency magistrate appointed only in the gravest crisis. Holds extraordinary authority for a limited mandate.",
+    can:["⚡ Submit one emergency order","🛡️ Coordinate the full crisis response","⚔️ Direct military priorities during the emergency","⏳ Act quickly when Rome cannot wait"],
+    cannot:["♾️ Hold office permanently","👑 Declare himself king","📜 Ignore the limited emergency mandate","🛡️ Abolish the Senate"]},
+  magister_equitum_1:{emoji:"🐎",title:"Magister Equitum",abbr:"MAG EQ",color:"#0F766E",bg:"#ECFEFF",
+    desc:"Master of Horse. Deputy to an emergency command, focused on cavalry, mobility and rapid military operations.",
+    can:["🐎 Submit one cavalry or rapid response order","⚔️ Organize scouts, cavalry and mobile detachments","🛡️ Support the Dictator or Consuls in campaign logistics","📍 React to fast-moving threats"],
+    cannot:["👑 Override the supreme magistrate","💰 Spend freely without approval","🏛️ Rule the Senate","♾️ Keep emergency command forever"]},
 };
 
 // Physical senate seating positions (col 0-8, row 0-6 on 9×7 grid)
-const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},praetor_1:{c:3,r:2},praetor_2:{c:5,r:2},
-  censor_1:{c:1,r:2},censor_2:{c:7,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},
-  aedile_1:{c:4,r:4},tribune_1:{c:2,r:5},tribune_2:{c:6,r:5}};
+const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},dictator_1:{c:4,r:2},magister_equitum_1:{c:4,r:3},praetor_1:{c:2,r:2},praetor_2:{c:6,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},aedile_1:{c:4,r:5},tribune_1:{c:2,r:6},tribune_2:{c:6,r:6}};
 
 /* ══ GAME DATA ════════════════════════════════════════════════════════════ */
-const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Summer",
-  gold:2200,food:3200,pop:175000,legionUpkeep:110,legionFood:90,lgold:550,lfood:450,lpop:5000,lturns:2};
+const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
+  gold:1800,food:2800,pop:175000,legionUpkeep:125,legionFood:110,fleetUpkeep:2,fleetFood:1,lgold:650,lfood:550,lpop:5000,lturns:2};
 
 const DEF_LEGIONS=["I","II","III","IV"].map((id)=>
-  ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma"}));
+  ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Italian Field Army"}));
+
+const DEF_CAVALRY=[
+  {id:"eq_1",name:"Equites Consulares",str:1200,max:1200,status:"active",location:"Roma",commander:"Unassigned",armyCommand:"Italian Field Army"},
+  {id:"eq_2",name:"Socii Equites",str:900,max:900,status:"active",location:"Capua",commander:"Unassigned",armyCommand:"Campanian Reserve"},
+];
+
+const DEF_FLEETS=[
+  {id:"classis_ostia",name:"Classis Ostiensis",triremes:45,status:"active",location:"Ostia",commander:"Unassigned",mission:"Defend the Tiber and Tyrrhenian coast"},
+  {id:"classis_sicilia",name:"Classis Siciliensis",triremes:60,status:"active",location:"Syracusae",commander:"Unassigned",mission:"Secure Sicily and watch Carthaginian movements"},
+];
 
 const DEF_REGIONS=[
-  {id:"latium",   name:"Latium",        bG:200,bF:150,s:"roman"},
-  {id:"campania", name:"Campania",       bG:300,bF:200,s:"roman"},
-  {id:"etruria",  name:"Etruria",        bG:180,bF:120,s:"roman"},
-  {id:"samnium",  name:"Samnium",        bG:120,bF:100,s:"roman"},
-  {id:"apulia",   name:"Apulia",         bG:150,bF:180,s:"roman"},
-  {id:"calabria", name:"Calabria",       bG:100,bF:130,s:"roman"},
-  {id:"bruttium", name:"Bruttium",       bG:80, bF:100,s:"roman"},
-  {id:"lucania",  name:"Lucania",        bG:90, bF:120,s:"roman"},
-  {id:"umbria",   name:"Umbria",         bG:120,bF:100,s:"roman"},
-  {id:"picenum",  name:"Picenum",        bG:100,bF:80, s:"roman"},
-  {id:"cisalpine",name:"Cisalpine Gaul", bG:50, bF:80, s:"contested"},
-  {id:"sicily",   name:"Sicily",         bG:250,bF:300,s:"roman"},
-  {id:"sardinia", name:"Sardinia",       bG:100,bF:120,s:"roman"},
+  {id:"latium",name:"Latium",capital:"Roma",pop:175000,bG:180,bF:140,s:"roman"},
+  {id:"etruria",name:"Etruria",capital:"Arretium",pop:260000,bG:160,bF:110,s:"roman"},
+  {id:"umbria",name:"Umbria",capital:"Spoletium",pop:150000,bG:105,bF:90,s:"roman"},
+  {id:"picenum",name:"Picenum",capital:"Ancona",pop:120000,bG:90,bF:85,s:"roman"},
+  {id:"samnium",name:"Samnium",capital:"Bovianum",pop:210000,bG:115,bF:105,s:"roman"},
+  {id:"campania",name:"Campania",capital:"Capua",pop:360000,bG:260,bF:210,s:"roman"},
+  {id:"apulia",name:"Apulia",capital:"Luceria",pop:220000,bG:130,bF:190,s:"roman"},
+  {id:"lucania",name:"Lucania",capital:"Grumentum",pop:130000,bG:80,bF:115,s:"roman"},
+  {id:"bruttium",name:"Bruttium",capital:"Consentia",pop:120000,bG:70,bF:105,s:"roman"},
+  {id:"calabria",name:"Calabria",capital:"Tarentum",pop:170000,bG:95,bF:130,s:"roman"},
+  {id:"sicilia",name:"Sicilia",capital:"Syracusae",pop:650000,bG:230,bF:310,s:"roman"},
+  {id:"sardinia_corsica",name:"Sardinia et Corsica",capital:"Caralis",pop:300000,bG:110,bF:130,s:"roman"},
+  {id:"gallia_cisalpina",name:"Gallia Cisalpina",capital:"Placentia",pop:420000,bG:55,bF:90,s:"contested"},
+  {id:"illyria",name:"Illyrian Coast",capital:"Scodra",pop:90000,bG:50,bF:60,s:"contested"},
 ];
 const RS={roman:{l:"Roman Control",c:"#40A030",m:1.0},contested:{l:"Contested",c:"#C8922A",m:0.5},
-  sacked:{l:"Sacked",c:"#E05050",m:0.1},devastated:{l:"Devastated",c:"#CC6622",m:0.25},enemy:{l:"Enemy Control",c:"#880020",m:0.0}};
+  sacked:{l:"Sacked",c:"#E05050",m:0.1},devastated:{l:"Devastated",c:"#CC6622",m:0.25},enemy:{l:"🐘 Carthaginian Control",c:"#880020",m:0.0}};
 
 const LAWS=[
   {t:"Lex Duodecim Tabularum (451 BC) — The Twelve Tables",b:"The foundation of Roman law. Citizens may not be punished without trial. All citizens are equal before these written laws. Justice must be seen, not merely administered in darkness."},
@@ -107,7 +116,7 @@ const LAWS=[
 ];
 
 const ADMIN_PASS="SPQR_GM_218BC";
-const SEASONS=["Spring","Summer","Autumn","Winter"];
+const SEASONS=["Spring","Early Summer","High Summer","Autumn","Winter"];
 
 /* ══ STORAGE & UTILS ══════════════════════════════════════════════════════ */
 const db={
@@ -116,29 +125,41 @@ const db={
   async gP(k){return this.get(k,false);},
   async sP(k,v){return this.set(k,v,false);},
 };
-const sLab=g=>`${g.year} BC ${g.season} S${g.sessionInSeason}`;
+const sLab=g=>`${g.year} BC · ${g.season} · Turn ${g.session||1}`;
+const normalizeElections=(multi,legacy)=>{
+  const arr=Array.isArray(multi)?multi.filter(Boolean):[];
+  if(legacy&&legacy.status!=="closed"&&!arr.some(e=>e.id===legacy.id))arr.push(legacy);
+  return arr;
+};
 const fmt=n=>Number(n||0).toLocaleString();
 const calcInc=regs=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=r.bG*m;f+=r.bF*m;});return{gold:Math.floor(g),food:Math.floor(f)};};
 const compress=(file,mx=600)=>new Promise(res=>{const c=document.createElement('canvas'),img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(mx/img.width,mx/img.height,1);c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',0.75));};img.src=u;});
 const pushN=async(title,body,forId="all")=>{const all=await db.get("spqr_n")||[];all.push({id:Date.now()+Math.random().toString(36).slice(2),title,body,for:forId,ts:Date.now()});await db.set("spqr_n",all.slice(-200));};
 
 const activeLegions=legs=>(legs||[]).filter(l=>l.status==="active");
-const economySnapshot=(game,regions,legions)=>{
+const activeFleets=fleets=>(fleets||[]).filter(f=>f.status==="active");
+const fleetTriremes=fleets=>activeFleets(fleets).reduce((sum,f)=>sum+Number(f.triremes??f.ships??0),0);
+const economySnapshot=(game,regions,legions,fleets=DEF_FLEETS)=>{
   const g={...DEF_GAME,...(game||{})};
   const inc=calcInc(regions||DEF_REGIONS);
   const act=activeLegions(legions||DEF_LEGIONS);
-  const upkeepG=act.length*(g.legionUpkeep||0);
-  const upkeepF=act.length*(g.legionFood||0);
-  return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,ts:Date.now()};
+  const triremes=fleetTriremes(fleets||DEF_FLEETS);
+  const legionGoldUpkeep=act.length*(g.legionUpkeep||0);
+  const legionFoodUpkeep=act.length*(g.legionFood||0);
+  const fleetGoldUpkeep=triremes*(g.fleetUpkeep||0);
+  const fleetFoodUpkeep=triremes*(g.fleetFood||0);
+  const upkeepG=legionGoldUpkeep+fleetGoldUpkeep;
+  const upkeepF=legionFoodUpkeep+fleetFoodUpkeep;
+  return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,legionGoldUpkeep,legionFoodUpkeep,fleetGoldUpkeep,fleetFoodUpkeep,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,activeTriremes:triremes,ts:Date.now()};
 };
 const roleEntries=()=>Object.entries(POS).map(([key,pos])=>({key,...pos}));
 const getPlayerName=(players,id)=>players.find(p=>p.id===id)?.latinName||"Unknown Senator";
 
 
 /* ══ SHARED UI ════════════════════════════════════════════════════════════ */
-const Lbl=({c})=><div style={{color:T.mut,fontSize:"0.68rem",letterSpacing:"0.14em",fontFamily:"'Cinzel',serif",marginBottom:"0.22rem",textTransform:"uppercase"}}>{c}</div>;
+const Lbl=({c})=><div style={{color:T.mut,fontSize:"0.9rem",letterSpacing:"0.14em",fontFamily:"'Cinzel',serif",marginBottom:"0.22rem",textTransform:"uppercase"}}>{c}</div>;
 function Inp({label,value,onChange,type="text",placeholder="",rows,disabled}){
-  const s={width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"0.95rem",opacity:disabled?0.6:1};
+  const s={width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"1.05rem",opacity:disabled?0.6:1};
   return(<div style={{marginBottom:"0.8rem"}}>{label&&<Lbl c={label}/>}{rows?<textarea value={value} onChange={e=>onChange(e.target.value)} rows={rows} placeholder={placeholder} style={{...s,resize:"vertical"}} disabled={disabled}/>:<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={s} disabled={disabled}/>}</div>);
 }
 function Btn({children,onClick,v="gold",sm,full,disabled}){
@@ -147,11 +168,11 @@ function Btn({children,onClick,v="gold",sm,full,disabled}){
   return(<button onClick={onClick} disabled={disabled} style={{padding:sm?"0.26rem 0.55rem":"0.48rem 1rem",background:bg,color:c,border:`1px solid ${T.border}`,fontFamily:"'Cinzel',serif",fontSize:sm?"0.65rem":"0.74rem",letterSpacing:"0.08em",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.45:1,width:full?"100%":"auto",fontWeight:600,whiteSpace:"nowrap"}}>{children}</button>);
 }
 const Card=({children,style={}})=><div style={{background:T.card,border:`1px solid ${T.border}`,padding:"0.9rem",marginBottom:"0.6rem",...style}}>{children}</div>;
-const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",background:`${color}22`,border:`1px solid ${color}`,color,padding:sm?"0.05rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.6rem":"0.66rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{c}</span>;
-const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.78rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
+const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",background:`${color}22`,border:`1px solid ${color}`,color,padding:sm?"0.05rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{c}</span>;
+const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.9rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
 const Row=({children,gap="0.4rem",wrap})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:wrap?"wrap":"nowrap"}}>{children}</div>;
-const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.3rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.6rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
-function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.3rem"}}>✕</button></div>{children}</div></div>);}
+const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.55rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.72rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
+function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.55rem"}}>✕</button></div>{children}</div></div>);}
 
 /* ══ NOTIFICATION BELL ════════════════════════════════════════════════════ */
 function NotifBell({userId}){
@@ -276,7 +297,7 @@ function SenateMap({players,onSelectPlayer}){
                 <>
                   <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:holder?posInfo.color:posInfo.color+"88",textAlign:"center",letterSpacing:"0.05em",lineHeight:1.2,marginBottom:2}}>{posInfo.abbr}</div>
                   {holder?.avatar&&<img src={holder.avatar} style={{width:30,height:30,objectFit:"cover",borderRadius:"50%",border:`1px solid ${posInfo.color}`}} alt=""/>}
-                  {!holder&&<div style={{fontSize:"0.6rem",color:posInfo.color+"66",fontFamily:"'Cinzel',serif",textAlign:"center",lineHeight:1}}>vacant</div>}
+                  {!holder&&<div style={{fontSize:"0.72rem",color:posInfo.color+"66",fontFamily:"'Cinzel',serif",textAlign:"center",lineHeight:1}}>vacant</div>}
                   {holder&&!holder.avatar&&<div style={{width:30,height:30,background:`${posInfo.color}33`,border:`1px solid ${posInfo.color}`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.55rem",color:posInfo.color,fontFamily:"'Cinzel',serif"}}>{holder.latinName?.[0]||"?"}</div>}
                 </>
               )}
@@ -301,11 +322,11 @@ function SenateMap({players,onSelectPlayer}){
               {hov.player.avatar&&<img src={hov.player.avatar} style={{width:48,height:48,objectFit:"cover",border:`1px solid ${T.bhi}`,marginBottom:"0.4rem",display:"block"}} alt=""/>}
               <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"0.82rem",fontWeight:600}}>{hov.player.latinName}</div>
               <div style={{color:T.mut,fontSize:"0.75rem",marginTop:"0.15rem"}}>{hov.player.charClass}</div>
-              {hov.player.discord&&<div style={{color:"#7289DA",fontSize:"0.72rem",marginTop:"0.15rem"}}>Discord: {hov.player.discord}</div>}
+              {hov.player.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem",marginTop:"0.15rem"}}>Discord: {hov.player.discord}</div>}
               {!hov.posInfo&&<div style={{color:T.fnt,fontSize:"0.7rem",marginTop:"0.15rem",fontStyle:"italic"}}>Senator</div>}
             </>
           )}
-          {hov.posInfo&&!hov.player&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.78rem"}}>— Vacant —</div>}
+          {hov.posInfo&&!hov.player&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>— Vacant —</div>}
         </div>
       )}
       <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginTop:"0.75rem",justifyContent:"center"}}>
@@ -336,7 +357,7 @@ function VotingGrid({motion,players}){
           );
         })}
       </div>
-      <div style={{display:"flex",gap:"1rem",marginTop:"0.5rem",fontSize:"0.78rem",color:T.mut}}>
+      <div style={{display:"flex",gap:"1rem",marginTop:"0.5rem",fontSize:"0.9rem",color:T.mut}}>
         <span style={{color:T.gre}}>✓ YEA: {Object.values(motion.votes||{}).filter(v=>v==="yea").length}</span>
         <span style={{color:T.rhi}}>✗ NAY: {Object.values(motion.votes||{}).filter(v=>v==="nay").length}</span>
         <span>⟳ NOT VOTED: {players.length-Object.keys(motion.votes||{}).length}</span>
@@ -367,7 +388,7 @@ function SenatePanel({players,D}){
               <div key={p.id} onClick={()=>setSelected(p)} style={{display:"flex",gap:"0.75rem",alignItems:"center",padding:"0.65rem",background:T.bg,border:`1px solid ${pos?pos.color+"66":T.fnt}`,cursor:"pointer"}}>
                 {p.avatar?<img src={p.avatar} style={{width:54,height:54,objectFit:"cover",borderRadius:"50%",border:`2px solid ${pos?pos.color:T.border}`,flexShrink:0}} alt=""/>:<div style={{width:54,height:54,background:`${pos?pos.color:T.fnt}33`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",color:pos?pos.color:T.mut,fontFamily:"'Cinzel',serif",flexShrink:0}}>{p.latinName?.[0]||"?"}</div>}
                 <div style={{minWidth:0}}>
-                  <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"0.95rem",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.latinName}</div>
+                  <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"1.05rem",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.latinName}</div>
                   <div style={{color:T.mut,fontSize:"0.85rem"}}>{p.charClass}{p.discord&&<span style={{color:"#7289DA",marginLeft:"0.4rem"}}>{p.discord}</span>}</div>
                   {pos&&<Badge c={pos.title} color={pos.color} sm/>}
                 </div>
@@ -424,8 +445,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         </div>}
         <Inp label="Motion Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Raise Legio VII immediately" disabled={motionLocked}/>
         <Inp label="Motion Text — be specific and persuasive" value={form.body} onChange={v=>setForm(f=>({...f,body:v}))} rows={3} disabled={motionLocked}/>
-        {err&&<div style={{color:T.rhi,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{err}</div>}
-        {ok&&<div style={{color:T.gre,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{ok}</div>}
+        {err&&<div style={{color:T.rhi,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{err}</div>}
+        {ok&&<div style={{color:T.gre,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{ok}</div>}
         <Btn onClick={propose} disabled={motionLocked}>{motionLocked?"Motion Already Submitted This Turn":"Submit to GM for Approval"}</Btn>
       </Card>
       {/* Active votes */}
@@ -442,12 +463,12 @@ function VotingPanel({motions,players,user,game,onRefresh}){
                 <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:600}}>{m.title}</div>
                 <Badge c="OPEN TO VOTE" color={T.gold}/>
               </div>
-              <div style={{color:T.mut,fontSize:"0.72rem",fontFamily:"'Cinzel',serif",marginBottom:"0.4rem"}}>Proposed by {m.byName} · {m.session||""}</div>
+              <div style={{color:T.mut,fontSize:"0.9rem",fontFamily:"'Cinzel',serif",marginBottom:"0.4rem"}}>Proposed by {m.byName} · {m.session||""}</div>
               <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,marginBottom:"0.65rem"}}>{m.body}</div>
               {!myVote?<Row gap="0.5rem"><Btn v="green" sm onClick={()=>vote(m.id,"yea")}>✓ AYE</Btn><Btn v="crimson" sm onClick={()=>vote(m.id,"nay")}>✗ NAY</Btn></Row>
                 :<div style={{color:myVote==="yea"?T.gre:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.8rem"}}>You voted {myVote.toUpperCase()}</div>}
               <div style={{marginTop:"0.5rem"}}>
-                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.72rem",cursor:"pointer",fontFamily:"'Cinzel',serif"}}>
+                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.9rem",cursor:"pointer",fontFamily:"'Cinzel',serif"}}>
                   {isSel?"▲ Hide tally":"▼ Show tally"} — AYE {yeas} · NAY {nays}
                 </button>
                 {isSel&&<VotingGrid motion={m} players={players}/>}
@@ -470,10 +491,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
             </div>
             <div style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",marginBottom:"0.3rem"}}>By {m.byName} · {m.session||""}</div>
             <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.4rem"}}>{m.body}</div>
-            {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.78rem"}}>Awaiting GM review…</div>}
-            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}</div>}
-            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}</div>}
-            {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.78rem"}}>Rejected by GM — not put to vote</div>}
+            {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>Awaiting GM review…</div>}
+            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}</div>}
+            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}</div>}
+            {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.9rem"}}>Rejected by GM — not put to vote</div>}
             {(m.status==="passed"||m.status==="failed")&&<button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.7rem",cursor:"pointer",marginTop:"0.3rem"}}>
               {isSel?"▲ Hide":"▼ Show vote record"}</button>}
             {isSel&&<VotingGrid motion={m} players={players}/>}
@@ -498,7 +519,7 @@ function OrdersPanel({orders,game,players}){
       {sessions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No orders have been submitted yet.</div>}
       {sessions.map(sess=>(
         <div key={sess}>
-          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
             {sess}{sess===currSess&&<Badge c="CURRENT SESSION" color={T.gold} sm/>}
           </div>
           {grouped[sess].map(o=>{
@@ -508,7 +529,7 @@ function OrdersPanel({orders,game,players}){
               <Card key={o.id} style={{borderLeft:`3px solid ${pos?.color||T.fnt}`,marginBottom:"0.4rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.3rem"}}>
                   <div>
-                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontSize:"0.78rem",fontWeight:700}}>{pos?.title||o.role}</span>
+                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontSize:"0.9rem",fontWeight:700}}>{pos?.title||o.role}</span>
                     <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
                   </div>
                   <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
@@ -523,7 +544,7 @@ function OrdersPanel({orders,game,players}){
   );
 }
 
-function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
+function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,deadline,onRefresh}){
   const role=user.role;
   const pos=POS[role];
   const [text,setText]=useState("");
@@ -553,15 +574,15 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
 
   const isConsul=role.startsWith("consul");
   const isQuaestor=role.startsWith("quaestor");
-  const isCensor=role.startsWith("censor");
+  const isEmergency=role.startsWith("dictator")||role.startsWith("magister_equitum");
   const isAedile=role.startsWith("aedile");
 
   return(
-    <div>
+    <div style={{background:`linear-gradient(135deg, ${pos.bg||T.card} 0%, #FFFFFF 58%, ${pos.bg||T.card} 100%)`,border:`2px solid ${pos.color}`,borderTop:`8px solid ${pos.color}`,boxShadow:`0 0 0 9999px ${pos.bg||T.bg}33 inset`,padding:"1rem",minHeight:"70vh"}}>
       {/* Position header */}
       <Card style={{borderLeft:`3px solid ${pos.color}`,background:pos.bg}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem",marginBottom:"0.5rem"}}>
-          <div style={{fontFamily:"'Cinzel',serif",color:pos.color,fontSize:"1.05rem",fontWeight:700}}>{pos.title}</div>
+          <div style={{fontFamily:"'Cinzel',serif",color:pos.color,fontSize:"1.05rem",fontWeight:700}}>{pos.emoji||"🏛️"} {pos.title}</div>
           <Badge c={pos.abbr} color={pos.color}/>
         </div>
         <div style={{fontSize:"0.9rem",color:T.mut,lineHeight:1.6,marginBottom:"0.75rem"}}>{pos.desc}</div>
@@ -578,19 +599,32 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
       </Card>
 
       {/* Relevant data pane */}
-      {(isConsul||isCensor)&&(
+      {(isConsul||isEmergency)&&(
         <Card>
           <STit c="Legion Status"/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"0.35rem"}}>
             {legions.map(l=>{
               const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt};
               return<div key={l.id} style={{display:"flex",justifyContent:"space-between",padding:"0.3rem 0.5rem",background:T.bg,border:`1px solid ${T.border}`,fontSize:"0.82rem"}}>
-                <span>{l.name||`Legio ${l.id}`}</span><span style={{color:sc[l.status]||T.mut}}>{l.status==="active"?`${fmt(l.str)} men`:l.status==="raising"?`Raising ${l.prog}/${game.lturns}t`:l.status.toUpperCase()}</span>
+                <span>{l.name||`Legio ${l.id}`}<br/><small style={{color:T.mut}}>📍 {l.location||"Unknown"} · 🎖️ {l.commander||"Unassigned"}</small></span><span style={{color:sc[l.status]||T.mut}}>{l.status==="active"?`${fmt(l.str)} men`:l.status==="raising"?`Raising ${l.prog}/${game.lturns}t`:l.status.toUpperCase()}</span>
               </div>;
             })}
           </div>
         </Card>
       )}
+      {role.startsWith("magister_equitum")&&(
+        <Card>
+          <STit c="Cavalry Detachments"/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:"0.35rem"}}>
+            {(cavalry||[]).map(c=><div key={c.id} style={{padding:"0.45rem 0.6rem",background:T.bg,border:`1px solid ${T.border}`,fontSize:"0.95rem"}}>
+              <b style={{color:T.blue}}>🐎 {c.name}</b><br/>
+              <span>{fmt(c.str||0)} riders · 📍 {c.location||"Unknown"}</span><br/>
+              <small>🎖️ {c.commander||"Unassigned"} · 🏕️ {c.armyCommand||"Independent"}</small>
+            </div>)}
+          </div>
+        </Card>
+      )}
+
       {(isQuaestor)&&(
         <Card>
           <STit c="Treasury"/>
@@ -670,7 +704,7 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
                   <div style={{fontSize:"0.85rem",color:T.text,whiteSpace:"pre-wrap"}}>{o.resolution}</div>
                   {o.resolutionImage&&<a href={o.resolutionImage} target="_blank" rel="noreferrer" style={{color:"#8090D0",fontSize:"0.75rem",display:"block",marginTop:"0.25rem"}}>📎 Attached image/map</a>}
                 </div>
-              ):<div style={{color:T.fnt,fontSize:"0.78rem",fontStyle:"italic"}}>No resolution recorded</div>}
+              ):<div style={{color:T.fnt,fontSize:"0.9rem",fontStyle:"italic"}}>No resolution recorded</div>}
             </div>
           ))}
         </Card>
@@ -702,7 +736,7 @@ function CharacterPanel({user,onUpdate}){
             <div style={{width:140,height:140,background:T.fnt,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${T.border}`,fontFamily:"'Cinzel',serif",color:T.mut,fontSize:"2rem"}}>{user.latinName?.[0]||"?"}</div>}
             <input type="file" ref={fileRef} onChange={handleFile} accept="image/*" style={{display:"none"}}/>
             <button onClick={()=>fileRef.current.click()} style={{display:"block",marginTop:"0.4rem",background:"none",border:`1px solid ${T.border}`,color:T.mut,fontFamily:"'Cinzel',serif",fontSize:"0.62rem",padding:"0.2rem 0.4rem",cursor:"pointer",width:"100%",letterSpacing:"0.06em"}}>UPLOAD AVATAR</button>
-            {msg&&<div style={{color:T.gre,fontSize:"0.72rem",marginTop:"0.2rem"}}>{msg}</div>}
+            {msg&&<div style={{color:T.gre,fontSize:"0.9rem",marginTop:"0.2rem"}}>{msg}</div>}
           </div>
           <div style={{flex:1}}>
             <div style={{fontFamily:"'Cinzel',serif",color:T.ghi,fontSize:"1.1rem",fontWeight:700,marginBottom:"0.25rem"}}>{user.latinName}</div>
@@ -774,7 +808,7 @@ function MapPanel({cfg}){
 
 function EconomyGraph({history=[]}){
   const data=(history||[]).slice(-8);
-  if(data.length===0)return <div style={{color:T.mut,fontStyle:"italic",fontSize:"0.95rem"}}>Economy history will appear after the GM advances at least one session.</div>;
+  if(data.length===0)return <div style={{color:T.mut,fontStyle:"italic",fontSize:"1.05rem"}}>Economy history will appear after the GM advances at least one session.</div>;
   const maxGold=Math.max(1,...data.map(x=>Math.abs(x.netGold||0)));
   const maxFood=Math.max(1,...data.map(x=>Math.abs(x.netFood||0)));
   return(
@@ -788,8 +822,8 @@ function EconomyGraph({history=[]}){
             <div title={`Net food ${d.netFood}`} style={{height:fh,width:18,background:(d.netFood||0)>=0?T.green:T.rhi,border:`1px solid ${T.border}`}}/>
           </div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.58rem",color:T.mut,marginTop:"0.35rem",lineHeight:1.2}}>{d.label}</div>
-          <div style={{fontSize:"0.72rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
-          <div style={{fontSize:"0.72rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
+          <div style={{fontSize:"0.9rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
+          <div style={{fontSize:"0.9rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
         </div>;
       })}
     </div>
@@ -800,22 +834,24 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   const g={...DEF_GAME,...(D.game||{})};
   const regs=D.regions||DEF_REGIONS;
   const legs=D.legions||DEF_LEGIONS;
-  const snap=economySnapshot(g,regs,legs);
+  const snap=economySnapshot(g,regs,legs,D.fleets||DEF_FLEETS);
   return(
     <div>
       <Card style={{borderLeft:`4px solid ${T.red}`}}>
-        <STit c="Economy of the Republic" sub="Stockpile, regional income and legion upkeep are shown together."/>
+        <STit c="Economy of the Republic" sub="Stockpile, regional income, legion upkeep and fleet maintenance are shown together."/>
         <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
           <Stat label="Gold Stockpile" value={`${fmt(g.gold)}T`} color={T.ghi}/>
           <Stat label="Food Stockpile" value={`${fmt(g.food)}M`} color={T.green}/>
           <Stat label="Gold Income" value={`+${fmt(snap.goldIncome)}T`} color={T.gre}/>
           <Stat label="Food Income" value={`+${fmt(snap.foodIncome)}M`} color={T.gre}/>
-          <Stat label="Legion Gold Cost" value={`-${fmt(snap.goldUpkeep)}T`} color={T.rhi}/>
-          <Stat label="Legion Food Cost" value={`-${fmt(snap.foodUpkeep)}M`} color={T.rhi}/>
+          <Stat label="Legion Gold Cost" value={`-${fmt(snap.legionGoldUpkeep||0)}T`} color={T.rhi}/>
+          <Stat label="Legion Food Cost" value={`-${fmt(snap.legionFoodUpkeep||0)}M`} color={T.rhi}/>
+          <Stat label="Fleet Gold Cost" value={`-${fmt(snap.fleetGoldUpkeep||0)}T`} color={T.rhi}/>
+          <Stat label="Fleet Food Cost" value={`-${fmt(snap.fleetFoodUpkeep||0)}M`} color={T.rhi}/>
           <Stat label="Net Gold / Turn" value={`${snap.netGold>=0?"+":""}${fmt(snap.netGold)}T`} color={snap.netGold>=0?T.gre:T.rhi}/>
           <Stat label="Net Food / Turn" value={`${snap.netFood>=0?"+":""}${fmt(snap.netFood)}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
         </div>
-        <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5}}>Rome starts wounded after Trebia: enough resources to survive, but not enough to expand recklessly. New legions require gold, food, manpower and time.</div>
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5}}>Rome starts wounded after Trebia: enough resources to survive, but not enough to expand recklessly. New legions require gold, food, manpower and time.</div>
       </Card>
       <Card>
         <STit c="Economy Trend" sub="Updated when the Game Master advances the session."/>
@@ -830,8 +866,10 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
               <div style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:T.text}}>{r.name}</div>
               <Badge c={st.l} color={st.c} sm/>
             </div>
-            <div style={{fontSize:"0.9rem",color:T.mut}}>Base: {fmt(r.bG)}T / {fmt(r.bF)}M</div>
-            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.85rem",color:st.c,marginTop:"0.25rem"}}>Effective: {fmt(Math.floor((r.bG||0)*st.m))}T / {fmt(Math.floor((r.bF||0)*st.m))}M</div>
+            <div style={{fontSize:"1rem",color:T.mut}}>🏛️ Capital: <span style={{color:T.text}}>{r.capital||"Unknown"}</span></div>
+            <div style={{fontSize:"1rem",color:T.mut}}>👥 Population: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(r.pop||0)}</span></div>
+            <div style={{fontSize:"0.95rem",color:T.mut,marginTop:"0.25rem"}}>Base: {fmt(r.bG)}T / {fmt(r.bF)}M</div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.9rem",color:st.c,marginTop:"0.25rem"}}>Effective: {fmt(Math.floor((r.bG||0)*st.m))}T / {fmt(Math.floor((r.bF||0)*st.m))}M</div>
           </div>})}
         </div>
       </Card>
@@ -839,25 +877,56 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   );
 }
 
-function LegionsPublicPanel({legions,game}){
-  const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt};
+function LegionsPublicPanel({D}){
+  const legions=D.legions||DEF_LEGIONS;
+  const cavalry=D.cavalry||DEF_CAVALRY;
+  const fleets=D.fleets||DEF_FLEETS;
+  const game=D.game||DEF_GAME;
+  const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt,repairing:T.gold};
   return <div>
-    <Card><STit c="Legions of the Republic" sub="Each legion is normally 5,000 soldiers. Raising new legions costs gold, food, manpower and time."/>
+    <Card><STit c="Armies, Legions and Fleets" sub="Public military register: legions, cavalry detachments, fleets, commanders and locations."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>
-        <Stat label="Active Legions" value={(legions||[]).filter(l=>l.status==="active").length}/>
-        <Stat label="Cost to Raise" value={`${fmt(game?.lgold||DEF_GAME.lgold)}T`} color={T.rhi}/>
-        <Stat label="Food to Raise" value={`${fmt(game?.lfood||DEF_GAME.lfood)}M`} color={T.rhi}/>
-        <Stat label="Turns to Raise" value={game?.lturns||DEF_GAME.lturns}/>
+        <Stat label="Active Legions" value={legions.filter(l=>l.status==="active").length}/>
+        <Stat label="Cavalry Units" value={cavalry.length} color={T.blue}/>
+        <Stat label="Fleets" value={fleets.length} color={T.ghi}/><Stat label="Active Triremes" value={fmt(fleetTriremes(fleets))} color={T.gold}/>
+        <Stat label="Cost to Raise Legion" value={`${fmt(game?.lgold||DEF_GAME.lgold)}T`} color={T.rhi}/>
       </div>
     </Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:"0.6rem"}}>
-      {(legions||[]).map((l,i)=><Card key={`${l.id}-${i}`} style={{borderLeft:`4px solid ${sc[l.status]||T.border}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.4rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{l.name||`Legio ${l.id}`}</div><Badge c={(l.status||"active").toUpperCase()} color={sc[l.status]||T.mut} sm/></div>
-        <div style={{fontSize:"0.95rem",color:T.mut}}>Strength: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(l.str||0)} / {fmt(l.max||5000)}</span></div>
-        <div style={{fontSize:"0.95rem",color:T.mut}}>Location: <span style={{color:T.text}}>{l.location||"Unknown"}</span></div>
-        {l.status==="raising"&&<div style={{marginTop:"0.35rem",color:T.gold}}>Raising progress: {l.prog||0}/{game?.lturns||DEF_GAME.lturns}</div>}
-      </Card>)}
-    </div>
+    <Card><STit c="Legions" sub="Each legion shows its commander, army command and stationed location."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>
+        {legions.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.4rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>🛡️ {l.name||`Legio ${l.id}`}</div><Badge c={(l.status||"active").toUpperCase()} color={sc[l.status]||T.mut} sm/></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>Strength: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(l.str||0)} / {fmt(l.max||5000)}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>📍 Stationed at: <span style={{color:T.text}}>{l.location||"Unknown"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🎖️ Commander: <span style={{color:T.text}}>{l.commander||"Unassigned"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🏕️ Army Command: <span style={{color:T.text}}>{l.armyCommand||"Independent"}</span></div>
+          {l.status==="raising"&&<div style={{marginTop:"0.35rem",color:T.gold}}>Raising progress: {l.prog||0}/{game?.lturns||DEF_GAME.lturns}</div>}
+        </div>)}
+      </div>
+    </Card>
+    <Card><STit c="Cavalry" sub="Cavalry is especially important for the Magister Equitum and rapid operations."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>
+        {cavalry.map((c,i)=><div key={`${c.id}-${i}`} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.blue}`,padding:"0.75rem"}}>
+          <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.blue}}>🐎 {c.name}</div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>Strength: <span style={{color:T.text}}>{fmt(c.str||0)} / {fmt(c.max||0)}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>📍 Location: <span style={{color:T.text}}>{c.location||"Unknown"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🎖️ Commander: <span style={{color:T.text}}>{c.commander||"Unassigned"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🏕️ Army Command: <span style={{color:T.text}}>{c.armyCommand||"Independent"}</span></div>
+        </div>)}
+      </div>
+    </Card>
+    <Card><STit c="Fleets" sub="Roman naval forces: triremes, bases, commanders, missions and maintenance."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>
+        {fleets.map((f,i)=><div key={`${f.id}-${i}`} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.gold}`,padding:"0.75rem"}}>
+          <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>🚢 {f.name}</div><Badge c={(f.status||"active").toUpperCase()} color={sc[f.status]||T.gold} sm/></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>Triremes: <span style={{color:T.text}}>{fmt(f.triremes??f.ships??0)}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>⚓ Base: <span style={{color:T.text}}>{f.location||"Unknown"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>🎖️ Commander: <span style={{color:T.text}}>{f.commander||"Unassigned"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>📜 Mission: <span style={{color:T.text}}>{f.mission||"No mission assigned"}</span></div>
+          <div style={{fontSize:"1.05rem",color:T.mut}}>💰 Maintenance: <span style={{color:T.text}}>{fmt((f.triremes??f.ships??0)*(game.fleetUpkeep||0))}T / {fmt((f.triremes??f.ships??0)*(game.fleetFood||0))}M per turn</span></div>
+        </div>)}
+      </div>
+    </Card>
   </div>;
 }
 
@@ -866,45 +935,60 @@ function MagistratesPanel({players=[]}){
     <Card><STit c="Magistrates and Roles" sub="Offices of the Roman Republic, current holders and responsibilities."/></Card>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"0.65rem"}}>
       {roleEntries().map(pos=>{const holder=players.find(p=>p.role===pos.key);return <Card key={pos.key} style={{borderLeft:`4px solid ${pos.color}`,background:pos.bg||T.card}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:pos.color}}>{pos.title}</div><Badge c={pos.abbr} color={pos.color}/></div>
-        <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.45,marginBottom:"0.45rem"}}>{pos.desc}</div>
-        <div style={{fontSize:"0.95rem",color:T.text}}>Holder: <span style={{fontFamily:"'Cinzel',serif",color:holder?T.ghi:T.rhi}}>{holder?holder.latinName:"Vacant"}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:pos.color}}>{pos.emoji||"🏛️"} {pos.title}</div><Badge c={pos.abbr} color={pos.color}/></div>
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.45,marginBottom:"0.45rem"}}>{pos.desc}</div>
+        <div style={{fontSize:"1.05rem",color:T.text}}>Holder: <span style={{fontFamily:"'Cinzel',serif",color:holder?T.ghi:T.rhi}}>{holder?holder.latinName:"Vacant"}</span></div>
       </Card>})}
     </div>
   </div>;
 }
 
 function ElectionsPlayerPanel({user,D,onRefresh}){
-  const election=D.election;
+  const elections=D.elections||normalizeElections(null,D.election);
   const players=D.players||[];
-  const [speech,setSpeech]=useState("");
-  if(!election||election.status==="closed")return <Card><STit c="Elections"/><div style={{color:T.mut}}>No election is currently open.</div></Card>;
-  const office=POS[election.office];
-  const isCandidate=(election.candidates||[]).some(c=>c.playerId===user.id);
-  const myVote=election.votes?.[user.id];
-  const stand=async()=>{
-    if(isCandidate)return;
-    const all=await db.get("spqr_election")||election;
-    const candidates=[...(all.candidates||[]),{playerId:user.id,name:user.latinName,speech:speech||"I present myself for this office in service of Rome."}];
-    await db.set("spqr_election",{...all,candidates});
+  const [speechBy,setSpeechBy]=useState({});
+  const active=elections.filter(e=>e&&e.status!=="closed");
+  if(active.length===0)return <Card><STit c="Elections"/><div style={{color:T.mut}}>No election is currently open.</div></Card>;
+  const stand=async(election)=>{
+    const office=POS[election.office];
+    if((election.candidates||[]).some(c=>c.playerId===user.id))return;
+    const all=await db.get("spqr_elections")||active;
+    const updated=all.map(e=>{
+      if(e.id!==election.id)return e;
+      const speech=speechBy[e.id]||"I present myself for this office in service of Rome.";
+      return {...e,candidates:[...(e.candidates||[]),{playerId:user.id,name:user.latinName,speech}]};
+    });
+    await db.set("spqr_elections",updated);
+    await db.set("spqr_election",null);
     await pushN("Election Candidacy",`${user.latinName} stands for ${office?.title||"office"}.`);
-    setSpeech("");onRefresh();
+    setSpeechBy({...speechBy,[election.id]:""});onRefresh();
   };
-  const vote=async(candidateId)=>{
-    if(election.status!=="voting"||myVote)return;
-    const all=await db.get("spqr_election")||election;
-    await db.set("spqr_election",{...all,votes:{...(all.votes||{}),[user.id]:candidateId}});
+  const vote=async(election,candidateId)=>{
+    if(election.status!=="voting"||election.votes?.[user.id])return;
+    const office=POS[election.office];
+    const all=await db.get("spqr_elections")||active;
+    const updated=all.map(e=>e.id===election.id?{...e,votes:{...(e.votes||{}),[user.id]:candidateId}}:e);
+    await db.set("spqr_elections",updated);
+    await db.set("spqr_election",null);
     await pushN("Election Vote Cast",`${user.latinName} has voted in the election for ${office?.title||"office"}.`,"gm");
     onRefresh();
   };
-  const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
   return <div>
-    <Card style={{borderLeft:`4px solid ${office?.color||T.gold}`}}><STit c={`Election: ${office?.title||election.office}`} sub={`Phase: ${election.status.toUpperCase()}`}/>
-      <div style={{color:T.mut,lineHeight:1.5}}>{election.status==="candidacy"?"Declare your candidacy before the GM opens voting.":"Vote for one candidate. Each senator has one vote."}</div>
-    </Card>
-    {election.status==="candidacy"&&<Card><STit c="Stand as Candidate"/>{isCandidate?<div style={{color:T.gre}}>You are already a candidate.</div>:<><Inp label="Short Speech" value={speech} onChange={setSpeech} rows={3} placeholder="Fathers of the Senate..."/><Btn onClick={stand}>Stand for Office</Btn></>}</Card>}
-    <STit c="Candidates"/>
-    {(election.candidates||[]).map(c=><Card key={c.playerId}><div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{c.name||getPlayerName(players,c.playerId)}</div><div style={{color:T.mut,whiteSpace:"pre-wrap",marginTop:"0.35rem"}}>{c.speech}</div></div><div>{election.status==="voting"&&<Btn sm disabled={!!myVote} onClick={()=>vote(c.playerId)}>{myVote===c.playerId?"Voted":"Vote"}</Btn>}<div style={{marginTop:"0.4rem",textAlign:"center",color:T.ghi,fontFamily:"'Cinzel',serif"}}>{counts[c.playerId]||0} votes</div></div></div></Card>)}
+    <Card><STit c="Active Magistrate Elections" sub="Several offices may be open at the same time. You may stand and vote separately for each office."/></Card>
+    {active.map(election=>{
+      const office=POS[election.office];
+      const isCandidate=(election.candidates||[]).some(c=>c.playerId===user.id);
+      const myVote=election.votes?.[user.id];
+      const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+      return <Card key={election.id} style={{borderLeft:`6px solid ${office?.color||T.gold}`,background:office?.bg||T.card}}>
+        <STit c={`${office?.emoji||"🏛️"} Election: ${office?.title||election.office}`} sub={`Phase: ${election.status.toUpperCase()} · Round ${election.round||1}`}/>
+        <div style={{color:T.mut,lineHeight:1.6,marginBottom:"0.65rem"}}>{election.status==="candidacy"?"Declare your candidacy before the GM opens voting.":"Vote for one candidate. Each senator has one vote for this office."}</div>
+        {election.status==="candidacy"&&<div style={{marginBottom:"0.8rem"}}>{isCandidate?<div style={{color:T.gre,fontFamily:"'Cinzel',serif"}}>✓ You are already a candidate for this office.</div>:<><Inp label="Short Speech" value={speechBy[election.id]||""} onChange={v=>setSpeechBy({...speechBy,[election.id]:v})} rows={3} placeholder="Fathers of the Senate..."/><Btn onClick={()=>stand(election)}>Stand for {office?.title||"Office"}</Btn></>}</div>}
+        <STit c="Candidates"/>
+        {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
+        {(election.candidates||[]).map(c=><Card key={c.playerId} style={{background:T.card,border:`1px solid ${office?.color||T.border}`}}><div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text,fontSize:"1.05rem"}}>{c.name||getPlayerName(players,c.playerId)}</div><div style={{color:T.mut,whiteSpace:"pre-wrap",marginTop:"0.35rem"}}>{c.speech}</div></div><div>{election.status==="voting"&&<Btn sm disabled={!!myVote} onClick={()=>vote(election,c.playerId)}>{myVote===c.playerId?"Voted":"Vote"}</Btn>}<div style={{marginTop:"0.4rem",textAlign:"center",color:T.ghi,fontFamily:"'Cinzel',serif"}}>{counts[c.playerId]||0} votes</div></div></div></Card>)}
+      </Card>;
+    })}
   </div>;
 }
 
@@ -912,15 +996,16 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
 function PlayerApp({user:initUser,onLogout}){
   const [tab,setTab]=useState("senate");
   const [user,setUser]=useState(initUser);
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f")
     ]);
+    const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS});
     if(players){const me=players.find(p=>p.id===user.id);if(me)setUser(me);}
   },[user.id]);
 
@@ -950,7 +1035,7 @@ function PlayerApp({user:initUser,onLogout}){
       <div className="spqr-topbar" style={{background:T.surf,borderBottom:`2px solid ${T.border}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
         <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
         <div style={{display:"flex",alignItems:"center",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} S{D.game.sessionInSeason}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>}
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
@@ -960,7 +1045,7 @@ function PlayerApp({user:initUser,onLogout}){
       </div>
       <div className="spqr-tabs" style={{display:"flex",borderBottom:`1px solid ${T.border}`,background:T.surf,overflowX:"auto",position:"sticky",top:"45px",zIndex:99}}>
         {TABS.map(({k,l})=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
             {l}
           </button>
         ))}
@@ -970,10 +1055,10 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
         {tab==="orders"    &&<OrdersPanel orders={D.orders} game={D.game} players={D.players}/>} 
         {tab==="resources" &&<ResourcesRegionsPanel D={D} editable={false}/>} 
-        {tab==="legions"   &&<LegionsPublicPanel legions={D.legions} game={D.game}/>} 
+        {tab==="legions"   &&<LegionsPublicPanel D={D}/>} 
         {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
         {tab==="elections" &&<ElectionsPlayerPanel user={user} D={D} onRefresh={refresh}/>} 
-        {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} players={D.players} orders={D.orders} deadline={D.deadline} onRefresh={refresh}/>}
+        {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} onRefresh={refresh}/>}
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
         {tab==="laws"      &&<LawsPanel laws={D.laws}/>}
         {tab==="map"       &&<MapPanel cfg={D.cfg}/>}
@@ -988,8 +1073,8 @@ function AOverview({D}){
   const [, setR]=useState(0);
   const activeLegs=(D.legions||[]).filter(l=>l.status==="active");
   const inc=D.regions?calcInc(D.regions):{gold:0,food:0};
-  const upkeepG=activeLegs.length*(D.game?.legionUpkeep||80);
-  const upkeepF=activeLegs.length*(D.game?.legionFood||60);
+  const upkeepG=activeLegs.length*(D.game?.legionUpkeep||80)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetUpkeep||DEF_GAME.fleetUpkeep);
+  const upkeepF=activeLegs.length*(D.game?.legionFood||60)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetFood||DEF_GAME.fleetFood);
   const pendingMotions=(D.motions||[]).filter(m=>m.status==="pending");
   const newOrders=(D.orders||[]).filter(o=>o.status==="pending");
   const vacant=Object.keys(POS).filter(k=>!(D.players||[]).find(p=>p.role===k));
@@ -998,7 +1083,7 @@ function AOverview({D}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"0.5rem",marginBottom:"1rem"}}>
         <Stat label="Session" value={D.game?.session||1}/>
         <Stat label="Year" value={`${D.game?.year||218} BC`}/>
-        <Stat label="Season" value={`${D.game?.season} S${D.game?.sessionInSeason}`}/>
+        <Stat label="Season" value={`${D.game?.season}`}/>
         <Stat label="Gold" value={`${fmt(D.game?.gold)}T`}/>
         <Stat label="Food" value={`${fmt(D.game?.food)}M`} color="#A0D060"/>
         <Stat label="Population" value={fmt(D.game?.pop)} color={T.mut}/>
@@ -1066,7 +1151,7 @@ function ASenators({D,onRefresh}){
                 <div>
                   <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:600}}>{p.latinName}</div>
                   <div style={{color:T.mut,fontSize:"0.75rem"}}>{p.username} · {p.charClass}</div>
-                  {p.discord&&<div style={{color:"#7289DA",fontSize:"0.72rem"}}>{p.discord}</div>}
+                  {p.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem"}}>{p.discord}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
@@ -1077,7 +1162,7 @@ function ASenators({D,onRefresh}){
             <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
               <Lbl c="Assign Position"/>
               <select value={p.role||""} onChange={e=>assign(p.id,e.target.value||null)}
-                style={{background:T.bg,border:`1px solid ${T.border}`,color:T.text,padding:"0.28rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",cursor:"pointer",flex:1}}>
+                style={{background:T.bg,border:`1px solid ${T.border}`,color:T.text,padding:"0.28rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",cursor:"pointer",flex:1}}>
                 <option value="">— No Position —</option>
                 {Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.title}</option>)}
               </select>
@@ -1093,63 +1178,69 @@ function ASenators({D,onRefresh}){
 
 function ALegions({D,onRefresh}){
   const [legs,setLegs]=useState(null);
+  const [cav,setCav]=useState(null);
+  const [fleets,setFleets]=useState(null);
   const [msg,setMsg]=useState("");
-  useEffect(()=>{setLegs((D.legions||DEF_LEGIONS).map(l=>({name:l.name||`Legio ${l.id}`,max:l.max||5000,str:l.str??5000,...l})));},[D.legions]);
-  if(!legs)return null;
-  const upd=(i,k,v)=>setLegs(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="str"||k==="max"||k==="prog")?Number(v):v}:l));
-  const save=async()=>{await db.set("spqr_l",legs);setMsg("Saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
-  const addLegion=()=>{const n=legs.length+1;setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:5000,max:5000,status:"active",prog:0,location:"Roma"}]);};
-  const removeLegion=(i)=>{if(confirm("Remove this legion?"))setLegs(ls=>ls.filter((_,j)=>j!==i));};
-  const raiseExisting=async(i)=>{
-    const g=await db.get("spqr_g")||DEF_GAME;
-    if(g.gold<g.lgold||g.food<g.lfood||g.pop<g.lpop){setMsg("Insufficient resources to raise a legion.");return;}
-    await db.set("spqr_g",{...g,gold:g.gold-g.lgold,food:g.food-g.lfood,pop:g.pop-g.lpop});
-    setLegs(ls=>ls.map((l,j)=>j===i?{...l,status:"raising",prog:0,str:0,max:l.max||5000,location:l.location||"Roma"}:l));
-    setMsg("Raising started.");
-  };
+  useEffect(()=>{
+    setLegs((D.legions||DEF_LEGIONS).map(l=>({name:l.name||`Legio ${l.id}`,max:l.max||5000,str:l.str??5000,commander:l.commander||"Unassigned",armyCommand:l.armyCommand||"Independent",...l})));
+    setCav((D.cavalry||DEF_CAVALRY).map(c=>({commander:"Unassigned",armyCommand:"Independent",...c})));
+    setFleets((D.fleets||DEF_FLEETS).map(f=>({commander:"Unassigned",mission:"",...f,triremes:Number(f.triremes??f.ships??0)})));
+  },[D.legions,D.cavalry,D.fleets]);
+  if(!legs||!cav||!fleets)return null;
+  const updLeg=(i,k,v)=>setLegs(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="str"||k==="max"||k==="prog")?Number(v):v}:l));
+  const updCav=(i,k,v)=>setCav(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="str"||k==="max")?Number(v):v}:l));
+  const updFleet=(i,k,v)=>setFleets(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="triremes")?Number(v):v}:l));
+  const save=async()=>{await db.set("spqr_l",legs);await db.set("spqr_cav",cav);await db.set("spqr_f",fleets);setMsg("Military forces saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
+  const addLegion=()=>{const n=legs.length+1;setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);};
+  const addCav=()=>{const n=cav.length+1;setCav(ls=>[...ls,{id:`eq_${n}`,name:`Equites ${n}`,str:600,max:600,status:"active",location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);};
+  const addFleet=()=>{const n=fleets.length+1;setFleets(ls=>[...ls,{id:`classis_${n}`,name:`Classis ${n}`,triremes:20,status:"active",location:"Ostia",commander:"Unassigned",mission:"Awaiting orders"}]);};
+  const remove=(setter,i,label)=>{if(confirm(`Remove this ${label}?`))setter(ls=>ls.filter((_,j)=>j!==i));};
   const recruitNew=async()=>{
     const g=await db.get("spqr_g")||DEF_GAME;
     if(g.gold<g.lgold||g.food<g.lfood||g.pop<g.lpop){setMsg("Insufficient resources to recruit a new legion.");return;}
     await db.set("spqr_g",{...g,gold:g.gold-g.lgold,food:g.food-g.lfood,pop:g.pop-g.lpop});
     const n=legs.length+1;
-    setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:0,max:5000,status:"raising",prog:0,location:"Roma"}]);
+    setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:0,max:5000,status:"raising",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);
     setMsg("New legion recruitment started. Save to keep it.");
   };
-  const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt};
+  const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt,repairing:T.gold};
+  const field=(label,value,onChange,type="text")=><div><Lbl c={label}/><input type={type} value={value??""} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem",fontSize:"1.05rem"}}/></div>;
   return(
     <div>
       {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem",fontSize:"1rem"}}>{msg}</div>}
       <Card>
-        <STit c="Legion Recruitment" sub="Legions are 5,000 soldiers by default. There is no hard limit; add or recruit as many as the campaign needs."/>
-        <Row gap="0.5rem" wrap>
-          <Btn v="green" onClick={recruitNew}>＋ Recruit New Legion</Btn>
-          <Btn v="dark" onClick={addLegion}>＋ Add Legion Manually</Btn>
-          <Btn onClick={save}>💾 Save Legion Data</Btn>
-        </Row>
+        <STit c="Military Control Panel" sub="Manage legions, cavalry, fleets, commanders, army commands and locations."/>
+        <Row gap="0.5rem" wrap><Btn v="green" onClick={recruitNew}>＋ Recruit New Legion</Btn><Btn v="dark" onClick={addLegion}>＋ Add Legion</Btn><Btn v="blue" onClick={addCav}>＋ Add Cavalry</Btn><Btn onClick={addFleet}>＋ Add Fleet</Btn><Btn onClick={save}>💾 Save Military Data</Btn></Row>
       </Card>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.6rem",marginBottom:"0.75rem"}}>
-        {legs.map((l,i)=>(
-          <div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,padding:"0.75rem"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.5rem",gap:"0.5rem",flexWrap:"wrap"}}>
-              <span style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:800,fontSize:"1rem"}}>{l.name||`Legio ${l.id}`}</span>
-              <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
-                <select value={l.status} onChange={e=>upd(i,"status",e.target.value)} style={{background:T.bg,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.25rem 0.4rem",fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>
-                  <option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option>
-                </select>
-                {(l.status==="destroyed"||l.status==="unraised")&&<Btn v="green" sm onClick={()=>raiseExisting(i)}>Raise</Btn>}
-                <Btn v="red" sm onClick={()=>removeLegion(i)}>Remove</Btn>
-              </div>
+      <Card><STit c="Legions" sub="Assign commanders and army commands here."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+          {legs.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {l.name}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>
+              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander",l.commander,v=>updLeg(i,"commander",v))}{field("Army Command",l.armyCommand,v=>updLeg(i,"armyCommand",v))}{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
+              <div><Lbl c="Status"/><select value={l.status} onChange={e=>updLeg(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.35rem 0.5rem",fontFamily:"'Cinzel',serif"}}><option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option></select></div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.4rem"}}>
-              {[ ["Legion ID","id","text"],["Legion Name","name","text"],["Strength","str","number"],["Max Soldiers","max","number"],["Location","location","text"],["Progress","prog","number"] ].map(([lb,k,type])=>(
-                <div key={k}><Lbl c={lb}/><input type={type} value={l[k]??""} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem",fontSize:"0.95rem"}}/></div>
-              ))}
-            </div>
-            {l.status==="raising"&&<div style={{marginTop:"0.45rem",fontSize:"0.9rem",color:T.gold}}>Progress: {l.prog||0}/{D.game?.lturns||3} turns. When finished, it becomes active at 5,000 soldiers.</div>}
-          </div>
-        ))}
-      </div>
-      <Btn onClick={save}>💾 Save Legion Data</Btn>
+          </div>)}
+        </div>
+      </Card>
+      <Card><STit c="Cavalry" sub="Extra mobile units for reconnaissance, pursuit and Magister Equitum operations."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+          {cav.map((c,i)=><div key={`${c.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.blue}`,padding:"0.75rem"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.blue}}>🐎 {c.name}</b><Btn v="red" sm onClick={()=>remove(setCav,i,"cavalry unit")}>Remove</Btn></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>{field("Unit ID",c.id,v=>updCav(i,"id",v))}{field("Unit Name",c.name,v=>updCav(i,"name",v))}{field("Strength",c.str,v=>updCav(i,"str",v),"number")}{field("Max Riders",c.max,v=>updCav(i,"max",v),"number")}{field("Location",c.location,v=>updCav(i,"location",v))}{field("Commander",c.commander,v=>updCav(i,"commander",v))}{field("Army Command",c.armyCommand,v=>updCav(i,"armyCommand",v))}</div>
+          </div>)}
+        </div>
+      </Card>
+      <Card><STit c="Fleets" sub="Manage Roman naval forces: triremes, bases, commanders, missions and maintenance."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:"0.6rem"}}>
+          {fleets.map((f,i)=><div key={`${f.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.gold}`,padding:"0.75rem"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.ghi}}>🚢 {f.name}</b><Btn v="red" sm onClick={()=>remove(setFleets,i,"fleet")}>Remove</Btn></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.45rem"}}>{field("Fleet ID",f.id,v=>updFleet(i,"id",v))}{field("Fleet Name",f.name,v=>updFleet(i,"name",v))}{field("Triremes",f.triremes??f.ships??0,v=>updFleet(i,"triremes",v),"number")}{field("Base / Location",f.location,v=>updFleet(i,"location",v))}{field("Commander",f.commander,v=>updFleet(i,"commander",v))}<div><Lbl c="Status"/><select value={f.status} onChange={e=>updFleet(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,padding:"0.35rem 0.5rem"}}><option value="active">Active</option><option value="repairing">Repairing</option><option value="destroyed">Destroyed</option></select></div></div>
+            <div style={{marginTop:"0.45rem"}}>{field("Mission",f.mission,v=>updFleet(i,"mission",v))}</div><div style={{fontSize:"0.95rem",color:T.mut,marginTop:"0.35rem"}}>💰 Maintenance: {fmt((f.triremes??f.ships??0)*((D.game||DEF_GAME).fleetUpkeep||0))}T / {fmt((f.triremes??f.ships??0)*((D.game||DEF_GAME).fleetFood||0))}M per turn</div>
+          </div>)}
+        </div>
+      </Card>
+      <Btn onClick={save}>💾 Save Military Data</Btn>
     </div>
   );
 }
@@ -1158,7 +1249,7 @@ function ALegions({D,onRefresh}){
 function ABackupRestore({onRefresh}){
   const [msg,setMsg]=useState("");
   const fileRef=useRef();
-  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election"];
+  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f"];
   const exportData=async()=>{
     const data={version:1,exportedAt:new Date().toISOString(),keys:{}};
     for(const k of keys){data.keys[k]=await db.get(k);}
@@ -1200,8 +1291,8 @@ function ABackupRestore({onRefresh}){
   return(
     <Card style={{borderLeft:`3px solid ${T.blue}`}}>
       <STit c="Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects senators, motions, orders, laws, legions, resources, map and settings."/>
-      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"0.95rem"}}>{msg}</div>}
-      <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
+      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"1.05rem"}}>{msg}</div>}
+      <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
         Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the shared game.
       </div>
       <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
@@ -1222,21 +1313,20 @@ function AResources({D,onRefresh}){
   if(!g||!regs)return null;
   const inc=calcInc(regs);
   const activeLegs=activeLegions(D.legions||[]);
-  const upkeepG=activeLegs.length*g.legionUpkeep;
-  const upkeepF=activeLegs.length*g.legionFood;
-  const snap=economySnapshot(g,regs,D.legions||DEF_LEGIONS);
-  const updReg=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:k==="s"?v:(k==="name"||k==="id"?v:Number(v))}:r));
-  const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",bG:50,bF:50,s:"roman"}]);
+  const upkeepG=activeLegs.length*g.legionUpkeep+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetUpkeep||0);
+  const upkeepF=activeLegs.length*g.legionFood+fleetTriremes(D.fleets||DEF_FLEETS)*(g.fleetFood||0);
+  const snap=economySnapshot(g,regs,D.legions||DEF_LEGIONS,D.fleets||DEF_FLEETS);
+  const updReg=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:k==="s"?v:(k==="name"||k==="id"||k==="capital"?v:Number(v))}:r));
+  const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",capital:"New Capital",pop:50000,bG:50,bF:50,s:"roman"}]);
   const delRegion=i=>{if(confirm("Delete this province/region?"))setRegs(rs=>rs.filter((_,j)=>j!==i));};
   const save=async()=>{await db.set("spqr_g",g);await db.set("spqr_r",regs);setMsg("Resources and regions saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
   const doAdvance=async()=>{
-    const seasons=["Spring","Summer","Autumn","Winter"];
     let {year,season,sessionInSeason,session,gold,food,pop,lturns}=g;
     gold=gold+inc.gold-upkeepG;
     food=food+inc.food-upkeepF;
-    let newSess=sessionInSeason+1;
+    let newSess=1;
     let newSeason=season;let newYear=year;
-    if(newSess>2){newSess=1;const idx=seasons.indexOf(season);const nIdx=(idx+1)%4;newSeason=seasons[nIdx];if(nIdx===0)newYear=year-1;}
+    const idx=SEASONS.indexOf(season);const nIdx=(idx+1)%SEASONS.length;newSeason=SEASONS[nIdx];if(nIdx===0)newYear=year-1;
     session++;
     const legs=await db.get("spqr_l")||DEF_LEGIONS;
     const nl=legs.map(l=>{if(l.status==="raising"){const np=(l.prog||0)+1;if(np>=lturns)return{...l,status:"active",str:l.max||5000,max:l.max||5000,prog:0};return{...l,prog:np};}return l;});
@@ -1253,31 +1343,31 @@ function AResources({D,onRefresh}){
   const goBack=async()=>{
     if(!confirm("Go back one session? This changes only the calendar/session counter, not resources or orders."))return;
     let ng={...g};ng.session=Math.max(1,(ng.session||1)-1);
-    if((ng.sessionInSeason||1)>1){ng.sessionInSeason=1;}else{const idx=SEASONS.indexOf(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=2;if(ng.season==="Winter")ng.year=(ng.year||218)+1;}
+    const idx=SEASONS.indexOf(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=1;if(idx===0)ng.year=(ng.year||218)+1;
     await db.set("spqr_g",ng);await db.set("spqr_deadline",null);setG(ng);setMsg("Went back one session.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   const restartGame=async()=>{
     if(!confirm("Restart the campaign? This will reset resources, legions, regions, motions, orders, deadlines, elections and notifications. Senators and setup images/links are kept."))return;
-    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS)]);await db.set("spqr_election",null);
+    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);
     setG(DEF_GAME);setRegs(DEF_REGIONS.map(r=>({...r})));setMsg("Game restarted.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   return <div>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem",fontSize:"1rem"}}>{msg}</div>}
-    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are now integrated in one place."/>
+    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are integrated. One campaign year has five seasons: Spring, Early Summer, High Summer, Autumn and Winter."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
-        <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season} S${g.sessionInSeason}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
+        <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
       </div>
       <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
     </Card>
     <ABackupRestore onRefresh={onRefresh}/>
-    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${g.sessionInSeason===2?(SEASONS[(SEASONS.indexOf(g.season)+1)%4]+` S1`):g.season+` S2`}`}/><Stat label="Gold Income" value={`+${inc.gold}T`} color={T.gre}/><Stat label="Legion Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${inc.food}M`} color={T.gre}/><Stat label="Legion Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+inc.gold-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+inc.food-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
+    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(SEASONS.indexOf(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${inc.gold}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${inc.food}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+inc.gold-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+inc.food-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
     <Card><STit c="Edit Stockpile and Legion Costs"/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"0.95rem"}}/></div>)}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"],["fleetUpkeep","Gold Upkeep / Trireme"],["fleetFood","Food Upkeep / Trireme"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"1.05rem"}}/></div>)}</div>
       <Btn onClick={save}>💾 Save Resources and Regions</Btn>
     </Card>
     <Card><STit c="Edit Provinces / Regions"/><Row gap="0.5rem" wrap><Btn v="green" onClick={addRegion}>＋ Add Province</Btn><Btn onClick={save}>💾 Save</Btn></Row></Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {Math.floor((r.bG||0)*st.m)}T / {Math.floor((r.bF||0)*st.m)}M</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><Inp label="Capital" value={r.capital||""} onChange={v=>updReg(i,"capital",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Population"/><input type="number" value={r.pop||0} onChange={e=>updReg(i,"pop",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {Math.floor((r.bG||0)*st.m)}T / {Math.floor((r.bF||0)*st.m)}M</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
   </div>;
 }
 
@@ -1314,7 +1404,7 @@ function ARegions({D,onRefresh}){
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.3rem"}}>
                 {[["bG","Base Gold"],["bF","Base Food"]].map(([k,l])=>(
-                  <div key={k}><Lbl c={l}/><input type="number" value={r[k]} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.2rem 0.35rem",fontSize:"0.78rem"}}/></div>
+                  <div key={k}><Lbl c={l}/><input type="number" value={r[k]} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.2rem 0.35rem",fontSize:"0.9rem"}}/></div>
                 ))}
                 <div style={{textAlign:"center",paddingTop:"0.4rem"}}>
                   <Lbl c="Effective"/>
@@ -1438,7 +1528,7 @@ function AOrders({D,onRefresh}){
       {/* Orders by session */}
       {sessions.map(sess=>(
         <div key={sess}>
-          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
             {sess}{sess===currSess&&<Badge c="CURRENT" color={T.gold} sm/>}
           </div>
           {grouped[sess].map(o=>{
@@ -1447,7 +1537,7 @@ function AOrders({D,onRefresh}){
               <Card key={o.id} style={{borderLeft:`3px solid ${pos?.color||T.fnt}`,marginBottom:"0.4rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
                   <div>
-                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:700,fontSize:"0.78rem"}}>{pos?.title||o.role}</span>
+                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:700,fontSize:"0.9rem"}}>{pos?.title||o.role}</span>
                     <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
                   </div>
                   <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
@@ -1547,70 +1637,88 @@ function ASetup({D,onRefresh}){
 
 
 function AElections({D,onRefresh}){
-  const election=D.election;
+  const elections=D.elections||normalizeElections(null,D.election);
   const [office,setOffice]=useState("consul_1");
   const [msg,setMsg]=useState("");
   const players=D.players||[];
+  const active=elections.filter(e=>e&&e.status!=="closed");
+  const saveElections=async(next)=>{await db.set("spqr_elections",next);await db.set("spqr_election",null);};
   const start=async()=>{
-    const e={id:Date.now().toString(),status:"candidacy",office,session:sLab(D.game||DEF_GAME),candidates:[],votes:{},round:1,openedAt:new Date().toISOString()};
-    await db.set("spqr_election",e);
+    if(active.some(e=>e.office===office&&e.status!=="closed")){setMsg("There is already an active election for this office.");return;}
+    const e={id:Date.now().toString()+"_"+office,status:"candidacy",office,session:sLab(D.game||DEF_GAME),candidates:[],votes:{},round:1,openedAt:new Date().toISOString()};
+    await saveElections([...elections.filter(x=>x.status!=="closed"),e]);
     await pushN("Election Opened",`Candidacies are now open for ${POS[office]?.title||office}.`);
     setMsg("Election candidacy phase opened.");onRefresh();
   };
-  const openVoting=async()=>{
-    if(!election)return;
-    if((election.candidates||[]).length<1){setMsg("There are no candidates yet.");return;}
-    await db.set("spqr_election",{...election,status:"voting",votes:{}});
-    await pushN("Election Voting Open",`Voting has opened for ${POS[election.office]?.title||election.office}.`);
-    setMsg("Voting phase opened.");onRefresh();
+  const updateElection=async(id,patch)=>{
+    const all=await db.get("spqr_elections")||active;
+    const updated=all.map(e=>e.id===id?{...e,...patch}:e);
+    await saveElections(updated);onRefresh();
   };
-  const closeElection=async()=>{
-    if(!election)return;
+  const openVoting=async(election)=>{
+    if((election.candidates||[]).length<1){setMsg("There are no candidates yet for this office.");return;}
+    await updateElection(election.id,{status:"voting",votes:{}});
+    await pushN("Election Voting Open",`Voting has opened for ${POS[election.office]?.title||election.office}.`);
+    setMsg("Voting phase opened.");
+  };
+  const closeElection=async(election)=>{
     const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
     const cands=election.candidates||[];
-    if(cands.length===0){setMsg("No candidates. Election closed.");await db.set("spqr_election",null);onRefresh();return;}
+    if(cands.length===0){setMsg("No candidates. Election removed.");await saveElections(active.filter(e=>e.id!==election.id));onRefresh();return;}
     const max=Math.max(0,...cands.map(c=>counts[c.playerId]||0));
     const winners=cands.filter(c=>(counts[c.playerId]||0)===max);
     if(winners.length!==1 || max===0){
       const fresh={...election,status:"candidacy",candidates:[],votes:{},round:(election.round||1)+1,draw:true};
-      await db.set("spqr_election",fresh);
+      await saveElections(active.map(e=>e.id===election.id?fresh:e));
       await pushN("Election Draw",`The election for ${POS[election.office]?.title||election.office} ended in a draw. Candidacies reopen.`);
-      setMsg("Draw or no votes. The election has restarted with a new candidacy phase.");onRefresh();return;
+      setMsg("Draw or no votes. This election has restarted with a new candidacy phase.");onRefresh();return;
     }
     const winner=winners[0];
-    const updated=players.map(p=>{
+    const updatedPlayers=players.map(p=>{
       if(p.role===election.office&&p.id!==winner.playerId)return{...p,role:null};
       if(p.id===winner.playerId)return{...p,role:election.office};
       return p;
     });
-    await db.set("spqr_p",updated);
-    await db.set("spqr_election",{...election,status:"closed",winnerId:winner.playerId,winnerName:winner.name,closedAt:new Date().toISOString()});
+    await db.set("spqr_p",updatedPlayers);
+    const closed={...election,status:"closed",winnerId:winner.playerId,winnerName:winner.name,closedAt:new Date().toISOString()};
+    await saveElections(active.map(e=>e.id===election.id?closed:e));
     await pushN("Election Result",`${winner.name} has been elected ${POS[election.office]?.title||election.office}.`);
     setMsg(`${winner.name} elected and assigned to ${POS[election.office]?.title||election.office}.`);onRefresh();
   };
-  const cancel=async()=>{if(!confirm("Cancel the current election?"))return;await db.set("spqr_election",null);setMsg("Election cancelled.");onRefresh();};
-  const counts={};Object.values(election?.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+  const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
   return <div>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
-    <Card><STit c="Magistrate Election Control" sub="Open candidacy, then voting, then close the election. If there is a draw, the election restarts."/>
-      {!election||election.status==="closed"?<Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.title}</option>)}</select><Btn v="green" onClick={start}>Open Candidacy</Btn></Row>:<Row gap="0.5rem" wrap><Badge c={`${POS[election.office]?.title||election.office} — ${election.status.toUpperCase()} — Round ${election.round||1}`} color={POS[election.office]?.color||T.gold}/>{election.status==="candidacy"&&<Btn onClick={openVoting}>Open Voting Phase</Btn>}{election.status==="voting"&&<Btn v="green" onClick={closeElection}>Close Election & Assign Winner</Btn>}<Btn v="red" onClick={cancel}>Cancel Election</Btn></Row>}
+    <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
+      <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
     </Card>
-    {election&&election.status!=="closed"&&<><STit c="Candidates and Votes"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>{(election.candidates||[]).map(c=><Card key={c.playerId} style={{borderLeft:`4px solid ${POS[election.office]?.color||T.gold}`}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{c.name||getPlayerName(players,c.playerId)}</div><div style={{color:T.mut,whiteSpace:"pre-wrap",margin:"0.35rem 0"}}>{c.speech}</div><Stat label="Votes" value={counts[c.playerId]||0}/></Card>)}</div>{(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}<Card><STit c="Voters"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:"0.35rem"}}>{players.map(p=><div key={p.id} style={{padding:"0.4rem",background:T.surf,border:`1px solid ${T.border}`,fontSize:"0.9rem"}}>{p.latinName}: <span style={{color:election.votes?.[p.id]?T.gre:T.rhi}}>{election.votes?.[p.id]?"Voted":"Not voted"}</span></div>)}</div></Card></>}
+    {active.length===0&&<Card><div style={{color:T.mut,fontStyle:"italic"}}>No active elections. Open candidacy for any magistracy above.</div></Card>}
+    {active.map(election=>{
+      const officeInfo=POS[election.office];
+      const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+      return <Card key={election.id} style={{borderLeft:`6px solid ${officeInfo?.color||T.gold}`,background:officeInfo?.bg||T.card}}>
+        <Row gap="0.5rem" wrap><Badge c={`${officeInfo?.emoji||"🏛️"} ${officeInfo?.title||election.office} — ${election.status.toUpperCase()} — Round ${election.round||1}`} color={officeInfo?.color||T.gold}/>{election.status==="candidacy"&&<Btn onClick={()=>openVoting(election)}>Open Voting Phase</Btn>}{election.status==="voting"&&<Btn v="green" onClick={()=>closeElection(election)}>Close & Assign Winner</Btn>}<Btn v="red" onClick={()=>cancel(election)}>Cancel</Btn></Row>
+        <STit c="Candidates and Votes"/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>{(election.candidates||[]).map(c=><Card key={c.playerId} style={{borderLeft:`4px solid ${officeInfo?.color||T.gold}`}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{c.name||getPlayerName(players,c.playerId)}</div><div style={{color:T.mut,whiteSpace:"pre-wrap",margin:"0.35rem 0"}}>{c.speech}</div><Stat label="Votes" value={counts[c.playerId]||0}/></Card>)}</div>
+        {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
+        <Card><STit c="Voters"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:"0.35rem"}}>{players.map(p=><div key={p.id} style={{padding:"0.4rem",background:T.surf,border:`1px solid ${T.border}`,fontSize:"0.9rem"}}>{p.latinName}: <span style={{color:election.votes?.[p.id]?T.gre:T.rhi}}>{election.votes?.[p.id]?"Voted":"Not voted"}</span></div>)}</div></Card>
+      </Card>;
+    })}
   </div>;
 }
 
 /* ══ ADMIN APP ════════════════════════════════════════════════════════════ */
 function AdminApp({onLogout}){
   const [tab,setTab]=useState("overview");
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f")
     ]);
+    const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
@@ -1637,7 +1745,7 @@ function AdminApp({onLogout}){
       <div className="spqr-topbar" style={{background:"#0A0600",borderBottom:`2px solid ${T.red}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
         <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><Badge c="GM PANEL" color={T.rhi}/></Row>
         <Row gap="0.5rem">
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} S{D.game.sessionInSeason}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
           <NotifBell userId="gm"/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit Panel</Btn>
@@ -1645,7 +1753,7 @@ function AdminApp({onLogout}){
       </div>
       <div className="spqr-tabs" style={{display:"flex",borderBottom:`1px solid ${T.border}`,background:T.surf,overflowX:"auto",position:"sticky",top:"45px",zIndex:99}}>
         {TABS.map(({k,l})=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
             {l}
           </button>
         ))}
@@ -1704,14 +1812,14 @@ function LoginScreen({onLogin,onAdmin}){
         <div style={{textAlign:"center",marginBottom:"2rem"}}>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"3.5rem",fontWeight:900,color:T.gold,letterSpacing:"0.35em",textShadow:`0 0 80px rgba(200,146,42,0.35)`,lineHeight:1}}>SPQR</div>
           <div style={{color:T.mut,fontSize:"0.65rem",letterSpacing:"0.45em",marginTop:"0.5rem",fontFamily:"'Cinzel',serif"}}>SENATUS POPULUSQUE ROMANUS</div>
-          <div style={{color:T.fnt,fontSize:"0.6rem",letterSpacing:"0.3em",marginTop:"0.2rem",fontFamily:"'Cinzel',serif"}}>218 BC · THE SENATE AT WAR</div>
+          <div style={{color:T.fnt,fontSize:"0.72rem",letterSpacing:"0.3em",marginTop:"0.2rem",fontFamily:"'Cinzel',serif"}}>218 BC · THE SENATE AT WAR</div>
         </div>
 
         <div style={{background:T.surf,border:`1px solid ${T.border}`,padding:"1.5rem",boxShadow:`0 0 120px rgba(200,146,42,0.06)`}}>
           {/* Mode tabs */}
           <div style={{display:"flex",border:`1px solid ${T.border}`,marginBottom:"1.25rem",overflow:"hidden"}}>
             {[["login","Senator Login"],["register","Enroll"],["admin","GM"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setErr("");}} style={{flex:1,padding:"0.42rem 0.25rem",background:mode===m?T.gold:"transparent",color:mode===m?T.bg:T.mut,border:"none",fontFamily:"'Cinzel',serif",fontSize:"0.6rem",letterSpacing:"0.1em",cursor:"pointer"}}>
+              <button key={m} onClick={()=>{setMode(m);setErr("");}} style={{flex:1,padding:"0.42rem 0.25rem",background:mode===m?T.gold:"transparent",color:mode===m?T.bg:T.mut,border:"none",fontFamily:"'Cinzel',serif",fontSize:"0.72rem",letterSpacing:"0.1em",cursor:"pointer"}}>
                 {l}
               </button>
             ))}
@@ -1734,7 +1842,7 @@ function LoginScreen({onLogin,onAdmin}){
               <Inp label="Discord Username (required — prevents duplicate accounts)" value={f.discord} onChange={set("discord")} placeholder="your_discord_name"/>
               <div style={{marginBottom:"0.8rem"}}>
                 <Lbl c="Social Class"/>
-                <select value={f.cls} onChange={e=>setF(x=>({...x,cls:e.target.value}))} style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"0.95rem"}}>
+                <select value={f.cls} onChange={e=>setF(x=>({...x,cls:e.target.value}))} style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"1.05rem"}}>
                   <option>Patrician</option><option>Plebeian</option><option>Equestrian</option>
                 </select>
                 <div style={{fontSize:"0.75rem",color:T.mut,marginTop:"0.3rem",lineHeight:1.4}}>
@@ -1773,6 +1881,8 @@ export default function App(){
         await Promise.all([
           db.set("spqr_g",DEF_GAME),
           db.set("spqr_l",DEF_LEGIONS),
+          db.set("spqr_cav",DEF_CAVALRY),
+          db.set("spqr_f",DEF_FLEETS),
           db.set("spqr_r",DEF_REGIONS),
           db.set("spqr_p",[]),
           db.set("spqr_m",[]),
