@@ -4,93 +4,92 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-html{font-size:18px;-webkit-text-size-adjust:100%}
-body{background:#F6EFE4;color:#26160F;font-family:'EB Garamond',serif;font-size:1rem;line-height:1.45}
+html{font-size:20px;-webkit-text-size-adjust:100%}
+body{background:#F6EFE4;color:#26160F;font-family:'EB Garamond',serif;font-size:1.05rem;line-height:1.55}
 img{max-width:100%}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:#F6EFE4}::-webkit-scrollbar-thumb{background:#A32020}
 input,select,textarea,button{outline:none;font-size:1rem}
 button{cursor:pointer}
-@media(max-width:720px){html{font-size:17px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
+@media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
 `;
 const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A32020",
   gold:"#B9872B",ghi:"#8C5F16",red:"#A32020",rhi:"#D63A2E",
   green:"#2F7D32",gre:"#46A04A",blue:"#284B7A",
-  text:"#26160F",mut:"#6B5948",fnt:"#BFAE99"};
+  text:"#26160F",mut:"#4A382B",fnt:"#BFAE99"};
 
 /* ══ POSITIONS ════════════════════════════════════════════════════════════ */
 const POS={
-  consul_1:{title:"Consul I",abbr:"COS I",color:"#E05050",bg:"#1a0505",
-    desc:"Supreme magistrate of Rome. Commands all legions and presides over the Senate with imperium maius.",
-    can:["Submit one military order per session","Propose any Senate motion","Command all active legions","Declare war (requires Senate vote)","Veto any lesser magistrate's decision"],
-    cannot:["Declare war alone without Senate","Serve more than one year","Raise legions without Senate vote","Re-take office for 10 years"]},
-  consul_2:{title:"Consul II",abbr:"COS II",color:"#E05050",bg:"#1a0505",
-    desc:"Co-equal supreme magistrate sharing command and authority with Consul I.",
-    can:["Submit one military order per session","Propose any Senate motion","Command all active legions"],
-    cannot:["Overrule Consul I without Senate","Serve more than one year","Re-take office for 10 years"]},
-  praetor_1:{title:"Praetor Urbanus",abbr:"PR I",color:"#B060F0",bg:"#150820",
-    desc:"Chief judicial magistrate. Governs Rome in the Consuls' absence. Administers law over citizens.",
-    can:["Submit one administrative order per session","Govern Rome when Consuls are absent","Propose legal and civic motions","Command a legion if assigned by Consuls"],
-    cannot:["Override Consular decisions","Declare war independently","Spend treasury without Senate authorization"]},
-  praetor_2:{title:"Praetor Peregrinus",abbr:"PR II",color:"#B060F0",bg:"#150820",
-    desc:"Oversees non-citizen affairs and outlying territories at the Senate's direction.",
-    can:["Submit one provincial order per session","Propose foreign affairs motions","Manage non-citizen disputes"],
-    cannot:["Override senior magistrates","Command legions without Consular authorization"]},
-  censor_1:{title:"Censor I",abbr:"CEN I",color:"#9050D0",bg:"#120818",
-    desc:"Guardian of the Roman census. Controls citizen rolls, social class, and the military levy.",
-    can:["Submit one census order per session","Propose levy and recruitment motions","View full population data","Authorize raising legions (Senate vote required)"],
-    cannot:["Raise legions unilaterally","Command armies in the field","Spend gold directly"]},
-  censor_2:{title:"Censor II",abbr:"CEN II",color:"#9050D0",bg:"#120818",
-    desc:"Co-censor overseeing public contracts, construction, and citizen conduct.",
-    can:["Submit one civic order per session","Propose public works motions","Assist in levy and recruitment"],
-    cannot:["Act alone on census matters","Command armies","Override Censor I"]},
-  quaestor_1:{title:"Quaestor I",abbr:"Q I",color:"#D09020",bg:"#140e00",
-    desc:"Keeper of the Treasury (Aerarium Saturni). No major expense moves without the Quaestor's seal.",
-    can:["Submit one treasury order per session","Propose financial and tax motions","View full treasury and income data","Flag or challenge major expenditures"],
-    cannot:["Spend gold without Senate authorization","Command legions","Override any senior magistrate"]},
-  quaestor_2:{title:"Quaestor II",abbr:"Q II",color:"#D09020",bg:"#140e00",
-    desc:"Military paymaster managing legion supply, payroll, and military expenditures.",
-    can:["Submit one supply order per session","Propose military expenditure motions","View legion upkeep and supply costs"],
-    cannot:["Command legions","Override Quaestor I","Access civilian treasury directly"]},
-  aedile_1:{title:"Aedile Curule",abbr:"AED",color:"#40A030",bg:"#061406",
-    desc:"Manager of Rome's grain supply and city logistics. If the grain runs out, Rome starves — the Aedile prevents that.",
-    can:["Submit one logistics order per session","Propose food supply and market motions","Monitor food consumption across legions","Manage grain distribution to the city"],
-    cannot:["Command legions","Access the gold treasury independently","Override financial magistrates"]},
-  tribune_1:{title:"Tribune I",abbr:"TR I",color:"#4080C0",bg:"#060e18",
-    desc:"Sacred protector of the plebs. Possesses absolute veto over any Senate motion. Their person is sacrosanct — inviolable.",
-    can:["VETO any Senate motion — absolute, no override possible","Propose plebeian motions","Submit one order per session","Intercede to protect any citizen from magistrate abuse"],
-    cannot:["Command armies in the field","Be overridden by any magistrate — not even Consuls","Be prosecuted or physically harmed while in office"]},
-  tribune_2:{title:"Tribune II",abbr:"TR II",color:"#4080C0",bg:"#060e18",
-    desc:"Co-tribune sharing the absolute veto power. Two tribunes acting together cannot be overridden by any force.",
-    can:["VETO any Senate motion — absolute, no override possible","Propose plebeian motions","Submit one order per session","Protect any plebeian citizen"],
-    cannot:["Command armies","Be overridden by any magistrate","Be prosecuted or harmed while in office"]},
+  consul_1:{emoji:"🦅",title:"Consul I",abbr:"COS I",color:"#B91C1C",bg:"#FFF1F1",
+    desc:"Supreme magistrate of Rome. Commands the legions, leads the Senate and directs the Republic during war.",
+    can:["🛡️ Submit one military order per turn","🏛️ Lead Senate policy and emergency debate","⚔️ Command active legions in the field","📜 Propose major war measures","🚫 Veto lesser magistrates when justified by office"],
+    cannot:["👑 Act as king or ignore the Senate forever","⚖️ Declare war without political authority","💰 Spend the treasury without approval","♾️ Hold power permanently"]},
+  consul_2:{emoji:"🦅",title:"Consul II",abbr:"COS II",color:"#B91C1C",bg:"#FFF1F1",
+    desc:"Co-equal Consul sharing supreme authority with Consul I. Rome divides power to prevent tyranny.",
+    can:["🛡️ Submit one military order per turn","⚔️ Command active legions","🏛️ Lead Senate debate with Consul I","🤝 Check or support the other Consul"],
+    cannot:["👑 Rule alone","⚖️ Overrule the Senate by personal will","💰 Spend the treasury without approval","♾️ Hold power permanently"]},
+  praetor_1:{emoji:"⚖️",title:"Praetor Urbanus",abbr:"PR I",color:"#7C3AED",bg:"#F5F0FF",
+    desc:"Chief judicial magistrate of Rome. Oversees law, courts, civic order and administration inside the city.",
+    can:["⚖️ Submit one legal or administrative order","🏛️ Govern Rome when Consuls are absent","📜 Propose legal and civic motions","🛡️ Command troops only if assigned"],
+    cannot:["🦅 Override Consuls in military command","⚔️ Declare war independently","💰 Spend gold without authority"]},
+  praetor_2:{emoji:"🌍",title:"Praetor Peregrinus",abbr:"PR II",color:"#7C3AED",bg:"#F5F0FF",
+    desc:"Handles foreign citizens, allied disputes, provincial administration and matters beyond Rome itself.",
+    can:["🌍 Submit one foreign or provincial order","🤝 Manage allied and non-citizen disputes","📜 Propose foreign affairs motions","🛡️ Command troops only if assigned"],
+    cannot:["🦅 Override senior magistrates","⚔️ Command legions without authorization","💰 Spend provincial funds freely"]},
+  quaestor_1:{emoji:"💰",title:"Quaestor I",abbr:"Q I",color:"#B7791F",bg:"#FFF7E6",
+    desc:"Financial magistrate of the Republic. Shares responsibility for treasury, payments, supplies and military expenses.",
+    can:["💰 Submit one treasury or supply order","📊 View income, stockpiles and costs","🧾 Propose taxes, payments and funding plans","⚔️ Organize legion pay and supply spending"],
+    cannot:["⚔️ Command armies","👑 Override elected senior magistrates","💸 Spend unlimited gold without Senate authority"]},
+  quaestor_2:{emoji:"💰",title:"Quaestor II",abbr:"Q II",color:"#B7791F",bg:"#FFF7E6",
+    desc:"Financial magistrate of the Republic. Shares responsibility for treasury, payments, supplies and military expenses.",
+    can:["💰 Submit one treasury or supply order","📊 View income, stockpiles and costs","🧾 Propose taxes, payments and funding plans","⚔️ Organize legion pay and supply spending"],
+    cannot:["⚔️ Command armies","👑 Override elected senior magistrates","💸 Spend unlimited gold without Senate authority"]},
+  aedile_1:{emoji:"🌾",title:"Aedile Curule",abbr:"AED",color:"#2F7D32",bg:"#F0FFF4",
+    desc:"Manager of grain, food supply, public markets, city logistics and public order in Rome.",
+    can:["🌾 Submit one food or logistics order","🏪 Regulate markets and grain distribution","👥 Manage city stability and public order","📜 Propose food and infrastructure motions"],
+    cannot:["⚔️ Command legions","💰 Spend treasury independently","🌍 Decide foreign policy alone"]},
+  tribune_1:{emoji:"🛡️",title:"Tribune I",abbr:"TR I",color:"#2563EB",bg:"#EFF6FF",
+    desc:"Sacred protector of the plebs. Possesses veto power and protects citizens from abuse.",
+    can:["🚫 Veto Senate motions when defending the plebs","🛡️ Intercede for citizens against abuse","📣 Propose plebeian motions","👥 Mobilize popular pressure"],
+    cannot:["⚔️ Command armies in the field","👑 Act as king of the people","💰 Spend the treasury"]},
+  tribune_2:{emoji:"🛡️",title:"Tribune II",abbr:"TR II",color:"#2563EB",bg:"#EFF6FF",
+    desc:"Co-tribune sharing the sacred duty to protect the plebs and resist abusive power.",
+    can:["🚫 Veto Senate motions when defending the plebs","🛡️ Protect plebeian citizens","📣 Propose plebeian motions","👥 Mobilize popular pressure"],
+    cannot:["⚔️ Command armies","👑 Rule outside the law","💰 Spend the treasury"]},
+  dictator_1:{emoji:"⚡",title:"Dictator",abbr:"DICT",color:"#7F1D1D",bg:"#FFF1F2",
+    desc:"Emergency magistrate appointed only in the gravest crisis. Holds extraordinary authority for a limited mandate.",
+    can:["⚡ Submit one emergency order","🛡️ Coordinate the full crisis response","⚔️ Direct military priorities during the emergency","⏳ Act quickly when Rome cannot wait"],
+    cannot:["♾️ Hold office permanently","👑 Declare himself king","📜 Ignore the limited emergency mandate","🛡️ Abolish the Senate"]},
+  magister_equitum_1:{emoji:"🐎",title:"Magister Equitum",abbr:"MAG EQ",color:"#0F766E",bg:"#ECFEFF",
+    desc:"Master of Horse. Deputy to an emergency command, focused on cavalry, mobility and rapid military operations.",
+    can:["🐎 Submit one cavalry or rapid response order","⚔️ Organize scouts, cavalry and mobile detachments","🛡️ Support the Dictator or Consuls in campaign logistics","📍 React to fast-moving threats"],
+    cannot:["👑 Override the supreme magistrate","💰 Spend freely without approval","🏛️ Rule the Senate","♾️ Keep emergency command forever"]},
 };
 
 // Physical senate seating positions (col 0-8, row 0-6 on 9×7 grid)
-const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},praetor_1:{c:3,r:2},praetor_2:{c:5,r:2},
-  censor_1:{c:1,r:2},censor_2:{c:7,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},
-  aedile_1:{c:4,r:4},tribune_1:{c:2,r:5},tribune_2:{c:6,r:5}};
+const SEATS={consul_1:{c:4,r:0},consul_2:{c:4,r:1},dictator_1:{c:4,r:2},magister_equitum_1:{c:4,r:3},praetor_1:{c:2,r:2},praetor_2:{c:6,r:2},quaestor_1:{c:1,r:4},quaestor_2:{c:7,r:4},aedile_1:{c:4,r:5},tribune_1:{c:2,r:6},tribune_2:{c:6,r:6}};
 
 /* ══ GAME DATA ════════════════════════════════════════════════════════════ */
-const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Summer",
-  gold:2200,food:3200,pop:175000,legionUpkeep:110,legionFood:90,lgold:550,lfood:450,lpop:5000,lturns:2};
+const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
+  gold:1800,food:2800,pop:175000,legionUpkeep:125,legionFood:110,lgold:650,lfood:550,lpop:5000,lturns:2};
 
 const DEF_LEGIONS=["I","II","III","IV"].map((id)=>
   ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma"}));
 
 const DEF_REGIONS=[
-  {id:"latium",   name:"Latium",        bG:200,bF:150,s:"roman"},
-  {id:"campania", name:"Campania",       bG:300,bF:200,s:"roman"},
-  {id:"etruria",  name:"Etruria",        bG:180,bF:120,s:"roman"},
-  {id:"samnium",  name:"Samnium",        bG:120,bF:100,s:"roman"},
-  {id:"apulia",   name:"Apulia",         bG:150,bF:180,s:"roman"},
-  {id:"calabria", name:"Calabria",       bG:100,bF:130,s:"roman"},
-  {id:"bruttium", name:"Bruttium",       bG:80, bF:100,s:"roman"},
-  {id:"lucania",  name:"Lucania",        bG:90, bF:120,s:"roman"},
-  {id:"umbria",   name:"Umbria",         bG:120,bF:100,s:"roman"},
-  {id:"picenum",  name:"Picenum",        bG:100,bF:80, s:"roman"},
-  {id:"cisalpine",name:"Cisalpine Gaul", bG:50, bF:80, s:"contested"},
-  {id:"sicily",   name:"Sicily",         bG:250,bF:300,s:"roman"},
-  {id:"sardinia", name:"Sardinia",       bG:100,bF:120,s:"roman"},
+  {id:"latium",name:"Latium",capital:"Roma",pop:175000,bG:180,bF:140,s:"roman"},
+  {id:"etruria",name:"Etruria",capital:"Arretium",pop:260000,bG:160,bF:110,s:"roman"},
+  {id:"umbria",name:"Umbria",capital:"Spoletium",pop:150000,bG:105,bF:90,s:"roman"},
+  {id:"picenum",name:"Picenum",capital:"Ancona",pop:120000,bG:90,bF:85,s:"roman"},
+  {id:"samnium",name:"Samnium",capital:"Bovianum",pop:210000,bG:115,bF:105,s:"roman"},
+  {id:"campania",name:"Campania",capital:"Capua",pop:360000,bG:260,bF:210,s:"roman"},
+  {id:"apulia",name:"Apulia",capital:"Luceria",pop:220000,bG:130,bF:190,s:"roman"},
+  {id:"lucania",name:"Lucania",capital:"Grumentum",pop:130000,bG:80,bF:115,s:"roman"},
+  {id:"bruttium",name:"Bruttium",capital:"Consentia",pop:120000,bG:70,bF:105,s:"roman"},
+  {id:"calabria",name:"Calabria",capital:"Tarentum",pop:170000,bG:95,bF:130,s:"roman"},
+  {id:"sicilia",name:"Sicilia",capital:"Syracusae",pop:650000,bG:230,bF:310,s:"roman"},
+  {id:"sardinia_corsica",name:"Sardinia et Corsica",capital:"Caralis",pop:300000,bG:110,bF:130,s:"roman"},
+  {id:"gallia_cisalpina",name:"Gallia Cisalpina",capital:"Placentia",pop:420000,bG:55,bF:90,s:"contested"},
+  {id:"illyria",name:"Illyrian Coast",capital:"Scodra",pop:90000,bG:50,bF:60,s:"contested"},
 ];
 const RS={roman:{l:"Roman Control",c:"#40A030",m:1.0},contested:{l:"Contested",c:"#C8922A",m:0.5},
   sacked:{l:"Sacked",c:"#E05050",m:0.1},devastated:{l:"Devastated",c:"#CC6622",m:0.25},enemy:{l:"Enemy Control",c:"#880020",m:0.0}};
@@ -107,7 +106,7 @@ const LAWS=[
 ];
 
 const ADMIN_PASS="SPQR_GM_218BC";
-const SEASONS=["Spring","Summer","Autumn","Winter"];
+const SEASONS=["Spring","Early Summer","High Summer","Autumn","Winter"];
 
 /* ══ STORAGE & UTILS ══════════════════════════════════════════════════════ */
 const db={
@@ -116,7 +115,7 @@ const db={
   async gP(k){return this.get(k,false);},
   async sP(k,v){return this.set(k,v,false);},
 };
-const sLab=g=>`${g.year} BC ${g.season} S${g.sessionInSeason}`;
+const sLab=g=>`${g.year} BC · ${g.season} · Turn ${g.session||1}`;
 const fmt=n=>Number(n||0).toLocaleString();
 const calcInc=regs=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=r.bG*m;f+=r.bF*m;});return{gold:Math.floor(g),food:Math.floor(f)};};
 const compress=(file,mx=600)=>new Promise(res=>{const c=document.createElement('canvas'),img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(mx/img.width,mx/img.height,1);c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',0.75));};img.src=u;});
@@ -136,9 +135,9 @@ const getPlayerName=(players,id)=>players.find(p=>p.id===id)?.latinName||"Unknow
 
 
 /* ══ SHARED UI ════════════════════════════════════════════════════════════ */
-const Lbl=({c})=><div style={{color:T.mut,fontSize:"0.68rem",letterSpacing:"0.14em",fontFamily:"'Cinzel',serif",marginBottom:"0.22rem",textTransform:"uppercase"}}>{c}</div>;
+const Lbl=({c})=><div style={{color:T.mut,fontSize:"0.9rem",letterSpacing:"0.14em",fontFamily:"'Cinzel',serif",marginBottom:"0.22rem",textTransform:"uppercase"}}>{c}</div>;
 function Inp({label,value,onChange,type="text",placeholder="",rows,disabled}){
-  const s={width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"0.95rem",opacity:disabled?0.6:1};
+  const s={width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"1.05rem",opacity:disabled?0.6:1};
   return(<div style={{marginBottom:"0.8rem"}}>{label&&<Lbl c={label}/>}{rows?<textarea value={value} onChange={e=>onChange(e.target.value)} rows={rows} placeholder={placeholder} style={{...s,resize:"vertical"}} disabled={disabled}/>:<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={s} disabled={disabled}/>}</div>);
 }
 function Btn({children,onClick,v="gold",sm,full,disabled}){
@@ -147,11 +146,11 @@ function Btn({children,onClick,v="gold",sm,full,disabled}){
   return(<button onClick={onClick} disabled={disabled} style={{padding:sm?"0.26rem 0.55rem":"0.48rem 1rem",background:bg,color:c,border:`1px solid ${T.border}`,fontFamily:"'Cinzel',serif",fontSize:sm?"0.65rem":"0.74rem",letterSpacing:"0.08em",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.45:1,width:full?"100%":"auto",fontWeight:600,whiteSpace:"nowrap"}}>{children}</button>);
 }
 const Card=({children,style={}})=><div style={{background:T.card,border:`1px solid ${T.border}`,padding:"0.9rem",marginBottom:"0.6rem",...style}}>{children}</div>;
-const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",background:`${color}22`,border:`1px solid ${color}`,color,padding:sm?"0.05rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.6rem":"0.66rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{c}</span>;
-const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.78rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
+const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",background:`${color}22`,border:`1px solid ${color}`,color,padding:sm?"0.05rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.06em",whiteSpace:"nowrap"}}>{c}</span>;
+const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.9rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
 const Row=({children,gap="0.4rem",wrap})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:wrap?"wrap":"nowrap"}}>{children}</div>;
-const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.3rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.6rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
-function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.3rem"}}>✕</button></div>{children}</div></div>);}
+const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.55rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.72rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
+function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.55rem"}}>✕</button></div>{children}</div></div>);}
 
 /* ══ NOTIFICATION BELL ════════════════════════════════════════════════════ */
 function NotifBell({userId}){
@@ -276,7 +275,7 @@ function SenateMap({players,onSelectPlayer}){
                 <>
                   <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:holder?posInfo.color:posInfo.color+"88",textAlign:"center",letterSpacing:"0.05em",lineHeight:1.2,marginBottom:2}}>{posInfo.abbr}</div>
                   {holder?.avatar&&<img src={holder.avatar} style={{width:30,height:30,objectFit:"cover",borderRadius:"50%",border:`1px solid ${posInfo.color}`}} alt=""/>}
-                  {!holder&&<div style={{fontSize:"0.6rem",color:posInfo.color+"66",fontFamily:"'Cinzel',serif",textAlign:"center",lineHeight:1}}>vacant</div>}
+                  {!holder&&<div style={{fontSize:"0.72rem",color:posInfo.color+"66",fontFamily:"'Cinzel',serif",textAlign:"center",lineHeight:1}}>vacant</div>}
                   {holder&&!holder.avatar&&<div style={{width:30,height:30,background:`${posInfo.color}33`,border:`1px solid ${posInfo.color}`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.55rem",color:posInfo.color,fontFamily:"'Cinzel',serif"}}>{holder.latinName?.[0]||"?"}</div>}
                 </>
               )}
@@ -301,11 +300,11 @@ function SenateMap({players,onSelectPlayer}){
               {hov.player.avatar&&<img src={hov.player.avatar} style={{width:48,height:48,objectFit:"cover",border:`1px solid ${T.bhi}`,marginBottom:"0.4rem",display:"block"}} alt=""/>}
               <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"0.82rem",fontWeight:600}}>{hov.player.latinName}</div>
               <div style={{color:T.mut,fontSize:"0.75rem",marginTop:"0.15rem"}}>{hov.player.charClass}</div>
-              {hov.player.discord&&<div style={{color:"#7289DA",fontSize:"0.72rem",marginTop:"0.15rem"}}>Discord: {hov.player.discord}</div>}
+              {hov.player.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem",marginTop:"0.15rem"}}>Discord: {hov.player.discord}</div>}
               {!hov.posInfo&&<div style={{color:T.fnt,fontSize:"0.7rem",marginTop:"0.15rem",fontStyle:"italic"}}>Senator</div>}
             </>
           )}
-          {hov.posInfo&&!hov.player&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.78rem"}}>— Vacant —</div>}
+          {hov.posInfo&&!hov.player&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>— Vacant —</div>}
         </div>
       )}
       <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginTop:"0.75rem",justifyContent:"center"}}>
@@ -336,7 +335,7 @@ function VotingGrid({motion,players}){
           );
         })}
       </div>
-      <div style={{display:"flex",gap:"1rem",marginTop:"0.5rem",fontSize:"0.78rem",color:T.mut}}>
+      <div style={{display:"flex",gap:"1rem",marginTop:"0.5rem",fontSize:"0.9rem",color:T.mut}}>
         <span style={{color:T.gre}}>✓ YEA: {Object.values(motion.votes||{}).filter(v=>v==="yea").length}</span>
         <span style={{color:T.rhi}}>✗ NAY: {Object.values(motion.votes||{}).filter(v=>v==="nay").length}</span>
         <span>⟳ NOT VOTED: {players.length-Object.keys(motion.votes||{}).length}</span>
@@ -367,7 +366,7 @@ function SenatePanel({players,D}){
               <div key={p.id} onClick={()=>setSelected(p)} style={{display:"flex",gap:"0.75rem",alignItems:"center",padding:"0.65rem",background:T.bg,border:`1px solid ${pos?pos.color+"66":T.fnt}`,cursor:"pointer"}}>
                 {p.avatar?<img src={p.avatar} style={{width:54,height:54,objectFit:"cover",borderRadius:"50%",border:`2px solid ${pos?pos.color:T.border}`,flexShrink:0}} alt=""/>:<div style={{width:54,height:54,background:`${pos?pos.color:T.fnt}33`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",color:pos?pos.color:T.mut,fontFamily:"'Cinzel',serif",flexShrink:0}}>{p.latinName?.[0]||"?"}</div>}
                 <div style={{minWidth:0}}>
-                  <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"0.95rem",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.latinName}</div>
+                  <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"1.05rem",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.latinName}</div>
                   <div style={{color:T.mut,fontSize:"0.85rem"}}>{p.charClass}{p.discord&&<span style={{color:"#7289DA",marginLeft:"0.4rem"}}>{p.discord}</span>}</div>
                   {pos&&<Badge c={pos.title} color={pos.color} sm/>}
                 </div>
@@ -424,8 +423,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         </div>}
         <Inp label="Motion Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Raise Legio VII immediately" disabled={motionLocked}/>
         <Inp label="Motion Text — be specific and persuasive" value={form.body} onChange={v=>setForm(f=>({...f,body:v}))} rows={3} disabled={motionLocked}/>
-        {err&&<div style={{color:T.rhi,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{err}</div>}
-        {ok&&<div style={{color:T.gre,fontSize:"0.95rem",marginBottom:"0.5rem"}}>{ok}</div>}
+        {err&&<div style={{color:T.rhi,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{err}</div>}
+        {ok&&<div style={{color:T.gre,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{ok}</div>}
         <Btn onClick={propose} disabled={motionLocked}>{motionLocked?"Motion Already Submitted This Turn":"Submit to GM for Approval"}</Btn>
       </Card>
       {/* Active votes */}
@@ -442,12 +441,12 @@ function VotingPanel({motions,players,user,game,onRefresh}){
                 <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:600}}>{m.title}</div>
                 <Badge c="OPEN TO VOTE" color={T.gold}/>
               </div>
-              <div style={{color:T.mut,fontSize:"0.72rem",fontFamily:"'Cinzel',serif",marginBottom:"0.4rem"}}>Proposed by {m.byName} · {m.session||""}</div>
+              <div style={{color:T.mut,fontSize:"0.9rem",fontFamily:"'Cinzel',serif",marginBottom:"0.4rem"}}>Proposed by {m.byName} · {m.session||""}</div>
               <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,marginBottom:"0.65rem"}}>{m.body}</div>
               {!myVote?<Row gap="0.5rem"><Btn v="green" sm onClick={()=>vote(m.id,"yea")}>✓ AYE</Btn><Btn v="crimson" sm onClick={()=>vote(m.id,"nay")}>✗ NAY</Btn></Row>
                 :<div style={{color:myVote==="yea"?T.gre:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.8rem"}}>You voted {myVote.toUpperCase()}</div>}
               <div style={{marginTop:"0.5rem"}}>
-                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.72rem",cursor:"pointer",fontFamily:"'Cinzel',serif"}}>
+                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.9rem",cursor:"pointer",fontFamily:"'Cinzel',serif"}}>
                   {isSel?"▲ Hide tally":"▼ Show tally"} — AYE {yeas} · NAY {nays}
                 </button>
                 {isSel&&<VotingGrid motion={m} players={players}/>}
@@ -470,10 +469,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
             </div>
             <div style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",marginBottom:"0.3rem"}}>By {m.byName} · {m.session||""}</div>
             <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.4rem"}}>{m.body}</div>
-            {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.78rem"}}>Awaiting GM review…</div>}
-            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}</div>}
-            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}</div>}
-            {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.78rem"}}>Rejected by GM — not put to vote</div>}
+            {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>Awaiting GM review…</div>}
+            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}</div>}
+            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}</div>}
+            {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.9rem"}}>Rejected by GM — not put to vote</div>}
             {(m.status==="passed"||m.status==="failed")&&<button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.7rem",cursor:"pointer",marginTop:"0.3rem"}}>
               {isSel?"▲ Hide":"▼ Show vote record"}</button>}
             {isSel&&<VotingGrid motion={m} players={players}/>}
@@ -498,7 +497,7 @@ function OrdersPanel({orders,game,players}){
       {sessions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No orders have been submitted yet.</div>}
       {sessions.map(sess=>(
         <div key={sess}>
-          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
             {sess}{sess===currSess&&<Badge c="CURRENT SESSION" color={T.gold} sm/>}
           </div>
           {grouped[sess].map(o=>{
@@ -508,7 +507,7 @@ function OrdersPanel({orders,game,players}){
               <Card key={o.id} style={{borderLeft:`3px solid ${pos?.color||T.fnt}`,marginBottom:"0.4rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.3rem"}}>
                   <div>
-                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontSize:"0.78rem",fontWeight:700}}>{pos?.title||o.role}</span>
+                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontSize:"0.9rem",fontWeight:700}}>{pos?.title||o.role}</span>
                     <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
                   </div>
                   <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
@@ -553,7 +552,7 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
 
   const isConsul=role.startsWith("consul");
   const isQuaestor=role.startsWith("quaestor");
-  const isCensor=role.startsWith("censor");
+  const isEmergency=role.startsWith("dictator")||role.startsWith("magister_equitum");
   const isAedile=role.startsWith("aedile");
 
   return(
@@ -561,7 +560,7 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
       {/* Position header */}
       <Card style={{borderLeft:`3px solid ${pos.color}`,background:pos.bg}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"0.5rem",marginBottom:"0.5rem"}}>
-          <div style={{fontFamily:"'Cinzel',serif",color:pos.color,fontSize:"1.05rem",fontWeight:700}}>{pos.title}</div>
+          <div style={{fontFamily:"'Cinzel',serif",color:pos.color,fontSize:"1.05rem",fontWeight:700}}>{pos.emoji||"🏛️"} {pos.title}</div>
           <Badge c={pos.abbr} color={pos.color}/>
         </div>
         <div style={{fontSize:"0.9rem",color:T.mut,lineHeight:1.6,marginBottom:"0.75rem"}}>{pos.desc}</div>
@@ -578,7 +577,7 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
       </Card>
 
       {/* Relevant data pane */}
-      {(isConsul||isCensor)&&(
+      {(isConsul||isEmergency)&&(
         <Card>
           <STit c="Legion Status"/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"0.35rem"}}>
@@ -670,7 +669,7 @@ function MyOfficePanel({user,game,legions,players,orders,deadline,onRefresh}){
                   <div style={{fontSize:"0.85rem",color:T.text,whiteSpace:"pre-wrap"}}>{o.resolution}</div>
                   {o.resolutionImage&&<a href={o.resolutionImage} target="_blank" rel="noreferrer" style={{color:"#8090D0",fontSize:"0.75rem",display:"block",marginTop:"0.25rem"}}>📎 Attached image/map</a>}
                 </div>
-              ):<div style={{color:T.fnt,fontSize:"0.78rem",fontStyle:"italic"}}>No resolution recorded</div>}
+              ):<div style={{color:T.fnt,fontSize:"0.9rem",fontStyle:"italic"}}>No resolution recorded</div>}
             </div>
           ))}
         </Card>
@@ -702,7 +701,7 @@ function CharacterPanel({user,onUpdate}){
             <div style={{width:140,height:140,background:T.fnt,display:"flex",alignItems:"center",justifyContent:"center",border:`2px solid ${T.border}`,fontFamily:"'Cinzel',serif",color:T.mut,fontSize:"2rem"}}>{user.latinName?.[0]||"?"}</div>}
             <input type="file" ref={fileRef} onChange={handleFile} accept="image/*" style={{display:"none"}}/>
             <button onClick={()=>fileRef.current.click()} style={{display:"block",marginTop:"0.4rem",background:"none",border:`1px solid ${T.border}`,color:T.mut,fontFamily:"'Cinzel',serif",fontSize:"0.62rem",padding:"0.2rem 0.4rem",cursor:"pointer",width:"100%",letterSpacing:"0.06em"}}>UPLOAD AVATAR</button>
-            {msg&&<div style={{color:T.gre,fontSize:"0.72rem",marginTop:"0.2rem"}}>{msg}</div>}
+            {msg&&<div style={{color:T.gre,fontSize:"0.9rem",marginTop:"0.2rem"}}>{msg}</div>}
           </div>
           <div style={{flex:1}}>
             <div style={{fontFamily:"'Cinzel',serif",color:T.ghi,fontSize:"1.1rem",fontWeight:700,marginBottom:"0.25rem"}}>{user.latinName}</div>
@@ -774,7 +773,7 @@ function MapPanel({cfg}){
 
 function EconomyGraph({history=[]}){
   const data=(history||[]).slice(-8);
-  if(data.length===0)return <div style={{color:T.mut,fontStyle:"italic",fontSize:"0.95rem"}}>Economy history will appear after the GM advances at least one session.</div>;
+  if(data.length===0)return <div style={{color:T.mut,fontStyle:"italic",fontSize:"1.05rem"}}>Economy history will appear after the GM advances at least one session.</div>;
   const maxGold=Math.max(1,...data.map(x=>Math.abs(x.netGold||0)));
   const maxFood=Math.max(1,...data.map(x=>Math.abs(x.netFood||0)));
   return(
@@ -788,8 +787,8 @@ function EconomyGraph({history=[]}){
             <div title={`Net food ${d.netFood}`} style={{height:fh,width:18,background:(d.netFood||0)>=0?T.green:T.rhi,border:`1px solid ${T.border}`}}/>
           </div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.58rem",color:T.mut,marginTop:"0.35rem",lineHeight:1.2}}>{d.label}</div>
-          <div style={{fontSize:"0.72rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
-          <div style={{fontSize:"0.72rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
+          <div style={{fontSize:"0.9rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
+          <div style={{fontSize:"0.9rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
         </div>;
       })}
     </div>
@@ -815,7 +814,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
           <Stat label="Net Gold / Turn" value={`${snap.netGold>=0?"+":""}${fmt(snap.netGold)}T`} color={snap.netGold>=0?T.gre:T.rhi}/>
           <Stat label="Net Food / Turn" value={`${snap.netFood>=0?"+":""}${fmt(snap.netFood)}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
         </div>
-        <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5}}>Rome starts wounded after Trebia: enough resources to survive, but not enough to expand recklessly. New legions require gold, food, manpower and time.</div>
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5}}>Rome starts wounded after Trebia: enough resources to survive, but not enough to expand recklessly. New legions require gold, food, manpower and time.</div>
       </Card>
       <Card>
         <STit c="Economy Trend" sub="Updated when the Game Master advances the session."/>
@@ -853,8 +852,8 @@ function LegionsPublicPanel({legions,game}){
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:"0.6rem"}}>
       {(legions||[]).map((l,i)=><Card key={`${l.id}-${i}`} style={{borderLeft:`4px solid ${sc[l.status]||T.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.4rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{l.name||`Legio ${l.id}`}</div><Badge c={(l.status||"active").toUpperCase()} color={sc[l.status]||T.mut} sm/></div>
-        <div style={{fontSize:"0.95rem",color:T.mut}}>Strength: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(l.str||0)} / {fmt(l.max||5000)}</span></div>
-        <div style={{fontSize:"0.95rem",color:T.mut}}>Location: <span style={{color:T.text}}>{l.location||"Unknown"}</span></div>
+        <div style={{fontSize:"1.05rem",color:T.mut}}>Strength: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(l.str||0)} / {fmt(l.max||5000)}</span></div>
+        <div style={{fontSize:"1.05rem",color:T.mut}}>Location: <span style={{color:T.text}}>{l.location||"Unknown"}</span></div>
         {l.status==="raising"&&<div style={{marginTop:"0.35rem",color:T.gold}}>Raising progress: {l.prog||0}/{game?.lturns||DEF_GAME.lturns}</div>}
       </Card>)}
     </div>
@@ -866,9 +865,9 @@ function MagistratesPanel({players=[]}){
     <Card><STit c="Magistrates and Roles" sub="Offices of the Roman Republic, current holders and responsibilities."/></Card>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"0.65rem"}}>
       {roleEntries().map(pos=>{const holder=players.find(p=>p.role===pos.key);return <Card key={pos.key} style={{borderLeft:`4px solid ${pos.color}`,background:pos.bg||T.card}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:pos.color}}>{pos.title}</div><Badge c={pos.abbr} color={pos.color}/></div>
-        <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.45,marginBottom:"0.45rem"}}>{pos.desc}</div>
-        <div style={{fontSize:"0.95rem",color:T.text}}>Holder: <span style={{fontFamily:"'Cinzel',serif",color:holder?T.ghi:T.rhi}}>{holder?holder.latinName:"Vacant"}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.35rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:pos.color}}>{pos.emoji||"🏛️"} {pos.title}</div><Badge c={pos.abbr} color={pos.color}/></div>
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.45,marginBottom:"0.45rem"}}>{pos.desc}</div>
+        <div style={{fontSize:"1.05rem",color:T.text}}>Holder: <span style={{fontFamily:"'Cinzel',serif",color:holder?T.ghi:T.rhi}}>{holder?holder.latinName:"Vacant"}</span></div>
       </Card>})}
     </div>
   </div>;
@@ -950,7 +949,7 @@ function PlayerApp({user:initUser,onLogout}){
       <div className="spqr-topbar" style={{background:T.surf,borderBottom:`2px solid ${T.border}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
         <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
         <div style={{display:"flex",alignItems:"center",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} S{D.game.sessionInSeason}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>}
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
@@ -960,7 +959,7 @@ function PlayerApp({user:initUser,onLogout}){
       </div>
       <div className="spqr-tabs" style={{display:"flex",borderBottom:`1px solid ${T.border}`,background:T.surf,overflowX:"auto",position:"sticky",top:"45px",zIndex:99}}>
         {TABS.map(({k,l})=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
             {l}
           </button>
         ))}
@@ -998,7 +997,7 @@ function AOverview({D}){
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"0.5rem",marginBottom:"1rem"}}>
         <Stat label="Session" value={D.game?.session||1}/>
         <Stat label="Year" value={`${D.game?.year||218} BC`}/>
-        <Stat label="Season" value={`${D.game?.season} S${D.game?.sessionInSeason}`}/>
+        <Stat label="Season" value={`${D.game?.season}`}/>
         <Stat label="Gold" value={`${fmt(D.game?.gold)}T`}/>
         <Stat label="Food" value={`${fmt(D.game?.food)}M`} color="#A0D060"/>
         <Stat label="Population" value={fmt(D.game?.pop)} color={T.mut}/>
@@ -1066,7 +1065,7 @@ function ASenators({D,onRefresh}){
                 <div>
                   <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:600}}>{p.latinName}</div>
                   <div style={{color:T.mut,fontSize:"0.75rem"}}>{p.username} · {p.charClass}</div>
-                  {p.discord&&<div style={{color:"#7289DA",fontSize:"0.72rem"}}>{p.discord}</div>}
+                  {p.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem"}}>{p.discord}</div>}
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
@@ -1077,7 +1076,7 @@ function ASenators({D,onRefresh}){
             <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
               <Lbl c="Assign Position"/>
               <select value={p.role||""} onChange={e=>assign(p.id,e.target.value||null)}
-                style={{background:T.bg,border:`1px solid ${T.border}`,color:T.text,padding:"0.28rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",cursor:"pointer",flex:1}}>
+                style={{background:T.bg,border:`1px solid ${T.border}`,color:T.text,padding:"0.28rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",cursor:"pointer",flex:1}}>
                 <option value="">— No Position —</option>
                 {Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.title}</option>)}
               </select>
@@ -1133,7 +1132,7 @@ function ALegions({D,onRefresh}){
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.5rem",gap:"0.5rem",flexWrap:"wrap"}}>
               <span style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:800,fontSize:"1rem"}}>{l.name||`Legio ${l.id}`}</span>
               <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}>
-                <select value={l.status} onChange={e=>upd(i,"status",e.target.value)} style={{background:T.bg,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.25rem 0.4rem",fontFamily:"'Cinzel',serif",fontSize:"0.78rem"}}>
+                <select value={l.status} onChange={e=>upd(i,"status",e.target.value)} style={{background:T.bg,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.25rem 0.4rem",fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>
                   <option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option>
                 </select>
                 {(l.status==="destroyed"||l.status==="unraised")&&<Btn v="green" sm onClick={()=>raiseExisting(i)}>Raise</Btn>}
@@ -1142,7 +1141,7 @@ function ALegions({D,onRefresh}){
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.4rem"}}>
               {[ ["Legion ID","id","text"],["Legion Name","name","text"],["Strength","str","number"],["Max Soldiers","max","number"],["Location","location","text"],["Progress","prog","number"] ].map(([lb,k,type])=>(
-                <div key={k}><Lbl c={lb}/><input type={type} value={l[k]??""} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem",fontSize:"0.95rem"}}/></div>
+                <div key={k}><Lbl c={lb}/><input type={type} value={l[k]??""} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem",fontSize:"1.05rem"}}/></div>
               ))}
             </div>
             {l.status==="raising"&&<div style={{marginTop:"0.45rem",fontSize:"0.9rem",color:T.gold}}>Progress: {l.prog||0}/{D.game?.lturns||3} turns. When finished, it becomes active at 5,000 soldiers.</div>}
@@ -1200,8 +1199,8 @@ function ABackupRestore({onRefresh}){
   return(
     <Card style={{borderLeft:`3px solid ${T.blue}`}}>
       <STit c="Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects senators, motions, orders, laws, legions, resources, map and settings."/>
-      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"0.95rem"}}>{msg}</div>}
-      <div style={{fontSize:"0.95rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
+      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"1.05rem"}}>{msg}</div>}
+      <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
         Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the shared game.
       </div>
       <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
@@ -1225,18 +1224,17 @@ function AResources({D,onRefresh}){
   const upkeepG=activeLegs.length*g.legionUpkeep;
   const upkeepF=activeLegs.length*g.legionFood;
   const snap=economySnapshot(g,regs,D.legions||DEF_LEGIONS);
-  const updReg=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:k==="s"?v:(k==="name"||k==="id"?v:Number(v))}:r));
-  const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",bG:50,bF:50,s:"roman"}]);
+  const updReg=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:k==="s"?v:(k==="name"||k==="id"||k==="capital"?v:Number(v))}:r));
+  const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",capital:"New Capital",pop:50000,bG:50,bF:50,s:"roman"}]);
   const delRegion=i=>{if(confirm("Delete this province/region?"))setRegs(rs=>rs.filter((_,j)=>j!==i));};
   const save=async()=>{await db.set("spqr_g",g);await db.set("spqr_r",regs);setMsg("Resources and regions saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
   const doAdvance=async()=>{
-    const seasons=["Spring","Summer","Autumn","Winter"];
     let {year,season,sessionInSeason,session,gold,food,pop,lturns}=g;
     gold=gold+inc.gold-upkeepG;
     food=food+inc.food-upkeepF;
-    let newSess=sessionInSeason+1;
+    let newSess=1;
     let newSeason=season;let newYear=year;
-    if(newSess>2){newSess=1;const idx=seasons.indexOf(season);const nIdx=(idx+1)%4;newSeason=seasons[nIdx];if(nIdx===0)newYear=year-1;}
+    const idx=SEASONS.indexOf(season);const nIdx=(idx+1)%SEASONS.length;newSeason=SEASONS[nIdx];if(nIdx===0)newYear=year-1;
     session++;
     const legs=await db.get("spqr_l")||DEF_LEGIONS;
     const nl=legs.map(l=>{if(l.status==="raising"){const np=(l.prog||0)+1;if(np>=lturns)return{...l,status:"active",str:l.max||5000,max:l.max||5000,prog:0};return{...l,prog:np};}return l;});
@@ -1253,7 +1251,7 @@ function AResources({D,onRefresh}){
   const goBack=async()=>{
     if(!confirm("Go back one session? This changes only the calendar/session counter, not resources or orders."))return;
     let ng={...g};ng.session=Math.max(1,(ng.session||1)-1);
-    if((ng.sessionInSeason||1)>1){ng.sessionInSeason=1;}else{const idx=SEASONS.indexOf(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=2;if(ng.season==="Winter")ng.year=(ng.year||218)+1;}
+    const idx=SEASONS.indexOf(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=1;if(idx===0)ng.year=(ng.year||218)+1;
     await db.set("spqr_g",ng);await db.set("spqr_deadline",null);setG(ng);setMsg("Went back one session.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   const restartGame=async()=>{
@@ -1263,21 +1261,21 @@ function AResources({D,onRefresh}){
   };
   return <div>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem",fontSize:"1rem"}}>{msg}</div>}
-    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are now integrated in one place."/>
+    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are integrated. One campaign year has five seasons: Spring, Early Summer, High Summer, Autumn and Winter."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
-        <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season} S${g.sessionInSeason}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
+        <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
       </div>
       <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
     </Card>
     <ABackupRestore onRefresh={onRefresh}/>
-    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${g.sessionInSeason===2?(SEASONS[(SEASONS.indexOf(g.season)+1)%4]+` S1`):g.season+` S2`}`}/><Stat label="Gold Income" value={`+${inc.gold}T`} color={T.gre}/><Stat label="Legion Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${inc.food}M`} color={T.gre}/><Stat label="Legion Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+inc.gold-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+inc.food-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
+    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(SEASONS.indexOf(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${inc.gold}T`} color={T.gre}/><Stat label="Legion Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${inc.food}M`} color={T.gre}/><Stat label="Legion Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+inc.gold-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+inc.food-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
     <Card><STit c="Edit Stockpile and Legion Costs"/>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"0.95rem"}}/></div>)}</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>{[["gold","Gold Stockpile"],["food","Food Stockpile"],["pop","Population"],["lgold","Gold to Raise Legion"],["lfood","Food to Raise Legion"],["lpop","Population to Raise"],["lturns","Turns to Raise"],["legionUpkeep","Gold Upkeep / Legion"],["legionFood","Food Upkeep / Legion"]].map(([k,l])=><div key={k}><Lbl c={l}/><input type="number" value={g[k]} onChange={e=>setG(x=>({...x,[k]:Number(e.target.value)}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.4rem 0.55rem",fontSize:"1.05rem"}}/></div>)}</div>
       <Btn onClick={save}>💾 Save Resources and Regions</Btn>
     </Card>
     <Card><STit c="Edit Provinces / Regions"/><Row gap="0.5rem" wrap><Btn v="green" onClick={addRegion}>＋ Add Province</Btn><Btn onClick={save}>💾 Save</Btn></Row></Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {Math.floor((r.bG||0)*st.m)}T / {Math.floor((r.bF||0)*st.m)}M</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><Inp label="Capital" value={r.capital||""} onChange={v=>updReg(i,"capital",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Population"/><input type="number" value={r.pop||0} onChange={e=>updReg(i,"pop",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {Math.floor((r.bG||0)*st.m)}T / {Math.floor((r.bF||0)*st.m)}M</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
   </div>;
 }
 
@@ -1314,7 +1312,7 @@ function ARegions({D,onRefresh}){
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.3rem"}}>
                 {[["bG","Base Gold"],["bF","Base Food"]].map(([k,l])=>(
-                  <div key={k}><Lbl c={l}/><input type="number" value={r[k]} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.2rem 0.35rem",fontSize:"0.78rem"}}/></div>
+                  <div key={k}><Lbl c={l}/><input type="number" value={r[k]} onChange={e=>upd(i,k,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.2rem 0.35rem",fontSize:"0.9rem"}}/></div>
                 ))}
                 <div style={{textAlign:"center",paddingTop:"0.4rem"}}>
                   <Lbl c="Effective"/>
@@ -1438,7 +1436,7 @@ function AOrders({D,onRefresh}){
       {/* Orders by session */}
       {sessions.map(sess=>(
         <div key={sess}>
-          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.72rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
             {sess}{sess===currSess&&<Badge c="CURRENT" color={T.gold} sm/>}
           </div>
           {grouped[sess].map(o=>{
@@ -1447,7 +1445,7 @@ function AOrders({D,onRefresh}){
               <Card key={o.id} style={{borderLeft:`3px solid ${pos?.color||T.fnt}`,marginBottom:"0.4rem"}}>
                 <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
                   <div>
-                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:700,fontSize:"0.78rem"}}>{pos?.title||o.role}</span>
+                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:700,fontSize:"0.9rem"}}>{pos?.title||o.role}</span>
                     <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
                   </div>
                   <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
@@ -1637,7 +1635,7 @@ function AdminApp({onLogout}){
       <div className="spqr-topbar" style={{background:"#0A0600",borderBottom:`2px solid ${T.red}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
         <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><Badge c="GM PANEL" color={T.rhi}/></Row>
         <Row gap="0.5rem">
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} S{D.game.sessionInSeason}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
           <NotifBell userId="gm"/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit Panel</Btn>
@@ -1645,7 +1643,7 @@ function AdminApp({onLogout}){
       </div>
       <div className="spqr-tabs" style={{display:"flex",borderBottom:`1px solid ${T.border}`,background:T.surf,overflowX:"auto",position:"sticky",top:"45px",zIndex:99}}>
         {TABS.map(({k,l})=>(
-          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
+          <button key={k} onClick={()=>setTab(k)} style={{padding:"0.55rem 0.9rem",background:tab===k?T.card:"transparent",color:tab===k?T.gold:T.mut,border:"none",borderBottom:tab===k?`2px solid ${T.gold}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",letterSpacing:"0.1em",whiteSpace:"nowrap",flexShrink:0}}>
             {l}
           </button>
         ))}
@@ -1704,14 +1702,14 @@ function LoginScreen({onLogin,onAdmin}){
         <div style={{textAlign:"center",marginBottom:"2rem"}}>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:"3.5rem",fontWeight:900,color:T.gold,letterSpacing:"0.35em",textShadow:`0 0 80px rgba(200,146,42,0.35)`,lineHeight:1}}>SPQR</div>
           <div style={{color:T.mut,fontSize:"0.65rem",letterSpacing:"0.45em",marginTop:"0.5rem",fontFamily:"'Cinzel',serif"}}>SENATUS POPULUSQUE ROMANUS</div>
-          <div style={{color:T.fnt,fontSize:"0.6rem",letterSpacing:"0.3em",marginTop:"0.2rem",fontFamily:"'Cinzel',serif"}}>218 BC · THE SENATE AT WAR</div>
+          <div style={{color:T.fnt,fontSize:"0.72rem",letterSpacing:"0.3em",marginTop:"0.2rem",fontFamily:"'Cinzel',serif"}}>218 BC · THE SENATE AT WAR</div>
         </div>
 
         <div style={{background:T.surf,border:`1px solid ${T.border}`,padding:"1.5rem",boxShadow:`0 0 120px rgba(200,146,42,0.06)`}}>
           {/* Mode tabs */}
           <div style={{display:"flex",border:`1px solid ${T.border}`,marginBottom:"1.25rem",overflow:"hidden"}}>
             {[["login","Senator Login"],["register","Enroll"],["admin","GM"]].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setErr("");}} style={{flex:1,padding:"0.42rem 0.25rem",background:mode===m?T.gold:"transparent",color:mode===m?T.bg:T.mut,border:"none",fontFamily:"'Cinzel',serif",fontSize:"0.6rem",letterSpacing:"0.1em",cursor:"pointer"}}>
+              <button key={m} onClick={()=>{setMode(m);setErr("");}} style={{flex:1,padding:"0.42rem 0.25rem",background:mode===m?T.gold:"transparent",color:mode===m?T.bg:T.mut,border:"none",fontFamily:"'Cinzel',serif",fontSize:"0.72rem",letterSpacing:"0.1em",cursor:"pointer"}}>
                 {l}
               </button>
             ))}
@@ -1734,7 +1732,7 @@ function LoginScreen({onLogin,onAdmin}){
               <Inp label="Discord Username (required — prevents duplicate accounts)" value={f.discord} onChange={set("discord")} placeholder="your_discord_name"/>
               <div style={{marginBottom:"0.8rem"}}>
                 <Lbl c="Social Class"/>
-                <select value={f.cls} onChange={e=>setF(x=>({...x,cls:e.target.value}))} style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"0.95rem"}}>
+                <select value={f.cls} onChange={e=>setF(x=>({...x,cls:e.target.value}))} style={{width:"100%",background:T.card,border:`1px solid ${T.border}`,color:T.text,padding:"0.42rem 0.6rem",fontFamily:"'EB Garamond',serif",fontSize:"1.05rem"}}>
                   <option>Patrician</option><option>Plebeian</option><option>Equestrian</option>
                 </select>
                 <div style={{fontSize:"0.75rem",color:T.mut,marginTop:"0.3rem",lineHeight:1.4}}>
