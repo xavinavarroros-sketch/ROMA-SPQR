@@ -1,46 +1,25 @@
-# ROME-YES
+# ROME-YES App
 
-React/Vite app for the Roman Republic Discord strategy game.
+React/Vite app for the Roman Republic strategy roleplay game.
 
-## This update
-
-- Shows senator estate taxes as state income in the Republic economy balance sheet.
-- Adds senator estate tax income to projected state net gold/food.
-- Adds an admin panel error boundary so the GM panel does not crash the whole app.
-- Normalizes estate/property asset IDs to avoid duplicate-id issues and ensures multiple owned estates count separately for income.
-- Keeps all Supabase/shared-storage support.
+## Latest update
+- Motions now auto-resolve when AYE or NAY reaches majority of enrolled senators.
+- Automatically passed/failed motions are marked as auto-majority.
+- Court case submitters can rewrite/edit their submitted cases before Praetor/GM approval.
+- Court case submitters can withdraw their submitted case before approval.
+- Praetor Urbanus and GM retain full case management controls.
 
 ## Railway
+Build Command: npm install && npm run build
+Start Command: npm run start
 
-Build command:
+Do not upload node_modules, dist, .env, .env.local, or package-lock.json.
 
-```bash
-npm install && npm run build
-```
+## Latest update: Winter seasons and seasonal production
 
-Start command:
-
-```bash
-npm run start
-```
-
-Required variables:
-
-```text
-VITE_SUPABASE_URL
-VITE_SUPABASE_ANON_KEY
-```
-
-## Update: Game Master Registry
-- Added a GM Registry tab.
-- GM can see a searchable record of senator history, orders, motions, votes, donations, wealth ledger actions, elections and other actions.
-- Includes filters by senator, action type and text search.
-- Includes CSV export for backups or auditing.
-
-Update: Senate seating has been redesigned into a half-moon Roman Senate layout with Consul I and Consul II seated separately at the front magistrate dais.
-
-## Update: expanded business economy for 35 senators
-
-This update adds many new estate/business types in small, medium and elite tiers, with slightly increased income and more regional slots so a larger Senate can participate in the private economy.
-
-After deploying, if the old business list is already stored in Supabase, the GM should go to Private Wealth / Business control, click the balanced preset button, and save the private economy rules so the new business list is written to the shared database.
+- Campaign calendar now uses five seasons: Spring, Early Summer, Late Summer, Autumn and Winter.
+- Winter automatically reduces food production by 25%.
+- The reduction applies to regional food income and private estate/business food income.
+- Food-producing businesses show a winter marker when winter efficiency is reduced.
+- A season banner appears in player and GM areas, changing tone/color by season.
+- When advancing into winter, the app posts a notification warning that food production is reduced.
