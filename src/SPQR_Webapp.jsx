@@ -1499,7 +1499,7 @@ function PersonalWealthPanel({user,D,onRefresh}){
   const [msg,setMsg]=useState("");
   const [buy,setBuy]=useState({typeId:"olive_farm",regionId:"latium"});
   const regions=D.regions||DEF_REGIONS;
-  const load=useCallback(async()=>{setBusinesses((await db.get("spqr_biz"))||DEF_BUSINESSES);setAssets(normalizeAssetsList((await db.get("spqr_assets"))||[]));setWealth((await db.get("spqr_wealth"))||{});setDonations((await db.get("spqr_donations"))||[]);setWealthlog((await db.get("spqr_wealthlog"))||[]);},[]);
+  const load=useCallback(async()=>{const loadedBiz=(await db.get("spqr_biz"));setBusinesses((loadedBiz&&loadedBiz.length)?loadedBiz:DEF_BUSINESSES);setAssets(normalizeAssetsList((await db.get("spqr_assets"))||[]));setWealth((await db.get("spqr_wealth"))||{});setDonations((await db.get("spqr_donations"))||[]);setWealthlog((await db.get("spqr_wealthlog"))||[]);},[]);
   useEffect(()=>{load();},[load]);
   const myW=wealthOf(wealth,user.id);
   const myAssets=assets.filter(a=>a.ownerId===user.id);
@@ -1589,7 +1589,7 @@ function ABusinesses({D,onRefresh}){
   const [game,setGame]=useState({...DEF_GAME,...(D.game||{})});
   const [msg,setMsg]=useState("");
   const players=D.players||[]; const regions=D.regions||DEF_REGIONS;
-  useEffect(()=>{(async()=>{setBusinesses((await db.get("spqr_biz"))||DEF_BUSINESSES);setAssets(normalizeAssetsList((await db.get("spqr_assets"))||[]));setWealth((await db.get("spqr_wealth"))||{});setDonations((await db.get("spqr_donations"))||[]);setGame({...DEF_GAME,...((await db.get("spqr_g"))||D.game||{})});})();},[D.game]);
+  useEffect(()=>{(async()=>{const loadedBiz=(await db.get("spqr_biz"));setBusinesses((loadedBiz&&loadedBiz.length)?loadedBiz:DEF_BUSINESSES);setAssets(normalizeAssetsList((await db.get("spqr_assets"))||[]));setWealth((await db.get("spqr_wealth"))||{});setDonations((await db.get("spqr_donations"))||[]);setGame({...DEF_GAME,...((await db.get("spqr_g"))||D.game||{})});})();},[D.game]);
   const saveGame=async(next=game)=>{await db.set("spqr_g",next);setGame(next);onRefresh&&onRefresh();};
   const addBiz=()=>setBusinesses(bs=>[...bs,{id:`business_${Date.now()}`,emoji:"🏺",name:"New Business",costGold:100,costFood:0,incomeGold:12,incomeFood:0,regionCaps:{}}]);
   const applyBalancedPreset=()=>{
@@ -1851,10 +1851,10 @@ function ReputationPanel({user,D,onRefresh}){
     </Card>
     <Card><STit c="Slander a Rival" sub="Spend private gold to lower another senator's reputation. A bad roll can expose you and create a court case."/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem"}}><div><Lbl c="Target Senator"/><select value={target} onChange={e=>setTarget(e.target.value)} style={{width:"100%",padding:"0.5rem",border:`1px solid ${T.border}`}}><option value="">Choose target...</option>{players.map(p=><option key={p.id} value={p.id}>{p.latinName} · Rep {repOf(rep,p).score}</option>)}</select></div><div><Lbl c="Slander Type"/><select value={slanderId} onChange={e=>setSlanderId(e.target.value)} style={{width:"100%",padding:"0.5rem",border:`1px solid ${T.border}`}}>{(rules.slanderActions||DEF_REP_RULES.slanderActions).map(a=><option key={a.id} value={a.id}>{a.emoji} {a.name} — {a.costGold}T</option>)}</select></div></div>
-      <Inp label="Accusation / Rumour" value={accusation} onChange={setAccusation} rows={3} placeholder="e.g. Enemy of the plebs, coward before Hannibal, corrupt quaestor..."/>
+      <Inp label="Public Rumour to Spread" value={accusation} onChange={setAccusation} rows={3} placeholder="Write exactly what you want people to hear, e.g. Gaius is hoarding grain while soldiers starve..."/>
       <Inp label="Method" value={method} onChange={setMethod} placeholder="Forum gossip, paid clients, anonymous pamphlets..."/>
       <Inp label="Evidence" value={evidence} onChange={setEvidence} placeholder="none / weak / strong / public fact"/>
-      <label style={{display:"flex",gap:"0.4rem",alignItems:"center",marginBottom:"0.6rem"}}><input type="checkbox" checked={anon} onChange={e=>setAnon(e.target.checked)}/> Attempt anonymously</label><Btn v="crimson" onClick={doSlander}>Launch Slander Campaign</Btn>
+      <label style={{display:"flex",gap:"0.4rem",alignItems:"center",marginBottom:"0.6rem"}}><input type="checkbox" checked={anon} onChange={e=>setAnon(e.target.checked)}/> Attempt anonymously</label><div style={{fontSize:"0.85rem",color:T.mut,marginBottom:"0.5rem"}}>The text above is the public rumour/scandal that will appear if the campaign succeeds. If the roll backfires, the attacker may be exposed.</div><Btn v="crimson" onClick={doSlander}>Launch Slander Campaign</Btn>
     </Card>
     <Card><STit c="Defend Against Scandals" sub="Spend gold on counter-campaigns to reduce or remove public scandal markers."/>
       {activeScandals.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No active scandals.</div>:activeScandals.map(sc=><div key={sc.id} style={{background:"#FFF1F1",border:`1px solid ${T.rhi}`,padding:"0.65rem",marginBottom:"0.5rem"}}><b>⚠️ {sc.text}</b><div style={{color:T.mut}}>Severity: {sc.severity} · Source: {sc.sourceName||"Unknown / Anonymous"}</div><Row gap="0.4rem" wrap>{(rules.counterActions||DEF_REP_RULES.counterActions).map(a=><Btn key={a.id} sm v="dark" onClick={()=>counter(sc,a)}>{a.emoji} {a.name} ({a.costGold}T)</Btn>)}</Row></div>)}
@@ -1899,7 +1899,7 @@ function PlayerApp({user:initUser,onLogout}){
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
     if(players){const me=players.find(p=>p.id===user.id);if(me)setUser(me);}
   },[user.id]);
 
@@ -1951,6 +1951,7 @@ function PlayerApp({user:initUser,onLogout}){
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
         <SeasonBanner game={D.game}/>
+        <ErrorBoundary key={tab}>
         {tab==="senate"    &&<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>}
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
         {tab==="orders"    &&<OrdersPanel orders={D.orders} game={D.game} players={D.players}/>} 
@@ -1967,6 +1968,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
         {tab==="laws"      &&<LawsPanel laws={D.laws}/>}
         {tab==="map"       &&<MapPanel cfg={D.cfg}/>}
+        </ErrorBoundary>
       </div>
     </div>
   );
@@ -2899,7 +2901,7 @@ function AdminApp({onLogout}){
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
