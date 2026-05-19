@@ -1605,21 +1605,107 @@ function PartiesPanel({user,D,onRefresh}){
   </div>;
 }
 
+
+
+/* ══ COURTS / PRAETOR URBANUS ═══════════════════════════════════════════ */
+const COURT_STATUSES=["Submitted","Accepted","Rejected","In Trial","Awaiting Ruling","Ruled","Escalated to Senate","Closed"];
+const courtColor=status=>({Submitted:T.gold,Accepted:T.blue,Rejected:T.rhi,"In Trial":"#7C3AED","Awaiting Ruling":"#B7791F",Ruled:T.gre,"Escalated to Senate":T.red,Closed:T.mut}[status]||T.mut);
+const caseTitle=(c)=>c?.title||`Case ${c?.id||""}`;
+
+function CourtsPanel({user,D,onRefresh,isGM=false}){
+  const players=D.players||[];
+  const courts=Array.isArray(D.courts)?D.courts:[];
+  const [form,setForm]=useState({title:"",accuserId:user?.id||"",accusedId:"",law:"",summary:"",evidence:"",request:""});
+  const [filter,setFilter]=useState("all");
+  const [edit,setEdit]=useState({});
+  const isPraetor=user?.role==="praetor_1";
+  const canAdmin=isGM||isPraetor;
+  const pname=id=>players.find(p=>p.id===id)?.latinName||"Unknown";
+  const saveCourts=async(next)=>{await db.set("spqr_courts",next);onRefresh&&onRefresh();};
+  const submitCase=async()=>{
+    if(!form.title.trim()||!form.accusedId||!form.summary.trim())return alert("Case title, accused senator and summary are required.");
+    const me=players.find(p=>p.id===form.accuserId)||user;
+    const acc=players.find(p=>p.id===form.accusedId);
+    const nc={id:Date.now().toString()+Math.random().toString(36).slice(2),title:form.title.trim(),accuserId:form.accuserId,accuserName:me?.latinName||"Unknown",accusedId:form.accusedId,accusedName:acc?.latinName||"Unknown",law:form.law.trim(),summary:form.summary.trim(),evidence:form.evidence.trim(),request:form.request.trim(),status:"Submitted",praetorId:null,praetorName:null,threadLink:"",notes:"",ruling:"",punishment:"",created:Date.now(),updated:Date.now(),session:sLab(D.game||DEF_GAME)};
+    const next=[...courts,nc];
+    await saveCourts(next);
+    await pushN("⚖️ Court Case Submitted",`${nc.accuserName} has submitted a case against ${nc.accusedName}: ${nc.title}`);
+    await addHistory(form.accuserId,"Court Case Submitted",`Submitted ${nc.title} against ${nc.accusedName}.`,"court");
+    await addHistory(form.accusedId,"Accused in Court",`${nc.accuserName} submitted ${nc.title}.`,"court");
+    setForm({title:"",accuserId:user?.id||"",accusedId:"",law:"",summary:"",evidence:"",request:""});
+  };
+  const patchCase=async(id,patch,notice)=>{
+    const next=courts.map(c=>c.id===id?{...c,...patch,updated:Date.now()}:c);
+    await saveCourts(next);
+    const c=next.find(x=>x.id===id);
+    if(notice&&c)await pushN("⚖️ Court Case Updated",`${caseTitle(c)} is now ${c.status}.`);
+  };
+  const removeCase=async(id)=>{if(!confirm("Delete this court case?"))return;await saveCourts(courts.filter(c=>c.id!==id));};
+  const assignPraetor=async(id)=>{await patchCase(id,{praetorId:user?.id||"gm",praetorName:user?.latinName||"Game Master"},false);};
+  const filtered=courts.filter(c=>filter==="all"||c.status===filter).sort((a,b)=>(b.updated||0)-(a.updated||0));
+  const rowStyle={padding:"0.45rem",border:`1px solid ${T.border}`,verticalAlign:"top"};
+  return <div>
+    <Card style={{borderLeft:`6px solid ${POS.praetor_1.color}`}}>
+      <STit c="⚖️ Courts of Rome" sub="The app records official legal cases. The actual trial can happen in Discord threads; paste the thread link into the case record."/>
+      <div style={{color:T.mut,lineHeight:1.55}}>The <b>Praetor Urbanus</b> may accept cases, create the Discord court thread, add the thread link, manage status and issue rulings. The Game Master can control all cases.</div>
+    </Card>
+    <Card><STit c="Submit an Accusation / Legal Petition" sub="Senators may submit cases for review by the Praetor Urbanus."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem"}}>
+        <Inp label="Case Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Accusation of illegal treasury use"/>
+        <div><Lbl c="Accuser"/><select value={form.accuserId} onChange={e=>setForm(f=>({...f,accuserId:e.target.value}))} disabled={!isGM} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{players.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div>
+        <div><Lbl c="Accused"/><select value={form.accusedId} onChange={e=>setForm(f=>({...f,accusedId:e.target.value}))} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}><option value="">Select senator</option>{players.filter(p=>p.id!==form.accuserId).map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div>
+      </div>
+      <Inp label="Law Allegedly Broken" value={form.law} onChange={v=>setForm(f=>({...f,law:v}))} placeholder="Law, decree or principle allegedly violated"/>
+      <Inp label="Summary of Accusation" value={form.summary} onChange={v=>setForm(f=>({...f,summary:v}))} rows={3}/>
+      <Inp label="Evidence / Witnesses" value={form.evidence} onChange={v=>setForm(f=>({...f,evidence:v}))} rows={2}/>
+      <Inp label="Requested Ruling / Punishment" value={form.request} onChange={v=>setForm(f=>({...f,request:v}))} rows={2}/>
+      <Btn onClick={submitCase}>Submit Case to Court</Btn>
+    </Card>
+    <Card><STit c="Court Case Registry" sub="Official legal archive of the Republic."/>
+      <div style={{display:"flex",gap:"0.5rem",alignItems:"end",flexWrap:"wrap",marginBottom:"0.7rem"}}><div><Lbl c="Filter Status"/><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}><option value="all">All cases</option>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
+      {filtered.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No court cases yet.</div>}
+      {filtered.map(c=>{const isEditing=!!edit[c.id];const local=edit[c.id]||c;return <div key={c.id} style={{border:`1px solid ${T.border}`,borderLeft:`6px solid ${courtColor(c.status)}`,background:T.surf,padding:"0.75rem",marginBottom:"0.65rem"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"0.6rem",flexWrap:"wrap",alignItems:"center"}}><div><Badge c={c.status} color={courtColor(c.status)}/> <span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{caseTitle(c)}</span></div><div style={{color:T.mut,fontSize:"0.82rem"}}>{c.session||""}</div></div>
+        <div style={{marginTop:"0.35rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.45rem"}}>
+          <div><b>Accuser:</b> {c.accuserName||pname(c.accuserId)}</div><div><b>Accused:</b> {c.accusedName||pname(c.accusedId)}</div><div><b>Praetor:</b> {c.praetorName||"Not assigned"}</div>
+        </div>
+        {isEditing&&canAdmin?<div style={{marginTop:"0.65rem"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.55rem"}}>
+            <Inp label="Case Title" value={local.title||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,title:v}}))}/>
+            <div><Lbl c="Status"/><select value={local.status||"Submitted"} onChange={e=>setEdit(x=>({...x,[c.id]:{...local,status:e.target.value}}))} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <Inp label="Discord Thread Link" value={local.threadLink||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,threadLink:v}}))}/>
+          </div>
+          <Inp label="Law Broken" value={local.law||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,law:v}}))}/>
+          <Inp label="Summary" value={local.summary||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,summary:v}}))} rows={3}/>
+          <Inp label="Evidence / Witnesses" value={local.evidence||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,evidence:v}}))} rows={2}/>
+          <Inp label="Praetor Notes" value={local.notes||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,notes:v}}))} rows={2}/>
+          <Inp label="Final Ruling" value={local.ruling||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,ruling:v}}))} rows={3}/>
+          <Inp label="Punishment / Consequence" value={local.punishment||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,punishment:v}}))} rows={2}/>
+          <Row gap="0.45rem" wrap><Btn onClick={async()=>{await patchCase(c.id,local,true);setEdit(e=>{const n={...e};delete n[c.id];return n;});}}>Save Case</Btn><Btn v="ghost" onClick={()=>setEdit(e=>{const n={...e};delete n[c.id];return n;})}>Cancel</Btn>{isGM&&<Btn v="red" onClick={()=>removeCase(c.id)}>Delete</Btn>}</Row>
+        </div>:<div style={{marginTop:"0.55rem",lineHeight:1.5}}>
+          {c.law&&<div><b>Law:</b> {c.law}</div>}<div><b>Accusation:</b> {c.summary}</div>{c.evidence&&<div><b>Evidence:</b> {c.evidence}</div>}{c.request&&<div><b>Requested ruling:</b> {c.request}</div>}{c.threadLink&&<div><b>Discord thread:</b> <a href={c.threadLink} target="_blank" rel="noreferrer" style={{color:T.blue}}>Open court thread</a></div>}{c.notes&&<div><b>Praetor notes:</b> {c.notes}</div>}{c.ruling&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#F0FFF4",border:`1px solid ${T.gre}`}}><b>Ruling:</b> {c.ruling}</div>}{c.punishment&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`}}><b>Punishment / consequence:</b> {c.punishment}</div>}
+        </div>}
+        {canAdmin&&!isEditing&&<Row gap="0.45rem" wrap><Btn sm onClick={()=>setEdit(e=>({...e,[c.id]:c}))}>Edit / Manage Case</Btn>{isPraetor&&!c.praetorId&&<Btn sm v="dark" onClick={()=>assignPraetor(c.id)}>Assign Myself as Praetor</Btn>}</Row>}
+      </div>})}
+    </Card>
+  </div>;
+}
+
 /* ══ PLAYER APP ═══════════════════════════════════════════════════════════ */
 function PlayerApp({user:initUser,onLogout}){
   const [tab,setTab]=useState("senate");
   const [group,setGroup]=useState("gov");
   const [user,setUser]=useState(initUser);
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[]});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts")
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[]});
     if(players){const me=players.find(p=>p.id===user.id);if(me)setUser(me);}
   },[user.id]);
 
@@ -1633,7 +1719,7 @@ function PlayerApp({user:initUser,onLogout}){
   const currentParty=partyOf(D.parties||[],user.id);
   const GROUPS=[
     {key:"gov",label:"🏛️ Government",tone:"gov",tabs:[
-      {k:"senate",l:"Senate"},{k:"voting",l:`Voting${votingCount>0?` (${votingCount})`:""}`},{k:"orders",l:"Orders"},{k:"resources",l:"Resources"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"elections",l:"Elections"},...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
+      {k:"senate",l:"Senate"},{k:"voting",l:`Voting${votingCount>0?` (${votingCount})`:""}`},{k:"orders",l:"Orders"},{k:"resources",l:"Resources"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:"Elections"},...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
     ]},
     {key:"personal",label:"👤 Personal",tone:"personal",tabs:[
       {k:"wealth",l:"Personal Wealth"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
@@ -1676,6 +1762,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="resources" &&<ResourcesRegionsPanel D={D} editable={false}/>} 
         {tab==="legions"   &&<LegionsPublicPanel D={D}/>} 
         {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
+        {tab==="courts"&&<CourtsPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="elections" &&<ElectionsPlayerPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} onRefresh={refresh}/>}
         {tab==="wealth"    &&<PersonalWealthPanel user={user} D={D} onRefresh={refresh}/>}
@@ -2605,16 +2692,16 @@ function ARegistry({D}){
 function AdminApp({onLogout}){
   const [tab,setTab]=useState("overview");
   const [group,setGroup]=useState("gov");
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[]});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts")
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[]});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
@@ -2624,7 +2711,7 @@ function AdminApp({onLogout}){
   const openE=(D.elections||[]).filter(e=>e.status!=="closed").length;
   const GROUPS=[
     {key:"gov",label:"🏛️ Government",tone:"gov",tabs:[
-      {k:"overview",l:"Overview"},{k:"senators",l:"Senators"},{k:"resources",l:"Resources"},{k:"regions",l:"Regions"},{k:"legions",l:"Armed Forces"},{k:"magistrates",l:"Magistrates"},{k:"elections",l:`Elections${openE?` (${openE})`:""}`},{k:"motions",l:`Motions${pendM?` (${pendM})`:""}`},{k:"orders",l:`Orders${newO?` (${newO})`:""}`}
+      {k:"overview",l:"Overview"},{k:"senators",l:"Senators"},{k:"resources",l:"Resources"},{k:"regions",l:"Regions"},{k:"legions",l:"Armed Forces"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:`Elections${openE?` (${openE})`:""}`},{k:"motions",l:`Motions${pendM?` (${pendM})`:""}`},{k:"orders",l:`Orders${newO?` (${newO})`:""}`}
     ]},
     {key:"personal",label:"👤 Personal / Politics",tone:"personal",tabs:[
       {k:"businesses",l:"Private Wealth"},{k:"parties",l:"Parties"},{k:"registry",l:"Registry"}
@@ -2665,6 +2752,7 @@ function AdminApp({onLogout}){
         {tab==="regions"   &&<ARegions D={D} onRefresh={refresh}/>} 
         {tab==="legions"   &&<ALegions D={D} onRefresh={refresh}/>} 
         {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
+        {tab==="courts"&&<CourtsPanel user={{id:"gm",latinName:"Game Master",role:"praetor_1"}} D={D} onRefresh={refresh} isGM/>} 
         {tab==="elections" &&<AElections D={D} onRefresh={refresh}/>} 
         {tab==="motions"   &&<AMotions D={D} onRefresh={refresh}/>} 
         {tab==="orders"    &&<AOrders D={D} onRefresh={refresh}/>} 
