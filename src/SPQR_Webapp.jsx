@@ -189,12 +189,37 @@ const CLASS_START_WEALTH={
   ally:{gold:240,food:120,householdGold:10,householdFood:10},
 };
 const startingWealthForClass=cls=>({ ...DEF_WEALTH, ...(CLASS_START_WEALTH[classKey(cls)]||{}) });
+const DEF_REP_RULES={
+  starting:{patrician:60,equestrian:52,plebeian:42,novus:45,ally:44},
+  boostActions:[
+    {id:"temple_offering",emoji:"🏛️",name:"Temple Offering",costGold:40,costFood:0,gain:3,desc:"Public piety and visible offerings to the gods."},
+    {id:"grain_charity",emoji:"🌾",name:"Grain Charity",costGold:70,costFood:40,gain:6,desc:"Distribute grain or aid to poorer citizens and clients."},
+    {id:"veteran_gift",emoji:"🛡️",name:"Veteran Patronage",costGold:90,costFood:0,gain:8,desc:"Support veterans, wounded soldiers and military families."},
+    {id:"public_games",emoji:"🎭",name:"Public Games",costGold:160,costFood:40,gain:12,desc:"Sponsor public spectacle, games and public goodwill."}
+  ],
+  slanderActions:[
+    {id:"minor",emoji:"🗣️",name:"Minor Rumour",costGold:35,impact:5,partial:2,backfire:5,success:55,backfireChance:15,desc:"Forum gossip, tavern talk and whispers among clients."},
+    {id:"medium",emoji:"📜",name:"Organized Slander",costGold:85,impact:10,partial:5,backfire:10,success:50,backfireChance:20,desc:"Paid informants, pamphlets, witnesses and coordinated rumours."},
+    {id:"major",emoji:"🔥",name:"Major Scandal Campaign",costGold:180,impact:18,partial:8,backfire:18,success:45,backfireChance:25,desc:"A large political attack that can ruin a candidate if believed."}
+  ],
+  counterActions:[
+    {id:"minor_counter",emoji:"🛡️",name:"Small Counter-Campaign",costGold:50,remove:5,desc:"Speeches, denials and friendly clients defending your name."},
+    {id:"major_counter",emoji:"⚖️",name:"Major Rehabilitation",costGold:130,remove:12,desc:"Public defense, witnesses, charity and pressure on the rumour network."}
+  ]
+};
+const clampRep=n=>Math.max(0,Math.min(100,Math.round(Number(n||0))));
+const defaultRepFor=player=>clampRep((DEF_REP_RULES.starting||{})[classKey(player?.charClass)]??45);
+const repOf=(rep,player)=>({score:defaultRepFor(player),scandals:[],...((rep||{})[player?.id]||{})});
+const repColor=score=>score>=70?T.green:score>=45?T.gold:score>=25?T.rhi:"#4B0000";
+const activeScandalsFor=(rep,playerId)=>(((rep||{})[playerId]?.scandals)||[]).filter(s=>s.active!==false);
+const addRepLog=async(entry)=>{const all=await db.get("spqr_replog")||[];all.push({id:Date.now().toString()+Math.random().toString(36).slice(2),ts:Date.now(),...entry});await db.set("spqr_replog",all.slice(-500));};
+
 const foodSaleRate=0.5;
 const salaryFor=()=>({gold:0,food:0});
 const addWealthLog=async(entry)=>{const all=await db.get("spqr_wealthlog")||[];all.push({id:Date.now().toString()+Math.random().toString(36).slice(2),ts:Date.now(),...entry});await db.set("spqr_wealthlog",all.slice(-500));};
 const privateTaxRates=game=>({gold:Number(game?.privateTaxGoldPct??10),food:Number(game?.privateTaxFoodPct??5)});
 const personalBalanceFor=(userId,role,assets,businesses,wealth,game={})=>{
-  const gross=personalIncomeFor(userId,assets,businesses);
+  const gross=personalIncomeFor(userId,assets,businesses,game);
   const tax=privateTaxRates(game);
   const taxGold=Math.floor(gross.gold*tax.gold/100);
   const taxFood=Math.floor(gross.food*tax.food/100);
@@ -207,7 +232,7 @@ const partyOf=(parties,userId)=>(parties||[]).find(pt=>(pt.members||[]).includes
 const PartyBadge=({party,sm})=>party?<span style={{display:"inline-block",background:`${party.color||T.blue}18`,border:`1px solid ${party.color||T.blue}`,color:party.color||T.blue,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{party.emoji||"🏛️"} {party.name}</span>:null;
 const getBiz=(businesses,id)=>(businesses||DEF_BUSINESSES).find(b=>b.id===id)||DEF_BUSINESSES[0];
 const getRegion=(regions,id)=>(regions||DEF_REGIONS).find(r=>r.id===id)||{id,name:id,capital:"Unknown"};
-const personalIncomeFor=(userId,assets,businesses)=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=Number(b.incomeGold||0);acc.food+=Number(b.incomeFood||0);return acc;},{gold:0,food:0});
+const personalIncomeFor=(userId,assets,businesses,game={})=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=Number(b.incomeGold||0);acc.food+=effectiveFoodIncome(b.incomeFood,game);return acc;},{gold:0,food:0});
 const totalPrivateTaxProjection=(players=[],assets=[],businesses=DEF_BUSINESSES,wealth={},game={})=>(players||[]).filter(Boolean).reduce((acc,p)=>{const b=personalBalanceFor(p.id,p.role,assets,businesses,wealth,game);acc.gold+=Number(b.taxGold||0);acc.food+=Number(b.taxFood||0);return acc;},{gold:0,food:0});
 const normalizeAssetsList=(assets=[])=>{
   const seen=new Set();
@@ -243,7 +268,21 @@ const LAWS=[
 ];
 
 const ADMIN_PASS="SPQR_GM_218BC";
-const SEASONS=["Spring","Early Summer","High Summer","Autumn","Winter"];
+const SEASONS=["Spring","Early Summer","Late Summer","Autumn","Winter"];
+const seasonIndex=season=>{const i=SEASONS.indexOf(season);return i>=0?i:(isWinterSeason(season)?SEASONS.indexOf("Winter"):0);};
+const WINTER_FOOD_MOD=0.75;
+const isWinterSeason=season=>String(season||"").toLowerCase().includes("winter");
+const seasonFoodModifier=game=>isWinterSeason(game?.season)?WINTER_FOOD_MOD:1;
+const seasonInfo=game=>{
+  const season=game?.season||"Spring";
+  if(isWinterSeason(season))return {emoji:"❄️",label:season,tone:"winter",color:"#2563EB",bg:"#EAF4FF",border:"#93C5FD",note:`Winter production: food output is reduced by ${Math.round((1-WINTER_FOOD_MOD)*100)}% this season.`};
+  if(String(season).includes("Spring"))return {emoji:"🌱",label:season,tone:"spring",color:"#2F7D32",bg:"#F0FFF4",border:"#86EFAC",note:"Spring season: farms and markets recover normal food production."};
+  if(String(season).includes("Summer"))return {emoji:"☀️",label:season,tone:"summer",color:"#B7791F",bg:"#FFF7E6",border:"#FACC15",note:"Summer season: normal harvest and trade conditions."};
+  return {emoji:"🍂",label:season,tone:"autumn",color:"#9A3412",bg:"#FFF1E6",border:"#FDBA74",note:"Autumn season: normal production before winter pressure."};
+};
+const effectiveFoodIncome=(amount,game)=>Math.floor(Number(amount||0)*seasonFoodModifier(game));
+const winterFoodMark=(incomeFood,game)=>isWinterSeason(game?.season)&&Number(incomeFood||0)>0?" ❄️":"";
+const displayedFoodIncome=(incomeFood,game)=>effectiveFoodIncome(incomeFood,game);
 
 /* ══ STORAGE & UTILS ══════════════════════════════════════════════════════ */
 const db={
@@ -259,7 +298,7 @@ const normalizeElections=(multi,legacy)=>{
   return arr;
 };
 const fmt=n=>Number(n||0).toLocaleString();
-const calcInc=regs=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=r.bG*m;f+=r.bF*m;});return{gold:Math.floor(g),food:Math.floor(f)};};
+const calcInc=(regs,game={})=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=Number(r.bG||0)*m;f+=effectiveFoodIncome(Number(r.bF||0)*m,game);});return{gold:Math.floor(g),food:Math.floor(f)};};
 const compress=(file,mx=600)=>new Promise(res=>{const c=document.createElement('canvas'),img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(mx/img.width,mx/img.height,1);c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',0.75));};img.src=u;});
 const pushN=async(title,body,forId="all")=>{const all=await db.get("spqr_n")||[];all.push({id:Date.now()+Math.random().toString(36).slice(2),title,body,for:forId,ts:Date.now()});await db.set("spqr_n",all.slice(-200));};
 
@@ -285,7 +324,7 @@ const militaryBreakdown=(game,legions,cavalry,fleets,forceTypes=FORCE_TYPES)=>{
 const activeCavalry=cavalry=>(cavalry||[]).filter(c=>c.status==="active");
 const economySnapshot=(game,regions,legions,cavalry=DEF_CAVALRY,fleets=DEF_FLEETS)=>{
   const g={...DEF_GAME,...game};
-  const inc=calcInc(regions||DEF_REGIONS);
+  const inc=calcInc(regions||DEF_REGIONS,g);
   const act=activeLegions(legions||DEF_LEGIONS);
   const cav=activeCavalry(cavalry||DEF_CAVALRY);
   const triremes=fleetTriremes(fleets||DEF_FLEETS);
@@ -319,6 +358,13 @@ const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",backgrou
 const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.9rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
 const Row=({children,gap="0.4rem",wrap})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:wrap?"wrap":"nowrap"}}>{children}</div>;
 const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.55rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.72rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
+const SeasonBanner=({game})=>{
+  const info=seasonInfo(game||DEF_GAME);
+  return <div style={{background:info.bg,border:`2px solid ${info.border}`,borderLeft:`8px solid ${info.color}`,padding:"0.75rem 0.9rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"0.75rem",flexWrap:"wrap"}}>
+    <div><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:info.color,letterSpacing:"0.08em",fontSize:"1rem"}}>{info.emoji} {info.label} · Turn {(game||DEF_GAME).session||1}</div><div style={{color:T.mut,fontSize:"0.95rem"}}>{info.note}</div></div>
+    {isWinterSeason(game?.season)&&<Badge c="❄️ FOOD PRODUCTION REDUCED" color={info.color}/>}
+  </div>;
+};
 function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.55rem"}}>✕</button></div>{children}</div></div>);}
 
 /* ══ NOTIFICATION BELL ════════════════════════════════════════════════════ */
@@ -372,18 +418,22 @@ function SenatorProfileModal({player,onClose}){
   const [businesses,setBusinesses]=useState(DEF_BUSINESSES);
   const [wealth,setWealth]=useState({});
   const [parties,setParties]=useState([]);
+  const [reputation,setReputation]=useState({});
   useEffect(()=>{(async()=>{
     setHistory(((await db.get("spqr_history"))||[]).filter(h=>h.playerId===player.id).sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,12));
     setAssets(((await db.get("spqr_assets"))||[]).filter(a=>a.ownerId===player.id));
     setBusinesses((await db.get("spqr_biz"))||DEF_BUSINESSES);
     setWealth((await db.get("spqr_wealth"))||{});
     setParties((await db.get("spqr_parties"))||[]);
+    setReputation((await db.get("spqr_reputation"))||{});
   })();},[player?.id]);
   if(!player)return null;
   const pos=player.role?POS[player.role]:null;
   const w=wealthOf(wealth,player.id);
   const inc=personalIncomeFor(player.id,assets,businesses);
   const party=partyOf(parties,player.id);
+  const rep=repOf(reputation,player);
+  const scandals=activeScandalsFor(reputation,player.id);
   return(
     <Modal title="SENATOR PROFILE" onClose={onClose} wide>
       <div style={{display:"flex",gap:"1rem",alignItems:"flex-start",flexWrap:"wrap"}}>
@@ -395,6 +445,7 @@ function SenatorProfileModal({player,onClose}){
           <div style={{marginBottom:"0.45rem"}}><ClassBadge cls={player.charClass||"Senator"}/></div>
           {pos&&<div style={{marginBottom:"0.5rem"}}><Badge c={pos.title} color={pos.color}/></div>}
           {party&&<div style={{marginBottom:"0.5rem"}}><PartyBadge party={party}/></div>}
+          <div style={{marginBottom:"0.5rem"}}><Badge c={`Reputation ${rep.score}/100`} color={repColor(rep.score)}/></div>
           {player.username&&<div style={{color:T.mut,marginBottom:"0.2rem"}}>Username: {player.username}</div>}
           {player.discord&&<div style={{color:"#7289DA",marginBottom:"0.2rem"}}>Discord: {player.discord}</div>}
           {player.joined&&<div style={{color:T.fnt}}>Enrolled: {new Date(player.joined).toLocaleDateString()}</div>}
@@ -408,6 +459,7 @@ function SenatorProfileModal({player,onClose}){
           {pos&&<div style={{marginTop:"0.75rem",padding:"0.75rem",background:T.bg,border:`1px solid ${pos.color}55`,color:T.mut,lineHeight:1.55}}>{pos.desc}</div>}
         </div>
       </div>
+      {scandals.length>0&&<Card style={{marginTop:"1rem",borderLeft:`5px solid ${T.rhi}`}}><STit c="Public Scandals"/>{scandals.map(sc=><div key={sc.id} style={{padding:"0.45rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`,marginBottom:"0.4rem"}}>⚠️ {sc.text}<div style={{fontSize:"0.75rem",color:T.mut}}>Severity {sc.severity} · Source: {sc.sourceName||"Unknown / Anonymous"}</div></div>)}</Card>}
       {player.bio&&<Card style={{marginTop:"1rem"}}><STit c="Biography / Background"/><div style={{whiteSpace:"pre-wrap",lineHeight:1.65}}>{player.bio}</div></Card>}
       <Card style={{marginTop:"1rem"}}><STit c="Personal Estates"/>{assets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No known estates or businesses.</div>:assets.map(a=>{const b=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:".5rem",borderBottom:`1px solid ${T.border}`,padding:".35rem 0",flexWrap:"wrap"}}><b>{b.emoji} {b.name}</b><span style={{color:T.mut}}>{a.regionName||a.regionId} · income private</span></div>})}</Card>
       <Card><STit c="Personal History" sub="Offices held, donations, estate purchases and notable actions."/>{history.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No recorded history yet.</div>:history.map(h=><div key={h.id} style={{borderLeft:`3px solid ${T.gold}`,padding:"0.4rem 0.6rem",marginBottom:"0.45rem",background:T.bg}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:T.ghi}}>{h.title}</div><div style={{color:T.text,whiteSpace:"pre-wrap"}}>{h.body}</div><div style={{fontSize:"0.75rem",color:T.fnt}}>{new Date(h.ts).toLocaleString()}</div></div>)}</Card>
@@ -601,6 +653,19 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     setForm({title:"",body:""});setErr("");setOk("Motion submitted — awaiting GM approval. You cannot propose another motion until the next turn.");
     onRefresh();setTimeout(()=>setOk(""),4000);
   };
+  const autoResolveMotionIfMajority=(motion,allPlayers)=>{
+    const voterCount=(allPlayers||[]).length||0;
+    const majority=Math.floor(voterCount/2)+1;
+    const ayeCount=Object.values(motion.votes||{}).filter(v=>v==="yea").length;
+    const nayCount=Object.values(motion.votes||{}).filter(v=>v==="nay").length;
+    if(voterCount>0&&ayeCount>=majority){
+      return {...motion,status:"passed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically passed by majority: AYE ${ayeCount} / ${voterCount}.`};
+    }
+    if(voterCount>0&&nayCount>=majority){
+      return {...motion,status:"failed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically failed by majority: NAY ${nayCount} / ${voterCount}.`};
+    }
+    return motion;
+  };
   const vote=async(motionId,choice)=>{
     const all=await db.get("spqr_m")||[];
     const m=all.find(x=>x.id===motionId);
@@ -608,8 +673,12 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     m.votes={...(m.votes||{})};
     if(choice==="withdraw"){delete m.votes[user.id];}
     else{m.votes[user.id]=choice;}
-    await db.set("spqr_m",all.map(x=>x.id===motionId?m:x));
+    const resolved=autoResolveMotionIfMajority(m,players);
+    await db.set("spqr_m",all.map(x=>x.id===motionId?resolved:x));
     await pushN("Vote Updated",`${user.latinName} ${choice==="withdraw"?"withdrew his vote":`voted ${choice.toUpperCase()}`} on "${m.title}"`);
+    if(resolved.status!=="voting"){
+      await pushN("Motion Automatically Resolved",`"${resolved.title}" has been ${resolved.status.toUpperCase()} by Senate majority.`);
+    }
     onRefresh();
   };
   const vetoMotion=async(motion)=>{
@@ -689,8 +758,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
             <div style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",marginBottom:"0.3rem"}}>By {m.byName} · {m.session||""}</div>
             <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.4rem"}}>{m.body}</div>
             {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>Awaiting GM review…</div>}
-            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}</div>}
-            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}</div>}
+            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
+            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
             {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.9rem"}}>Rejected by GM — not put to vote</div>}
             {m.status==="vetoed"&&<div style={{color:T.rhi,fontSize:"0.9rem"}}>Vetoed by {m.vetoedByName||"a Tribune"}</div>}
             {m.status==="queued"&&<div style={{color:T.gold,fontSize:"0.9rem"}}>Queued — another motion is currently being voted first.</div>}
@@ -1162,7 +1231,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   const g={...DEF_GAME,...(D.game||{})};
   const regs=D.regions||DEF_REGIONS;
   const legs=D.legions||DEF_LEGIONS;
-  const inc=calcInc(regs);
+  const inc=calcInc(regs,g);
   const mb=militaryBreakdown(g,legs,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS,D.forceTypes||FORCE_TYPES);
   const privateTaxes=totalPrivateTaxProjection(D.players||[],D.assets||[],D.businesses||DEF_BUSINESSES,D.wealth||{},g);
   const totalGoldIncome=inc.gold+privateTaxes.gold;
@@ -1239,7 +1308,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
             <div style={{fontSize:"1rem",color:T.mut}}>🏛️ Capital: <span style={{color:T.text}}>{r.capital||"Unknown"}</span></div>
             <div style={{fontSize:"1rem",color:T.mut}}>👥 Population: <span style={{color:T.text,fontFamily:"'Cinzel',serif"}}>{fmt(r.pop||0)}</span></div>
             <div style={{fontSize:"0.95rem",color:T.mut,marginTop:"0.25rem"}}>Base: <span style={goldStyle}>{fmt(r.bG)}T</span> / <span style={foodStyle}>{fmt(r.bF)}M</span></div>
-            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.9rem",color:st.c,marginTop:"0.25rem"}}>Effective: <span style={{color:RES.gold.color}}>{fmt(Math.floor((r.bG||0)*st.m))}T</span> / <span style={{color:RES.food.color}}>{fmt(Math.floor((r.bF||0)*st.m))}M</span></div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.9rem",color:st.c,marginTop:"0.25rem"}}>Effective: <span style={{color:RES.gold.color}}>{fmt(Math.floor((r.bG||0)*st.m))}T</span> / <span style={{color:RES.food.color}}>{fmt(effectiveFoodIncome((r.bF||0)*st.m,g))}M{winterFoodMark((r.bF||0)*st.m,g)}</span></div>
           </div>})}
         </div>
       </Card>
@@ -1468,6 +1537,7 @@ function PersonalWealthPanel({user,D,onRefresh}){
   const sendWealth=async()=>{const to=transfer.to,kind=transfer.kind,amt=Math.floor(Number(transfer.amount));if(!to||!amt||amt<=0){setMsg("Choose a recipient and amount.");return;}const fromW=wealthOf(wealth,user.id);if(fromW[kind]<amt){setMsg("You do not have enough personal resources.");return;}const toW=wealthOf(wealth,to);const recipient=(D.players||[]).find(p=>p.id===to);const next={...wealth,[user.id]:{...fromW,[kind]:fromW[kind]-amt},[to]:{...toW,[kind]:toW[kind]+amt}};await saveWealth(next);await addHistory(user.id,"Transfer Sent",`${user.latinName} sent ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Transfer Received",`${recipient?.latinName||"A senator"} received ${amt}${kind==="gold"?"T gold":"M food"} from ${user.latinName}.`,`wealth`);const entry={type:"transfer",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setTransfer({to:"",kind:"gold",amount:""});setMsg("Transfer completed and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   const sendProperty=async(asset)=>{const to=propTransfer[asset.id];if(!to){setMsg("Choose a recipient for the property.");return;}const recipient=(D.players||[]).find(p=>p.id===to);const biz=getBiz(businesses,asset.typeId);if(!confirm(`Transfer ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName}?`))return;const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:to,ownerName:recipient?.latinName||"Unknown"}:a);setAssets(nextAssets);await db.set("spqr_assets",nextAssets);await addHistory(user.id,"Property Transferred",`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Property Received",`${recipient?.latinName||"A senator"} received ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName}.`,`wealth`);const entry={type:"property",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setPropTransfer(x=>({...x,[asset.id]:""}));setMsg("Property transferred and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   return <div>
+    <SeasonBanner game={game||D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Personal Wealth Balance" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}>
@@ -1499,11 +1569,11 @@ function PersonalWealthPanel({user,D,onRefresh}){
         </div>
       </div>
       <STit c="Property Income Summary"/>
-      {myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties generating private income yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.95rem",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Province","Property Type","Assets","Gross Gold","Gross Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{Object.entries(myAssets.reduce((acc,a)=>{const biz=getBiz(businesses,a.typeId);const k=`${a.regionId||"unknown"}__${biz.id}`;if(!acc[k])acc[k]={region:a.regionName||getRegion(regions,a.regionId).name,biz,count:0,gold:0,food:0};acc[k].count+=1;acc[k].gold+=Number(biz.incomeGold||0);acc[k].food+=Number(biz.incomeFood||0);return acc;},{})).map(([k,row])=><tr key={k}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:800}}>{row.region}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.biz.emoji} {row.biz.name}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.count}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>+{row.gold}T</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.food.color}}>+{row.food}M</td></tr>)}</tbody></table></div>}
+      {myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties generating private income yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.95rem",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Province","Property Type","Assets","Gross Gold","Gross Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{Object.entries(myAssets.reduce((acc,a)=>{const biz=getBiz(businesses,a.typeId);const k=`${a.regionId||"unknown"}__${biz.id}`;if(!acc[k])acc[k]={region:a.regionName||getRegion(regions,a.regionId).name,biz,count:0,gold:0,food:0};acc[k].count+=1;acc[k].gold+=Number(biz.incomeGold||0);acc[k].food+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return acc;},{})).map(([k,row])=><tr key={k}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:800}}>{row.region}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.biz.emoji} {row.biz.name}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.count}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>+{row.gold}T</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.food.color}}>+{row.food}M</td></tr>)}</tbody></table></div>}
     </Card>
-    <Card><STit c="Invest in Estates and Businesses" sub="Each province has limited slots. Senators can compete to control profitable assets."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem",alignItems:"end"}}><div><Lbl c="Business Type"/><select value={buy.typeId} onChange={e=>setBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div><div><Lbl c="Province"/><select value={buy.regionId} onChange={e=>setBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div><Btn onClick={buyAsset}>Buy Property</Btn></div><div style={{marginTop:"0.75rem",padding:"0.65rem",background:T.bg,border:`1px solid ${T.border}`}}><b>{b.emoji} {b.name}</b> in <b>{reg.name}</b><br/>Cost: 🪙 {b.costGold}T / 🌾 {b.costFood}M · Gross Income: 🪙 +{b.incomeGold}T / 🌾 +{b.incomeFood}M · Slots: {used}/{cap}</div></Card>
+    <Card><STit c="Invest in Estates and Businesses" sub="Each province has limited slots. Senators can compete to control profitable assets."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem",alignItems:"end"}}><div><Lbl c="Business Type"/><select value={buy.typeId} onChange={e=>setBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div><div><Lbl c="Province"/><select value={buy.regionId} onChange={e=>setBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div><Btn onClick={buyAsset}>Buy Property</Btn></div><div style={{marginTop:"0.75rem",padding:"0.65rem",background:T.bg,border:`1px solid ${T.border}`}}><b>{b.emoji} {b.name}</b> in <b>{reg.name}</b><br/>Cost: 🪙 {b.costGold}T / 🌾 {b.costFood}M · Gross Income: 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,D.game||DEF_GAME)} · Slots: {used}/{cap}</div></Card>
     <Card><STit c="Estate Slots by Province" sub="See which businesses are available and which senators already control slots in each province."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.9rem",minWidth:"900px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"'Cinzel',serif"}}><th style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>Province</th>{businesses.map(bz=><th key={bz.id} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{bz.emoji} {bz.name}</th>)}</tr></thead><tbody>{regions.map(r=><tr key={r.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{r.name}</td>{businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,D.players||[]);return <td key={bz.id} style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{max<=0?<span style={{color:T.mut}}>Unavailable</span>:<><b>{owners.length}/{max}</b> occupied<br/>{owners.length?<span>{owners.join(", ")}</span>:<span style={{color:T.gre}}>Available</span>}{owners.length<max&&<div style={{color:T.gre,fontSize:"0.82rem"}}>Open slots: {max-owners.length}</div>}</>}</td>})}</tr>)}</tbody></table></div></Card>
-    <Card><STit c="My Properties by Region"/>{myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>You own no properties yet.</div>:Object.entries(byRegion).map(([regionId,list])=>{const r=getRegion(regions,regionId);const sum=list.reduce((a,x)=>{const biz=getBiz(businesses,x.typeId);a.g+=Number(biz.incomeGold||0);a.f+=Number(biz.incomeFood||0);return a;},{g:0,f:0});return <Card key={regionId} style={{borderLeft:`4px solid ${T.gold}`}}><STit c={r.name} sub={`Capital: ${r.capital||"Unknown"} · Gross income: 🪙 +${sum.g}T / 🌾 +${sum.f}M`}/>{list.map(a=>{const biz=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) auto",gap:"0.5rem",alignItems:"center",padding:"0.55rem",border:`1px solid ${T.border}`,marginBottom:"0.45rem",background:T.bg}}><div><b>{biz.emoji} {biz.name}</b><div style={{color:T.mut}}>Income: 🪙 +{biz.incomeGold}T / 🌾 +{biz.incomeFood}M</div><Row gap="0.35rem" wrap><select value={propTransfer[a.id]||""} onChange={e=>setPropTransfer(x=>({...x,[a.id]:e.target.value}))} style={{padding:"0.32rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Transfer property to...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select><Btn v="dark" sm onClick={()=>sendProperty(a)}>Transfer</Btn></Row></div><Btn v="red" sm onClick={()=>sellAsset(a)}>Sell</Btn></div>})}</Card>})}</Card>
+    <Card><STit c="My Properties by Region"/>{myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>You own no properties yet.</div>:Object.entries(byRegion).map(([regionId,list])=>{const r=getRegion(regions,regionId);const sum=list.reduce((a,x)=>{const biz=getBiz(businesses,x.typeId);a.g+=Number(biz.incomeGold||0);a.f+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return a;},{g:0,f:0});return <Card key={regionId} style={{borderLeft:`4px solid ${T.gold}`}}><STit c={r.name} sub={`Capital: ${r.capital||"Unknown"} · Gross income: 🪙 +${sum.g}T / 🌾 +${sum.f}M`}/>{list.map(a=>{const biz=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) auto",gap:"0.5rem",alignItems:"center",padding:"0.55rem",border:`1px solid ${T.border}`,marginBottom:"0.45rem",background:T.bg}}><div><b>{biz.emoji} {biz.name}</b><div style={{color:T.mut}}>Income: 🪙 +{biz.incomeGold}T / 🌾 +{displayedFoodIncome(biz.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(biz.incomeFood,D.game||DEF_GAME)}</div><Row gap="0.35rem" wrap><select value={propTransfer[a.id]||""} onChange={e=>setPropTransfer(x=>({...x,[a.id]:e.target.value}))} style={{padding:"0.32rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Transfer property to...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select><Btn v="dark" sm onClick={()=>sendProperty(a)}>Transfer</Btn></Row></div><Btn v="red" sm onClick={()=>sellAsset(a)}>Sell</Btn></div>})}</Card>})}</Card>
     {upgrade&&<Card><STit c="Class Advancement" sub="A senator may rise socially by paying the required private wealth. This is recorded in personal history."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="Current Class" value={`${getClassInfo(user.charClass).emoji} ${getClassInfo(user.charClass).label}`}/><Stat label="Next Class" value={`${getClassInfo(upgrade.to).emoji} ${getClassInfo(upgrade.to).label}`} color={getClassInfo(upgrade.to).color}/><Stat label="Cost" value={`🪙 ${upgrade.gold}T / 🌾 ${upgrade.food}M`} color={T.rhi}/><Btn onClick={changeClassByPayment}>Pay & Rise</Btn></div></Card>}
     <Card><STit c="Buy Food From the Roman Market" sub="The market is controlled by the Roman state. The Quaestors/GM can limit market stock and price. All purchases are publicly recorded."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="🌾 Market Food Available" value={`${fmt((D.game||{}).foodMarketStock??0)}M`} color={RES.food.color}/><Stat label="🪙 Price" value={`${fmt((D.game||{}).foodMarketPrice??2)}T / 1M`} color={RES.gold.color}/><Inp label="Food to Buy" type="number" value={foodBuy} onChange={setFoodBuy}/><Btn onClick={buyFoodFromState}>Buy Food</Btn></div></Card>
     <Card><STit c="Transfers, Donations and Food Sales"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem",alignItems:"end"}}><div><Lbl c="Recipient"/><select value={transfer.to} onChange={e=>setTransfer({...transfer,to:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="">Choose senator...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div><div><Lbl c="Resource"/><select value={transfer.kind} onChange={e=>setTransfer({...transfer,kind:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="gold">🪙 Gold</option><option value="food">🌾 Food</option></select></div><Inp label="Amount" type="number" value={transfer.amount} onChange={v=>setTransfer({...transfer,amount:v})}/><Btn onClick={sendWealth}>Send</Btn></div><Row gap="0.5rem" wrap><Btn onClick={()=>donate("gold")}>Donate 🪙 Gold to State</Btn><Btn onClick={()=>donate("food")}>Donate 🌾 Food to State</Btn><Btn v="dark" onClick={sellFood}>Sell Personal Food</Btn></Row></Card>
@@ -1536,13 +1606,14 @@ function ABusinesses({D,onRefresh}){
   const destroyAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);const reason=prompt(`Reason for destroying ${biz.name} in ${asset.regionName||asset.regionId}?`,"Destroyed by war / Hannibal");if(reason===null)return;const next=assets.filter(a=>a.id!==asset.id);setAssets(next);await db.set("spqr_assets",next);await addHistory(asset.ownerId,"Property Destroyed",`${biz.name} in ${asset.regionName||asset.regionId} was destroyed. Reason: ${reason||"War damage"}.`,"estate_destroyed");setMsg("Property destroyed and recorded in senator history.");setTimeout(()=>setMsg(""),3000);};
   const donationTotal=(kind)=>donations.filter(d=>d.kind===kind).reduce((a,d)=>a+Number(d.amount||0),0);
   return <div>
+    <SeasonBanner game={game||D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Private Economy Control" sub="Personal wealth is private from other players. This is the GM balance sheet for all senators."/><div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem"}}><Stat label="Business Types" value={businesses.length}/><Stat label="Properties Owned" value={assets.length}/><Stat label="Gold Donated" value={`🪙 ${fmt(donationTotal("gold"))}T`} color={RES.gold.color}/><Stat label="Food Donated" value={`🌾 ${fmt(donationTotal("food"))}M`} color={RES.food.color}/></div><Row gap="0.5rem" wrap><Btn v="green" onClick={addBiz}>＋ Add Business Type</Btn><Btn v="dark" onClick={applyBalancedPreset}>⚖️ Load Balanced Preset</Btn><Btn onClick={save}>💾 Save Private Economy Rules</Btn></Row></Card>
     <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the amount of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 State Food Market Stock" type="number" value={game.foodMarketStock??0} onChange={v=>setGame({...game,foodMarketStock:Number(v)||0})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame(game)}>Save Market & Tax Rules</Btn></Row></Card>
     <Card><STit c="Senator Balance Sheet" sub="GM-only overview. Exact private wealth is hidden from other players. Edit wealth and household upkeep here."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.92rem",minWidth:"980px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"'Cinzel',serif"}}>{["Senator","🪙 Gold","🌾 Food","Gross Estate","Tax","Household","Net / Season","Properties"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{players.map(p=>{const w=wealthOf(wealth,p.id);const bal=personalBalanceFor(p.id,p.role,assets,businesses,wealth,game);return <tr key={p.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{p.latinName}</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={w.gold} onChange={e=>setPlayerWealth(p.id,"gold",e.target.value)} style={{width:"110px",padding:"0.28rem",color:RES.gold.color}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={w.food} onChange={e=>setPlayerWealth(p.id,"food",e.target.value)} style={{width:"110px",padding:"0.28rem",color:RES.food.color}}/></td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:T.gre}}>+{bal.gross.gold}T / +{bal.gross.food}M</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:T.rhi}}>-{bal.taxGold}T / -{bal.taxFood}M</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input title="Household Gold" type="number" value={w.householdGold} onChange={e=>setPlayerWealth(p.id,"householdGold",e.target.value)} style={{width:"72px",padding:"0.25rem"}}/> / <input title="Household Food" type="number" value={w.householdFood} onChange={e=>setPlayerWealth(p.id,"householdFood",e.target.value)} style={{width:"72px",padding:"0.25rem"}}/></td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:(bal.netGold+bal.netFood)>=0?T.gre:T.rhi}}>{bal.netGold>=0?"+":""}{bal.netGold}T / {bal.netFood>=0?"+":""}{bal.netFood}M</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,textAlign:"center"}}>{assets.filter(a=>a.ownerId===p.id).length}</td></tr>})}</tbody></table></div></Card>
     <Card><STit c="Estate Slots Overview" sub="GM view of who owns each estate slot and what is still available for purchase."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.9rem",minWidth:"980px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"\'Cinzel\',serif"}}><th style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>Province</th>{businesses.map(bz=><th key={bz.id} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{bz.emoji} {bz.name}</th>)}</tr></thead><tbody>{regions.map(r=><tr key={r.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{r.name}</td>{businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,players);return <td key={bz.id} style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{max<=0?<span style={{color:T.mut}}>—</span>:<><b>{owners.length}/{max}</b><br/>{owners.length?owners.join(", "):<span style={{color:T.gre}}>Available</span>}{owners.length<max&&<div style={{color:T.gre,fontSize:"0.82rem"}}>Open: {max-owners.length}</div>}</>}</td>})}</tr>)}</tbody></table></div></Card>
     <Card><STit c="Business Types and Regional Limits"/>{businesses.map((b,i)=><Card key={b.id} style={{borderLeft:`4px solid ${T.gold}`}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem"}}><Inp label="Emoji" value={b.emoji} onChange={v=>updBiz(i,"emoji",v)}/><Inp label="Name" value={b.name} onChange={v=>updBiz(i,"name",v)}/><Inp label="ID" value={b.id} onChange={v=>updBiz(i,"id",v)}/><Inp label="Cost Gold" type="number" value={b.costGold} onChange={v=>updBiz(i,"costGold",v)}/><Inp label="Cost Food" type="number" value={b.costFood} onChange={v=>updBiz(i,"costFood",v)}/><Inp label="Income Gold" type="number" value={b.incomeGold} onChange={v=>updBiz(i,"incomeGold",v)}/><Inp label="Income Food" type="number" value={b.incomeFood} onChange={v=>updBiz(i,"incomeFood",v)}/></div><STit c="Slots by Province"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.4rem"}}>{regions.map(r=><div key={r.id}><Lbl c={r.name}/><input type="number" value={(b.regionCaps||{})[r.id]||0} onChange={e=>updCap(i,r.id,e.target.value)} style={{width:"100%",padding:"0.35rem",border:`1px solid ${T.border}`}}/></div>)}</div></Card>)}</Card>
-    <Card><STit c="All Properties"/>{assets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties purchased yet.</div>:assets.map(a=>{const b=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",padding:"0.45rem",borderBottom:`1px solid ${T.border}`,flexWrap:"wrap"}}><span><b>{b.emoji} {b.name}</b> — {a.ownerName} — {a.regionName} · 🪙 +{b.incomeGold}T / 🌾 +{b.incomeFood}M</span><Row gap="0.35rem" wrap><Btn v="red" sm onClick={()=>destroyAsset(a)}>Destroy / War Loss</Btn><Btn v="ghost" sm onClick={()=>removeAsset(a.id)}>Remove</Btn></Row></div>})}</Card>
+    <Card><STit c="All Properties"/>{assets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties purchased yet.</div>:assets.map(a=>{const b=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",padding:"0.45rem",borderBottom:`1px solid ${T.border}`,flexWrap:"wrap"}}><span><b>{b.emoji} {b.name}</b> — {a.ownerName} — {a.regionName} · 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,game||D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,game||D.game||DEF_GAME)}</span><Row gap="0.35rem" wrap><Btn v="red" sm onClick={()=>destroyAsset(a)}>Destroy / War Loss</Btn><Btn v="ghost" sm onClick={()=>removeAsset(a.id)}>Remove</Btn></Row></div>})}</Card>
     <Card><STit c="Donation Ledger"/>{donations.slice(-30).reverse().map(d=><div key={d.id} style={{padding:"0.35rem 0",borderBottom:`1px solid ${T.border}`}}>{d.kind==="gold"?"🪙":"🌾"} <b>{d.playerName}</b> donated {fmt(d.amount)} {d.kind} · {d.session}</div>)}{donations.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No donations yet.</div>}</Card>
   </div>;
 }
@@ -1647,7 +1718,7 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
   return <div>
     <Card style={{borderLeft:`6px solid ${POS.praetor_1.color}`}}>
       <STit c="⚖️ Courts of Rome" sub="The app records official legal cases. The actual trial can happen in Discord threads; paste the thread link into the case record."/>
-      <div style={{color:T.mut,lineHeight:1.55}}>The <b>Praetor Urbanus</b> may accept cases, create the Discord court thread, add the thread link, manage status and issue rulings. The Game Master can control all cases.</div>
+      <div style={{color:T.mut,lineHeight:1.55}}>The <b>Praetor Urbanus</b> may accept cases, create the Discord court thread, add the thread link, manage status and issue rulings. Submitted cases may be rewritten or withdrawn by the accuser before approval. The Game Master can control all cases.</div>
     </Card>
     <Card><STit c="Submit an Accusation / Legal Petition" sub="Senators may submit cases for review by the Praetor Urbanus."/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem"}}>
@@ -1664,15 +1735,15 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
     <Card><STit c="Court Case Registry" sub="Official legal archive of the Republic."/>
       <div style={{display:"flex",gap:"0.5rem",alignItems:"end",flexWrap:"wrap",marginBottom:"0.7rem"}}><div><Lbl c="Filter Status"/><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}><option value="all">All cases</option>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
       {filtered.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No court cases yet.</div>}
-      {filtered.map(c=>{const isEditing=!!edit[c.id];const local=edit[c.id]||c;return <div key={c.id} style={{border:`1px solid ${T.border}`,borderLeft:`6px solid ${courtColor(c.status)}`,background:T.surf,padding:"0.75rem",marginBottom:"0.65rem"}}>
+      {filtered.map(c=>{const isEditing=!!edit[c.id];const local=edit[c.id]||c;const canEditOwnSubmitted=!isGM&&!isPraetor&&c.status==="Submitted"&&c.accuserId===user?.id;return <div key={c.id} style={{border:`1px solid ${T.border}`,borderLeft:`6px solid ${courtColor(c.status)}`,background:T.surf,padding:"0.75rem",marginBottom:"0.65rem"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:"0.6rem",flexWrap:"wrap",alignItems:"center"}}><div><Badge c={c.status} color={courtColor(c.status)}/> <span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{caseTitle(c)}</span></div><div style={{color:T.mut,fontSize:"0.82rem"}}>{c.session||""}</div></div>
         <div style={{marginTop:"0.35rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.45rem"}}>
           <div><b>Accuser:</b> {c.accuserName||pname(c.accuserId)}</div><div><b>Accused:</b> {c.accusedName||pname(c.accusedId)}</div><div><b>Praetor:</b> {c.praetorName||"Not assigned"}</div>
         </div>
-        {isEditing&&canAdmin?<div style={{marginTop:"0.65rem"}}>
+        {isEditing&&(canAdmin||canEditOwnSubmitted)?<div style={{marginTop:"0.65rem"}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.55rem"}}>
             <Inp label="Case Title" value={local.title||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,title:v}}))}/>
-            <div><Lbl c="Status"/><select value={local.status||"Submitted"} onChange={e=>setEdit(x=>({...x,[c.id]:{...local,status:e.target.value}}))} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+            <div><Lbl c="Status"/><select value={local.status||"Submitted"} onChange={e=>setEdit(x=>({...x,[c.id]:{...local,status:e.target.value}}))} disabled={!canAdmin} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
             <Inp label="Discord Thread Link" value={local.threadLink||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,threadLink:v}}))}/>
           </div>
           <Inp label="Law Broken" value={local.law||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,law:v}}))}/>
@@ -1681,13 +1752,136 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
           <Inp label="Praetor Notes" value={local.notes||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,notes:v}}))} rows={2}/>
           <Inp label="Final Ruling" value={local.ruling||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,ruling:v}}))} rows={3}/>
           <Inp label="Punishment / Consequence" value={local.punishment||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,punishment:v}}))} rows={2}/>
-          <Row gap="0.45rem" wrap><Btn onClick={async()=>{await patchCase(c.id,local,true);setEdit(e=>{const n={...e};delete n[c.id];return n;});}}>Save Case</Btn><Btn v="ghost" onClick={()=>setEdit(e=>{const n={...e};delete n[c.id];return n;})}>Cancel</Btn>{isGM&&<Btn v="red" onClick={()=>removeCase(c.id)}>Delete</Btn>}</Row>
+          <Row gap="0.45rem" wrap><Btn onClick={async()=>{const patch=(canAdmin?local:{...c,title:local.title,law:local.law,summary:local.summary,evidence:local.evidence,request:local.request,updated:Date.now()});await patchCase(c.id,patch,true);setEdit(e=>{const n={...e};delete n[c.id];return n;});}}>Save Case</Btn><Btn v="ghost" onClick={()=>setEdit(e=>{const n={...e};delete n[c.id];return n;})}>Cancel</Btn>{canEditOwnSubmitted&&<Btn v="crimson" onClick={async()=>{if(confirm("Withdraw this submitted case before review?")){await removeCase(c.id);}}}>Withdraw Case</Btn>}{isGM&&<Btn v="red" onClick={()=>removeCase(c.id)}>Delete</Btn>}</Row>
         </div>:<div style={{marginTop:"0.55rem",lineHeight:1.5}}>
           {c.law&&<div><b>Law:</b> {c.law}</div>}<div><b>Accusation:</b> {c.summary}</div>{c.evidence&&<div><b>Evidence:</b> {c.evidence}</div>}{c.request&&<div><b>Requested ruling:</b> {c.request}</div>}{c.threadLink&&<div><b>Discord thread:</b> <a href={c.threadLink} target="_blank" rel="noreferrer" style={{color:T.blue}}>Open court thread</a></div>}{c.notes&&<div><b>Praetor notes:</b> {c.notes}</div>}{c.ruling&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#F0FFF4",border:`1px solid ${T.gre}`}}><b>Ruling:</b> {c.ruling}</div>}{c.punishment&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`}}><b>Punishment / consequence:</b> {c.punishment}</div>}
         </div>}
-        {canAdmin&&!isEditing&&<Row gap="0.45rem" wrap><Btn sm onClick={()=>setEdit(e=>({...e,[c.id]:c}))}>Edit / Manage Case</Btn>{isPraetor&&!c.praetorId&&<Btn sm v="dark" onClick={()=>assignPraetor(c.id)}>Assign Myself as Praetor</Btn>}</Row>}
+        {(canAdmin||canEditOwnSubmitted)&&!isEditing&&<Row gap="0.45rem" wrap><Btn sm onClick={()=>setEdit(e=>({...e,[c.id]:c}))}>{canEditOwnSubmitted?"Edit / Rewrite Submitted Case":"Edit / Manage Case"}</Btn>{isPraetor&&!c.praetorId&&<Btn sm v="dark" onClick={()=>assignPraetor(c.id)}>Assign Myself as Praetor</Btn>}</Row>}
       </div>})}
     </Card>
+  </div>;
+}
+
+
+
+function ReputationPanel({user,D,onRefresh}){
+  const [rep,setRep]=useState(D.reputation||{});
+  const [wealth,setWealth]=useState(D.wealth||{});
+  const [rules,setRules]=useState(D.repRules||DEF_REP_RULES);
+  const [msg,setMsg]=useState("");
+  const [target,setTarget]=useState("");
+  const [slanderId,setSlanderId]=useState("minor");
+  const [accusation,setAccusation]=useState("");
+  const [method,setMethod]=useState("Forum gossip and client networks");
+  const [evidence,setEvidence]=useState("none");
+  const [anon,setAnon]=useState(true);
+  const meRep=repOf(rep,user);
+  const w=wealthOf(wealth,user.id);
+  const players=(D.players||[]).filter(p=>p.id!==user.id);
+  const activeScandals=activeScandalsFor(rep,user.id);
+  const saveRep=async(next)=>{setRep(next);await db.set("spqr_reputation",next);onRefresh&&onRefresh();};
+  const saveWealthLocal=async(next)=>{setWealth(next);await db.set("spqr_wealth",next);onRefresh&&onRefresh();};
+  const boost=async(action)=>{
+    const cur=wealthOf(wealth,user.id);
+    if(cur.gold<Number(action.costGold||0)||cur.food<Number(action.costFood||0)){setMsg("Insufficient private resources for this reputation action.");return;}
+    const nextWealth={...wealth,[user.id]:{...cur,gold:cur.gold-Number(action.costGold||0),food:cur.food-Number(action.costFood||0)}};
+    const nextRep={...rep,[user.id]:{...meRep,score:clampRep(meRep.score+Number(action.gain||0))}};
+    await saveWealthLocal(nextWealth);await saveRep(nextRep);
+    const text=`${user.latinName} spent ${action.costGold||0}T/${action.costFood||0}M on ${action.name} and gained +${action.gain} reputation.`;
+    await addRepLog({type:"boost",playerId:user.id,playerName:user.latinName,session:sLab(D.game||DEF_GAME),text});
+    await addHistory(user.id,"Reputation Increased",text,"reputation");
+    setMsg("Reputation increased and recorded.");setTimeout(()=>setMsg(""),3000);
+  };
+  const doSlander=async()=>{
+    const act=(rules.slanderActions||DEF_REP_RULES.slanderActions).find(a=>a.id===slanderId)||DEF_REP_RULES.slanderActions[0];
+    const victim=(D.players||[]).find(p=>p.id===target);
+    if(!victim){setMsg("Choose a target senator.");return;}
+    if(!accusation.trim()){setMsg("Write the accusation or rumour.");return;}
+    const cur=wealthOf(wealth,user.id);
+    if(cur.gold<Number(act.costGold||0)){setMsg("Insufficient private gold for this slander campaign.");return;}
+    const roll=Math.floor(Math.random()*100)+1;
+    const success=Number(act.success||50);
+    const backfire=Number(act.backfireChance||15);
+    const nextWealth={...wealth,[user.id]:{...cur,gold:cur.gold-Number(act.costGold||0)}};
+    const attackerRep=repOf(rep,user), victimRep=repOf(rep,victim);
+    let nextRep={...rep};
+    let text="", outcome="failure";
+    if(roll<=backfire){
+      outcome="backfire";
+      nextRep[user.id]={...attackerRep,score:clampRep(attackerRep.score-Number(act.backfire||5)),scandals:[...(attackerRep.scandals||[]),{id:Date.now().toString()+"_bf",active:true,text:`Exposed for attempting to slander ${victim.latinName}: ${accusation}`,severity:Number(act.backfire||5),sourceId:user.id,sourceName:user.latinName,ts:Date.now()}]};
+      text=`BACKFIRE: ${user.latinName} was exposed attempting to slander ${victim.latinName}. ${user.latinName} loses ${act.backfire} reputation and may be brought before the Praetor Urbanus.`;
+    }else if(roll<=success){
+      outcome="success";
+      nextRep[victim.id]={...victimRep,score:clampRep(victimRep.score-Number(act.impact||5)),scandals:[...(victimRep.scandals||[]),{id:Date.now().toString()+"_sl",active:true,text:accusation,severity:Number(act.impact||5),sourceId:anon?null:user.id,sourceName:anon?"Anonymous":user.latinName,method,evidence,ts:Date.now()}]};
+      text=`SLANDER SUCCESS: A scandal marks ${victim.latinName}: "${accusation}". ${victim.latinName} loses ${act.impact} reputation.`;
+    }else if(roll<=success+20){
+      outcome="partial";
+      nextRep[victim.id]={...victimRep,score:clampRep(victimRep.score-Number(act.partial||2)),scandals:[...(victimRep.scandals||[]),{id:Date.now().toString()+"_ps",active:true,text:`Weak rumour: ${accusation}`,severity:Number(act.partial||2),sourceId:anon?null:user.id,sourceName:anon?"Anonymous":user.latinName,method,evidence,ts:Date.now()}]};
+      text=`PARTIAL SLANDER: Rumours circulate about ${victim.latinName}, but the impact is limited. Reputation -${act.partial}.`;
+    }else{
+      text=`SLANDER FAILED: A campaign against ${victim.latinName} failed to take hold.`;
+    }
+    await saveWealthLocal(nextWealth);await saveRep(nextRep);
+    await addRepLog({type:"slander",outcome,playerId:user.id,playerName:user.latinName,targetId:victim.id,targetName:victim.latinName,session:sLab(D.game||DEF_GAME),text,roll});
+    await addHistory(user.id,"Slander Attempt",`${text} Roll: ${roll}.`,"reputation");
+    await addHistory(victim.id,"Target of Slander",text,"reputation");
+    await pushN("Rumour Campaign",text);
+    setAccusation("");setMsg(`${text} Roll: ${roll}`);setTimeout(()=>setMsg(""),6000);
+  };
+  const counter=async(scandal,act)=>{
+    const cur=wealthOf(wealth,user.id);
+    if(cur.gold<Number(act.costGold||0)){setMsg("Insufficient private gold for this counter-campaign.");return;}
+    const remove=Number(act.remove||5);
+    const updated=(meRep.scandals||[]).map(sc=>sc.id===scandal.id?{...sc,severity:Math.max(0,Number(sc.severity||0)-remove),active:(Number(sc.severity||0)-remove)>0}:sc);
+    const scoreGain=Math.min(remove,Number(scandal.severity||remove));
+    const nextRep={...rep,[user.id]:{...meRep,score:clampRep(meRep.score+scoreGain),scandals:updated}};
+    const nextWealth={...wealth,[user.id]:{...cur,gold:cur.gold-Number(act.costGold||0)}};
+    await saveWealthLocal(nextWealth);await saveRep(nextRep);
+    const text=`${user.latinName} spent ${act.costGold}T on ${act.name} against scandal "${scandal.text}".`;
+    await addRepLog({type:"counter",playerId:user.id,playerName:user.latinName,session:sLab(D.game||DEF_GAME),text});
+    await addHistory(user.id,"Counter-Campaign",text,"reputation");
+    setMsg("Counter-campaign applied.");setTimeout(()=>setMsg(""),3000);
+  };
+  return <div>
+    <Card style={{borderLeft:`5px solid ${repColor(meRep.score)}`}}><STit c="Personal Reputation" sub="Reputation influences elections because senators can see scandals and use them in debate."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}><Stat label="Reputation" value={`${meRep.score}/100`} color={repColor(meRep.score)}/><Stat label="Active Scandals" value={activeScandals.length} color={activeScandals.length?T.rhi:T.gre}/><Stat label="Private Gold" value={`${fmt(w.gold)}T`} color={RES.gold.color}/></div>{msg&&<div style={{marginTop:"0.7rem",padding:"0.55rem",background:T.bg,border:`1px solid ${T.border}`}}>{msg}</div>}
+    </Card>
+    <Card><STit c="Increase Your Reputation" sub="Spend private wealth on public actions that improve your name."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:"0.55rem"}}>{(rules.boostActions||DEF_REP_RULES.boostActions).map(a=><div key={a.id} style={{background:T.surf,border:`1px solid ${T.border}`,padding:"0.7rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>{a.emoji} {a.name}</div><div style={{color:T.mut,fontSize:"0.88rem"}}>{a.desc}</div><div style={{margin:"0.35rem 0",fontWeight:800}}>Cost: {a.costGold||0}T / {a.costFood||0}M · Gain +{a.gain}</div><Btn sm onClick={()=>boost(a)}>Use Action</Btn></div>)}</div>
+    </Card>
+    <Card><STit c="Slander a Rival" sub="Spend private gold to lower another senator's reputation. A bad roll can expose you and create a court case."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem"}}><div><Lbl c="Target Senator"/><select value={target} onChange={e=>setTarget(e.target.value)} style={{width:"100%",padding:"0.5rem",border:`1px solid ${T.border}`}}><option value="">Choose target...</option>{players.map(p=><option key={p.id} value={p.id}>{p.latinName} · Rep {repOf(rep,p).score}</option>)}</select></div><div><Lbl c="Slander Type"/><select value={slanderId} onChange={e=>setSlanderId(e.target.value)} style={{width:"100%",padding:"0.5rem",border:`1px solid ${T.border}`}}>{(rules.slanderActions||DEF_REP_RULES.slanderActions).map(a=><option key={a.id} value={a.id}>{a.emoji} {a.name} — {a.costGold}T</option>)}</select></div></div>
+      <Inp label="Accusation / Rumour" value={accusation} onChange={setAccusation} rows={3} placeholder="e.g. Enemy of the plebs, coward before Hannibal, corrupt quaestor..."/>
+      <Inp label="Method" value={method} onChange={setMethod} placeholder="Forum gossip, paid clients, anonymous pamphlets..."/>
+      <Inp label="Evidence" value={evidence} onChange={setEvidence} placeholder="none / weak / strong / public fact"/>
+      <label style={{display:"flex",gap:"0.4rem",alignItems:"center",marginBottom:"0.6rem"}}><input type="checkbox" checked={anon} onChange={e=>setAnon(e.target.checked)}/> Attempt anonymously</label><Btn v="crimson" onClick={doSlander}>Launch Slander Campaign</Btn>
+    </Card>
+    <Card><STit c="Defend Against Scandals" sub="Spend gold on counter-campaigns to reduce or remove public scandal markers."/>
+      {activeScandals.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No active scandals.</div>:activeScandals.map(sc=><div key={sc.id} style={{background:"#FFF1F1",border:`1px solid ${T.rhi}`,padding:"0.65rem",marginBottom:"0.5rem"}}><b>⚠️ {sc.text}</b><div style={{color:T.mut}}>Severity: {sc.severity} · Source: {sc.sourceName||"Unknown / Anonymous"}</div><Row gap="0.4rem" wrap>{(rules.counterActions||DEF_REP_RULES.counterActions).map(a=><Btn key={a.id} sm v="dark" onClick={()=>counter(sc,a)}>{a.emoji} {a.name} ({a.costGold}T)</Btn>)}</Row></div>)}
+    </Card>
+    <Card><STit c="Public Reputation Marks" sub="Visible scandals and reputation pressures across the Senate."/>
+      {(D.players||[]).map(p=>{const pr=repOf(rep,p);const sc=activeScandalsFor(rep,p.id);return sc.length?<div key={p.id} style={{borderLeft:`4px solid ${repColor(pr.score)}`,background:T.surf,padding:"0.55rem",marginBottom:"0.4rem"}}><b>{p.latinName}</b> — Reputation {pr.score}/100{sc.map(x=><div key={x.id} style={{color:T.rhi}}>⚠️ {x.text} <span style={{color:T.mut}}>(severity {x.severity})</span></div>)}</div>:null})}
+    </Card>
+  </div>;
+}
+
+function AReputation({D,onRefresh}){
+  const [rep,setRep]=useState(D.reputation||{});
+  const [rules,setRules]=useState(D.repRules||DEF_REP_RULES);
+  const [log,setLog]=useState(D.replog||[]);
+  useEffect(()=>{setRep(D.reputation||{});setRules(D.repRules||DEF_REP_RULES);setLog(D.replog||[]);},[D.reputation,D.repRules,D.replog]);
+  const saveRules=async()=>{await db.set("spqr_rep_rules",rules);onRefresh&&onRefresh();};
+  const saveRep=async(next)=>{setRep(next);await db.set("spqr_reputation",next);onRefresh&&onRefresh();};
+  const updateAction=(group,i,k,v)=>{setRules(r=>({...r,[group]:(r[group]||[]).map((a,idx)=>idx===i?{...a,[k]:["costGold","costFood","gain","impact","partial","backfire","success","backfireChance","remove"].includes(k)?Number(v):v}:a)}));};
+  const closeScandal=async(pid,sid)=>{const p=(D.players||[]).find(x=>x.id===pid);const pr=repOf(rep,p);const next={...rep,[pid]:{...pr,scandals:(pr.scandals||[]).map(s=>s.id===sid?{...s,active:false}:s)}};await saveRep(next);};
+  return <div>
+    <Card><STit c="Reputation Control" sub="GM can edit scores, prices, success chances, scandal effects and active scandal marks."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:"0.55rem"}}>{(D.players||[]).map(p=>{const pr=repOf(rep,p);return <div key={p.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`5px solid ${repColor(pr.score)}`,padding:"0.65rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>{p.latinName}</div><Lbl c="Reputation Score"/><input type="number" value={pr.score} onChange={e=>saveRep({...rep,[p.id]:{...pr,score:clampRep(e.target.value)}})} style={{width:"100%",padding:"0.4rem",border:`1px solid ${T.border}`}}/>{activeScandalsFor(rep,p.id).map(sc=><div key={sc.id} style={{marginTop:"0.4rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`,padding:"0.35rem"}}>⚠️ {sc.text}<br/><small>Severity {sc.severity}</small><br/><Btn sm v="ghost" onClick={()=>closeScandal(p.id,sc.id)}>Close Scandal</Btn></div>)}</div>})}</div>
+    </Card>
+    <Card><STit c="Reputation Economy Rules" sub="Edit costs and mechanical effects for reputation actions."/>
+      {[["boostActions","Improve Reputation"],["slanderActions","Slander Actions"],["counterActions","Counter-Campaigns"]].map(([group,title])=><div key={group}><STit c={title}/>{(rules[group]||[]).map((a,i)=><div key={a.id} style={{background:T.surf,border:`1px solid ${T.border}`,padding:"0.55rem",marginBottom:"0.45rem"}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:"0.4rem"}}>{["emoji","name","costGold","costFood","gain","impact","partial","backfire","success","backfireChance","remove"].filter(k=>a[k]!==undefined).map(k=><div key={k}><Lbl c={k}/><input value={a[k]} onChange={e=>updateAction(group,i,k,e.target.value)} style={{width:"100%",padding:"0.35rem",border:`1px solid ${T.border}`}}/></div>)}</div><Inp label="Description" value={a.desc||""} onChange={v=>updateAction(group,i,"desc",v)}/></div>)}</div>)}<Btn onClick={saveRules}>Save Reputation Rules</Btn>
+    </Card>
+    <Card><STit c="Reputation Log"/>{log.slice().reverse().slice(0,80).map(e=><div key={e.id||e.ts} style={{borderBottom:`1px solid ${T.border}`,padding:"0.4rem 0"}}><b>{e.type}</b> — {e.text}<div style={{fontSize:"0.75rem",color:T.mut}}>{e.session||""} · {new Date(e.ts||Date.now()).toLocaleString()}</div></div>)}</Card>
   </div>;
 }
 
@@ -1696,16 +1890,16 @@ function PlayerApp({user:initUser,onLogout}){
   const [tab,setTab]=useState("senate");
   const [group,setGroup]=useState("gov");
   const [user,setUser]=useState(initUser);
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[]});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules")
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[]});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
     if(players){const me=players.find(p=>p.id===user.id);if(me)setUser(me);}
   },[user.id]);
 
@@ -1722,7 +1916,7 @@ function PlayerApp({user:initUser,onLogout}){
       {k:"senate",l:"Senate"},{k:"voting",l:`Voting${votingCount>0?` (${votingCount})`:""}`},{k:"orders",l:"Orders"},{k:"resources",l:"Resources"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:"Elections"},...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
     ]},
     {key:"personal",label:"👤 Personal",tone:"personal",tabs:[
-      {k:"wealth",l:"Personal Wealth"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
+      {k:"wealth",l:"Personal Wealth"},{k:"reputation",l:"Reputation"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
     ]},
     {key:"records",label:"📜 Records",tone:"records",tabs:[
       {k:"cemetery",l:"Cemetery"},{k:"laws",l:"Laws"},{k:"map",l:"Map"}
@@ -1756,6 +1950,7 @@ function PlayerApp({user:initUser,onLogout}){
         {activeTabs.map(it=>{const tone=it.tone||activeGroup.tone;return <button key={it.k} onClick={()=>jumpTab(it.k)} style={{padding:"0.52rem 0.9rem",background:tab===it.k?"#fff":"transparent",color:tab===it.k?toneColor(tone):T.mut,border:"none",borderBottom:tab===it.k?`2px solid ${toneColor(tone)}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>})}
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
+        <SeasonBanner game={D.game}/>
         {tab==="senate"    &&<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>}
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
         {tab==="orders"    &&<OrdersPanel orders={D.orders} game={D.game} players={D.players}/>} 
@@ -1766,6 +1961,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="elections" &&<ElectionsPlayerPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} onRefresh={refresh}/>}
         {tab==="wealth"    &&<PersonalWealthPanel user={user} D={D} onRefresh={refresh}/>}
+        {tab==="reputation"&&<ReputationPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="parties"   &&<PartiesPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="cemetery" &&<CemeteryPanel cemetery={D.cemetery||[]} players={D.players||[]}/>}
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
@@ -1781,7 +1977,7 @@ function PlayerApp({user:initUser,onLogout}){
 function AOverview({D}){
   const [, setR]=useState(0);
   const activeLegs=(D.legions||[]).filter(l=>l.status==="active");
-  const inc=D.regions?calcInc(D.regions):{gold:0,food:0};
+  const inc=D.regions?calcInc(D.regions,D.game||DEF_GAME):{gold:0,food:0};
   const upkeepG=activeLegs.length*(D.game?.legionUpkeep||80)+activeCavalry(D.cavalry||DEF_CAVALRY).length*(D.game?.cavalryUpkeep||DEF_GAME.cavalryUpkeep)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetUpkeep||DEF_GAME.fleetUpkeep);
   const upkeepF=activeLegs.length*(D.game?.legionFood||60)+activeCavalry(D.cavalry||DEF_CAVALRY).length*(D.game?.cavalryFood||DEF_GAME.cavalryFood)+fleetTriremes(D.fleets||DEF_FLEETS)*(D.game?.fleetFood||DEF_GAME.fleetFood);
   const pendingMotions=(D.motions||[]).filter(m=>m.status==="pending");
@@ -2123,7 +2319,7 @@ function AResources({D,onRefresh}){
   const [msg,setMsg]=useState("");
   useEffect(()=>{setG({...DEF_GAME,...D.game});setRegs((D.regions||DEF_REGIONS).map(r=>({...r})));},[D.game,D.regions]);
   if(!g||!regs)return null;
-  const inc=calcInc(regs);
+  const inc=calcInc(regs,g);
   const activeLegs=activeLegions(D.legions||[]);
   const mb=militaryBreakdown(g,D.legions||DEF_LEGIONS,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS,D.forceTypes||FORCE_TYPES);
   const upkeepG=mb.totalGold;
@@ -2151,7 +2347,7 @@ function AResources({D,onRefresh}){
     food=food+inc.food-upkeepF;
     let newSess=1;
     let newSeason=season;let newYear=year;
-    const idx=SEASONS.indexOf(season);const nIdx=(idx+1)%SEASONS.length;newSeason=SEASONS[nIdx];if(nIdx===0)newYear=year-1;
+    const idx=seasonIndex(season);const nIdx=(idx+1)%SEASONS.length;newSeason=SEASONS[nIdx];if(nIdx===0)newYear=year-1;
     session++;
     const legs=await db.get("spqr_l")||DEF_LEGIONS;
     const nl=legs.map(l=>{if(l.status==="raising"){const np=(l.prog||0)+1;if(np>=lturns)return{...l,status:"active",str:l.max||5000,max:l.max||5000,prog:0};return{...l,prog:np};}return l;});
@@ -2217,12 +2413,13 @@ function AResources({D,onRefresh}){
     await db.set("spqr_deadline",null);
     setG(ng);setConfirmAdv(false);setMsg("Session advanced.");
     await pushN("session",`Session Advanced`,`The Senate enters ${newYear} BC ${newSeason} S${newSess}`);
+    if(isWinterSeason(newSeason))await pushN("Winter Food Reduction",`The Republic has entered ${newSeason}. Food production from provinces and private estates is reduced by ${Math.round((1-WINTER_FOOD_MOD)*100)}%.`);
     onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   const goBack=async()=>{
     if(!confirm("Go back one session? This changes only the calendar/session counter, not resources or orders."))return;
     let ng={...g};ng.session=Math.max(1,(ng.session||1)-1);
-    const idx=SEASONS.indexOf(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=1;if(idx===0)ng.year=(ng.year||218)+1;
+    const idx=seasonIndex(ng.season);const prev=(idx-1+SEASONS.length)%SEASONS.length;ng.season=SEASONS[prev];ng.sessionInSeason=1;if(idx===0)ng.year=(ng.year||218)+1;
     await db.set("spqr_g",ng);await db.set("spqr_deadline",null);setG(ng);setMsg("Went back one session.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   const restartGame=async()=>{
@@ -2232,14 +2429,14 @@ function AResources({D,onRefresh}){
   };
   return <div>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem",fontSize:"1rem"}}>{msg}</div>}
-    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are integrated. One campaign year has five seasons: Spring, Early Summer, High Summer, Autumn and Winter."/>
+    <Card><STit c="Resources, Regions and Turn Control" sub="Economy and provinces are integrated. One campaign year has five seasons: Spring, Early Summer, Late Summer, Autumn and Winter. Winter automatically reduces food production."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
         <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
       </div>
       <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
     </Card>
     <ABackupRestore onRefresh={onRefresh}/>
-    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(SEASONS.indexOf(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${totalGoldIncome}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${totalFoodIncome}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+totalGoldIncome-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+totalFoodIncome-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
+    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(seasonIndex(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${totalGoldIncome}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${totalFoodIncome}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+totalGoldIncome-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+totalFoodIncome-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
     <Card><STit c="Military Upkeep Costs" sub="Edit upkeep for legions, cavalry and triremes. These are deducted from stockpiles when you advance the session or apply maintenance manually."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
@@ -2270,7 +2467,7 @@ function ARegions({D,onRefresh}){
   if(!regs)return null;
   const upd=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:isNaN(Number(v))&&k!=="s"?v:k==="s"?v:Number(v)}:r));
   const save=async()=>{await db.set("spqr_r",regs);setMsg("Saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
-  const inc=calcInc(regs);
+  const inc=calcInc(regs,g);
   const g={...DEF_GAME,...(D.game||{})};
   const privateTaxes=totalPrivateTaxProjection(D.players||[],D.assets||[],D.businesses||DEF_BUSINESSES,D.wealth||{},g);
   const totalGoldIncome=inc.gold+privateTaxes.gold;
@@ -2597,6 +2794,7 @@ function AElections({D,onRefresh}){
   };
   const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
   return <div>
+    <SeasonBanner game={game||D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
       <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
@@ -2692,16 +2890,16 @@ function ARegistry({D}){
 function AdminApp({onLogout}){
   const [tab,setTab]=useState("overview");
   const [group,setGroup]=useState("gov");
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[]});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules")
     ]);
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[]});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:businesses||DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
@@ -2714,7 +2912,7 @@ function AdminApp({onLogout}){
       {k:"overview",l:"Overview"},{k:"senators",l:"Senators"},{k:"resources",l:"Resources"},{k:"regions",l:"Regions"},{k:"legions",l:"Armed Forces"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:`Elections${openE?` (${openE})`:""}`},{k:"motions",l:`Motions${pendM?` (${pendM})`:""}`},{k:"orders",l:`Orders${newO?` (${newO})`:""}`}
     ]},
     {key:"personal",label:"👤 Personal / Politics",tone:"personal",tabs:[
-      {k:"businesses",l:"Private Wealth"},{k:"parties",l:"Parties"},{k:"registry",l:"Registry"}
+      {k:"businesses",l:"Private Wealth"},{k:"reputation",l:"Reputation"},{k:"parties",l:"Parties"},{k:"registry",l:"Registry"}
     ]},
     {key:"records",label:"📜 Records / Setup",tone:"records",tabs:[
       {k:"cemetery",l:"Cemetery"},{k:"laws",l:"Laws"},{k:"setup",l:"Setup & Media"}
@@ -2745,6 +2943,7 @@ function AdminApp({onLogout}){
         {activeTabs.map(it=><button key={it.k} onClick={()=>setTab(it.k)} style={{padding:"0.55rem 0.9rem",background:tab===it.k?T.card:"transparent",color:tab===it.k?toneColor(activeGroup.tone):T.mut,border:"none",borderBottom:tab===it.k?`3px solid ${toneColor(activeGroup.tone)}`:"3px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>)}
       </div>
       <div className="spqr-shell" style={{maxWidth:1180,margin:"0 auto",padding:"1rem"}}>
+        <SeasonBanner game={D.game}/>
         <ErrorBoundary key={tab}>
         {tab==="overview"  &&<AOverview D={D}/>} 
         {tab==="senators"  &&<ASenators D={D} onRefresh={refresh}/>} 
@@ -2757,6 +2956,7 @@ function AdminApp({onLogout}){
         {tab==="motions"   &&<AMotions D={D} onRefresh={refresh}/>} 
         {tab==="orders"    &&<AOrders D={D} onRefresh={refresh}/>} 
         {tab==="businesses"&&<ABusinesses D={D} onRefresh={refresh}/>} 
+        {tab==="reputation"&&<AReputation D={D} onRefresh={refresh}/>} 
         {tab==="parties"   &&<AParties D={D} onRefresh={refresh}/>} 
         {tab==="registry"  &&<ARegistry D={D}/>} 
         {tab==="cemetery"&&<CemeteryPanel cemetery={D.cemetery||[]} players={D.players||[]}/>} 
@@ -2796,6 +2996,8 @@ function LoginScreen({onLogin,onAdmin}){
     await db.set("spqr_p",[...ps,np]);
     const wealth=await db.get("spqr_wealth")||{};
     await db.set("spqr_wealth",{...wealth,[np.id]:startingWealthForClass(np.charClass)});
+    const reps=await db.get("spqr_reputation")||{};
+    await db.set("spqr_reputation",{...reps,[np.id]:{score:defaultRepFor(np),scandals:[]}});
     await addHistory(np.id,"Entered the Senate",`${np.latinName} registered as a ${np.charClass}.`,"profile");
     setLoading(false);onLogin(np);
   };
