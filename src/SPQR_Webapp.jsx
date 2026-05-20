@@ -112,7 +112,14 @@ const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
   cgold:420,cfood:260,cpop:2000,cturns:1,
   fgold:55,ffood:25,fpop:200,fturns:2,
   privateTaxGoldPct:10,privateTaxFoodPct:5,
-  foodMarketStock:600,foodMarketPrice:2};
+  foodMarketStock:600,foodMarketPrice:2,
+  seasonEffects:{
+    Spring:{goldMod:1,foodMod:1,note:"Spring: normal recovery of farms and trade."},
+    "Early Summer":{goldMod:1,foodMod:1,note:"Early Summer: normal harvest and trade conditions."},
+    "Late Summer":{goldMod:1,foodMod:1,note:"Late Summer: normal harvest and trade conditions."},
+    Autumn:{goldMod:1,foodMod:1,note:"Autumn: normal production before winter pressure."},
+    Winter:{goldMod:1,foodMod:0.75,note:"Winter: food production is reduced by 25%."}
+  }};
 
 const DEF_LEGIONS=["I","II","III","IV"].map((id)=>
   ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned"}));
@@ -233,7 +240,7 @@ const partyOf=(parties,userId)=>(parties||[]).find(pt=>(pt.members||[]).includes
 const PartyBadge=({party,sm})=>party?<span style={{display:"inline-block",background:`${party.color||T.blue}18`,border:`1px solid ${party.color||T.blue}`,color:party.color||T.blue,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{party.emoji||"🏛️"} {party.name}</span>:null;
 const getBiz=(businesses,id)=>(businesses||DEF_BUSINESSES).find(b=>b.id===id)||DEF_BUSINESSES[0];
 const getRegion=(regions,id)=>(regions||DEF_REGIONS).find(r=>r.id===id)||{id,name:id,capital:"Unknown"};
-const personalIncomeFor=(userId,assets,businesses,game={})=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=Number(b.incomeGold||0);acc.food+=effectiveFoodIncome(b.incomeFood,game);return acc;},{gold:0,food:0});
+const personalIncomeFor=(userId,assets,businesses,game={})=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=effectiveGoldIncome(b.incomeGold,game);acc.food+=effectiveFoodIncome(b.incomeFood,game);return acc;},{gold:0,food:0});
 const totalPrivateTaxProjection=(players=[],assets=[],businesses=DEF_BUSINESSES,wealth={},game={})=>(players||[]).filter(Boolean).reduce((acc,p)=>{const b=personalBalanceFor(p.id,p.role,assets,businesses,wealth,game);acc.gold+=Number(b.taxGold||0);acc.food+=Number(b.taxFood||0);return acc;},{gold:0,food:0});
 const normalizeAssetsList=(assets=[])=>{
   const seen=new Set();
@@ -272,17 +279,30 @@ const ADMIN_PASS="SPQR_GM_218BC";
 const SEASONS=["Spring","Early Summer","Late Summer","Autumn","Winter"];
 const seasonIndex=season=>{const i=SEASONS.indexOf(season);return i>=0?i:(isWinterSeason(season)?SEASONS.indexOf("Winter"):0);};
 const WINTER_FOOD_MOD=0.75;
-const isWinterSeason=season=>String(season||"").toLowerCase().includes("winter");
-const seasonFoodModifier=game=>isWinterSeason(game?.season)?WINTER_FOOD_MOD:1;
-const seasonInfo=game=>{
-  const season=game?.season||"Spring";
-  if(isWinterSeason(season))return {emoji:"❄️",label:season,tone:"winter",color:"#2563EB",bg:"#EAF4FF",border:"#93C5FD",note:`Winter production: food output is reduced by ${Math.round((1-WINTER_FOOD_MOD)*100)}% this season.`};
-  if(String(season).includes("Spring"))return {emoji:"🌱",label:season,tone:"spring",color:"#2F7D32",bg:"#F0FFF4",border:"#86EFAC",note:"Spring season: farms and markets recover normal food production."};
-  if(String(season).includes("Summer"))return {emoji:"☀️",label:season,tone:"summer",color:"#B7791F",bg:"#FFF7E6",border:"#FACC15",note:"Summer season: normal harvest and trade conditions."};
-  return {emoji:"🍂",label:season,tone:"autumn",color:"#9A3412",bg:"#FFF1E6",border:"#FDBA74",note:"Autumn season: normal production before winter pressure."};
+const DEFAULT_SEASON_EFFECTS={
+  Spring:{goldMod:1,foodMod:1,note:"Spring: normal recovery of farms and trade."},
+  "Early Summer":{goldMod:1,foodMod:1,note:"Early Summer: normal harvest and trade conditions."},
+  "Late Summer":{goldMod:1,foodMod:1,note:"Late Summer: normal harvest and trade conditions."},
+  Autumn:{goldMod:1,foodMod:1,note:"Autumn: normal production before winter pressure."},
+  Winter:{goldMod:1,foodMod:0.75,note:"Winter: food production is reduced by 25%."}
 };
+const isWinterSeason=season=>String(season||"").toLowerCase().includes("winter");
+const seasonEffects=game=>({ ...DEFAULT_SEASON_EFFECTS, ...((game&&game.seasonEffects)||{}) });
+const currentSeasonEffect=game=>{const season=game?.season||"Spring";return seasonEffects(game)[season]||DEFAULT_SEASON_EFFECTS[season]||{goldMod:1,foodMod:1,note:"Normal production."};};
+const seasonGoldModifier=game=>Number(currentSeasonEffect(game).goldMod??1);
+const seasonFoodModifier=game=>Number(currentSeasonEffect(game).foodMod??(isWinterSeason(game?.season)?WINTER_FOOD_MOD:1));
+const seasonInfo=game=>{
+  const season=game?.season||"Spring";const eff=currentSeasonEffect(game);
+  const pct=100-Math.round(seasonFoodModifier(game)*100);
+  if(isWinterSeason(season))return {emoji:"❄️",label:season,tone:"winter",color:"#2563EB",bg:"#EAF4FF",border:"#93C5FD",note:eff.note||`Winter production: food output is reduced by ${pct}% this season.`};
+  if(String(season).includes("Spring"))return {emoji:"🌱",label:season,tone:"spring",color:"#2F7D32",bg:"#F0FFF4",border:"#86EFAC",note:eff.note||"Spring season: farms and markets recover normal food production."};
+  if(String(season).includes("Summer"))return {emoji:"☀️",label:season,tone:"summer",color:"#B7791F",bg:"#FFF7E6",border:"#FACC15",note:eff.note||"Summer season: normal harvest and trade conditions."};
+  return {emoji:"🍂",label:season,tone:"autumn",color:"#9A3412",bg:"#FFF1E6",border:"#FDBA74",note:eff.note||"Autumn season: normal production before winter pressure."};
+};
+const effectiveGoldIncome=(amount,game)=>Math.floor(Number(amount||0)*seasonGoldModifier(game));
 const effectiveFoodIncome=(amount,game)=>Math.floor(Number(amount||0)*seasonFoodModifier(game));
-const winterFoodMark=(incomeFood,game)=>isWinterSeason(game?.season)&&Number(incomeFood||0)>0?" ❄️":"";
+const seasonFoodMark=(incomeFood,game)=>seasonFoodModifier(game)<1&&Number(incomeFood||0)>0?" ❄️":"";
+const winterFoodMark=seasonFoodMark;
 const displayedFoodIncome=(incomeFood,game)=>effectiveFoodIncome(incomeFood,game);
 
 /* ══ STORAGE & UTILS ══════════════════════════════════════════════════════ */
@@ -299,7 +319,7 @@ const normalizeElections=(multi,legacy)=>{
   return arr;
 };
 const fmt=n=>Number(n||0).toLocaleString();
-const calcInc=(regs,game={})=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=Number(r.bG||0)*m;f+=effectiveFoodIncome(Number(r.bF||0)*m,game);});return{gold:Math.floor(g),food:Math.floor(f)};};
+const calcInc=(regs,game={})=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||0;g+=effectiveGoldIncome(Number(r.bG||0)*m,game);f+=effectiveFoodIncome(Number(r.bF||0)*m,game);});return{gold:Math.floor(g),food:Math.floor(f)};};
 const compress=(file,mx=600)=>new Promise(res=>{const c=document.createElement('canvas'),img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(mx/img.width,mx/img.height,1);c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',0.75));};img.src=u;});
 const pushN=async(title,body,forId="all")=>{const all=await db.get("spqr_n")||[];all.push({id:Date.now()+Math.random().toString(36).slice(2),title,body,for:forId,ts:Date.now()});await db.set("spqr_n",all.slice(-200));};
 
@@ -1623,7 +1643,6 @@ function PersonalWealthPanel({user,D,onRefresh}){
   const sendWealth=async()=>{const to=transfer.to,kind=transfer.kind,amt=Math.floor(Number(transfer.amount));if(!to||!amt||amt<=0){setMsg("Choose a recipient and amount.");return;}const fromW=wealthOf(wealth,user.id);if(fromW[kind]<amt){setMsg("You do not have enough personal resources.");return;}const toW=wealthOf(wealth,to);const recipient=(D.players||[]).find(p=>p.id===to);const next={...wealth,[user.id]:{...fromW,[kind]:fromW[kind]-amt},[to]:{...toW,[kind]:toW[kind]+amt}};await saveWealth(next);await addHistory(user.id,"Transfer Sent",`${user.latinName} sent ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Transfer Received",`${recipient?.latinName||"A senator"} received ${amt}${kind==="gold"?"T gold":"M food"} from ${user.latinName}.`,`wealth`);const entry={type:"transfer",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setTransfer({to:"",kind:"gold",amount:""});setMsg("Transfer completed and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   const sendProperty=async(asset)=>{const to=propTransfer[asset.id];if(!to){setMsg("Choose a recipient for the property.");return;}const recipient=(D.players||[]).find(p=>p.id===to);const biz=getBiz(businesses,asset.typeId);if(!confirm(`Transfer ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName}?`))return;const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:to,ownerName:recipient?.latinName||"Unknown"}:a);setAssets(nextAssets);await db.set("spqr_assets",nextAssets);await addHistory(user.id,"Property Transferred",`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Property Received",`${recipient?.latinName||"A senator"} received ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName}.`,`wealth`);const entry={type:"property",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setPropTransfer(x=>({...x,[asset.id]:""}));setMsg("Property transferred and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Personal Wealth Balance" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}>
@@ -1655,11 +1674,11 @@ function PersonalWealthPanel({user,D,onRefresh}){
         </div>
       </div>
       <STit c="Property Income Summary"/>
-      {myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties generating private income yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.95rem",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Province","Property Type","Assets","Gross Gold","Gross Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{Object.entries(myAssets.reduce((acc,a)=>{const biz=getBiz(businesses,a.typeId);const k=`${a.regionId||"unknown"}__${biz.id}`;if(!acc[k])acc[k]={region:a.regionName||getRegion(regions,a.regionId).name,biz,count:0,gold:0,food:0};acc[k].count+=1;acc[k].gold+=Number(biz.incomeGold||0);acc[k].food+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return acc;},{})).map(([k,row])=><tr key={k}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:800}}>{row.region}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.biz.emoji} {row.biz.name}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.count}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>+{row.gold}T</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.food.color}}>+{row.food}M</td></tr>)}</tbody></table></div>}
+      {myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties generating private income yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.95rem",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Province","Property Type","Assets","Gross Gold","Gross Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{Object.entries(myAssets.reduce((acc,a)=>{const biz=getBiz(businesses,a.typeId);const k=`${a.regionId||"unknown"}__${biz.id}`;if(!acc[k])acc[k]={region:a.regionName||getRegion(regions,a.regionId).name,biz,count:0,gold:0,food:0};acc[k].count+=1;acc[k].gold+=effectiveGoldIncome(biz.incomeGold,D.game||DEF_GAME);acc[k].food+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return acc;},{})).map(([k,row])=><tr key={k}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:800}}>{row.region}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.biz.emoji} {row.biz.name}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.count}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>+{row.gold}T</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.food.color}}>+{row.food}M</td></tr>)}</tbody></table></div>}
     </Card>
     <Card><STit c="Invest in Estates and Businesses" sub="Each province has limited slots. Senators can compete to control profitable assets."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem",alignItems:"end"}}><div><Lbl c="Business Type"/><select value={buy.typeId} onChange={e=>setBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div><div><Lbl c="Province"/><select value={buy.regionId} onChange={e=>setBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div><Btn onClick={buyAsset}>Buy Property</Btn></div><div style={{marginTop:"0.75rem",padding:"0.65rem",background:T.bg,border:`1px solid ${T.border}`}}><b>{b.emoji} {b.name}</b> in <b>{reg.name}</b><br/>Cost: 🪙 {b.costGold}T / 🌾 {b.costFood}M · Gross Income: 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,D.game||DEF_GAME)} · Slots: {used}/{cap}</div></Card>
     <Card><STit c="Estate Slots by Province" sub="See which businesses are available and which senators already control slots in each province."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.9rem",minWidth:"900px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"'Cinzel',serif"}}><th style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>Province</th>{businesses.map(bz=><th key={bz.id} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{bz.emoji} {bz.name}</th>)}</tr></thead><tbody>{regions.map(r=><tr key={r.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{r.name}</td>{businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,D.players||[]);return <td key={bz.id} style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{max<=0?<span style={{color:T.mut}}>Unavailable</span>:<><b>{owners.length}/{max}</b> occupied<br/>{owners.length?<span>{owners.join(", ")}</span>:<span style={{color:T.gre}}>Available</span>}{owners.length<max&&<div style={{color:T.gre,fontSize:"0.82rem"}}>Open slots: {max-owners.length}</div>}</>}</td>})}</tr>)}</tbody></table></div></Card>
-    <Card><STit c="My Properties by Region"/>{myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>You own no properties yet.</div>:Object.entries(byRegion).map(([regionId,list])=>{const r=getRegion(regions,regionId);const sum=list.reduce((a,x)=>{const biz=getBiz(businesses,x.typeId);a.g+=Number(biz.incomeGold||0);a.f+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return a;},{g:0,f:0});return <Card key={regionId} style={{borderLeft:`4px solid ${T.gold}`}}><STit c={r.name} sub={`Capital: ${r.capital||"Unknown"} · Gross income: 🪙 +${sum.g}T / 🌾 +${sum.f}M`}/>{list.map(a=>{const biz=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) auto",gap:"0.5rem",alignItems:"center",padding:"0.55rem",border:`1px solid ${T.border}`,marginBottom:"0.45rem",background:T.bg}}><div><b>{biz.emoji} {biz.name}</b><div style={{color:T.mut}}>Income: 🪙 +{biz.incomeGold}T / 🌾 +{displayedFoodIncome(biz.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(biz.incomeFood,D.game||DEF_GAME)}</div><Row gap="0.35rem" wrap><select value={propTransfer[a.id]||""} onChange={e=>setPropTransfer(x=>({...x,[a.id]:e.target.value}))} style={{padding:"0.32rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Transfer property to...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select><Btn v="dark" sm onClick={()=>sendProperty(a)}>Transfer</Btn></Row></div><Btn v="red" sm onClick={()=>sellAsset(a)}>Sell</Btn></div>})}</Card>})}</Card>
+    <Card><STit c="My Properties by Region"/>{myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>You own no properties yet.</div>:Object.entries(byRegion).map(([regionId,list])=>{const r=getRegion(regions,regionId);const sum=list.reduce((a,x)=>{const biz=getBiz(businesses,x.typeId);a.g+=effectiveGoldIncome(biz.incomeGold,D.game||DEF_GAME);a.f+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return a;},{g:0,f:0});return <Card key={regionId} style={{borderLeft:`4px solid ${T.gold}`}}><STit c={r.name} sub={`Capital: ${r.capital||"Unknown"} · Gross income: 🪙 +${sum.g}T / 🌾 +${sum.f}M`}/>{list.map(a=>{const biz=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) auto",gap:"0.5rem",alignItems:"center",padding:"0.55rem",border:`1px solid ${T.border}`,marginBottom:"0.45rem",background:T.bg}}><div><b>{biz.emoji} {biz.name}</b><div style={{color:T.mut}}>Income: 🪙 +{biz.incomeGold}T / 🌾 +{displayedFoodIncome(biz.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(biz.incomeFood,D.game||DEF_GAME)}</div><Row gap="0.35rem" wrap><select value={propTransfer[a.id]||""} onChange={e=>setPropTransfer(x=>({...x,[a.id]:e.target.value}))} style={{padding:"0.32rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Transfer property to...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select><Btn v="dark" sm onClick={()=>sendProperty(a)}>Transfer</Btn></Row></div><Btn v="red" sm onClick={()=>sellAsset(a)}>Sell</Btn></div>})}</Card>})}</Card>
     {upgrade&&<Card><STit c="Class Advancement" sub="A senator may rise socially by paying the required private wealth. This is recorded in personal history."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="Current Class" value={`${getClassInfo(user.charClass).emoji} ${getClassInfo(user.charClass).label}`}/><Stat label="Next Class" value={`${getClassInfo(upgrade.to).emoji} ${getClassInfo(upgrade.to).label}`} color={getClassInfo(upgrade.to).color}/><Stat label="Cost" value={`🪙 ${upgrade.gold}T / 🌾 ${upgrade.food}M`} color={T.rhi}/><Btn onClick={changeClassByPayment}>Pay & Rise</Btn></div></Card>}
     <Card><STit c="Buy Food From the Roman Market" sub="The market is controlled by the Roman state. The Quaestors/GM can limit market stock and price. All purchases are publicly recorded."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="🌾 Market Food Available" value={`${fmt((D.game||{}).foodMarketStock??0)}M`} color={RES.food.color}/><Stat label="🪙 Price" value={`${fmt((D.game||{}).foodMarketPrice??2)}T / 1M`} color={RES.gold.color}/><Inp label="Food to Buy" type="number" value={foodBuy} onChange={setFoodBuy}/><Btn onClick={buyFoodFromState}>Buy Food</Btn></div></Card>
     <Card><STit c="Transfers, Donations and Food Sales"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem",alignItems:"end"}}><div><Lbl c="Recipient"/><select value={transfer.to} onChange={e=>setTransfer({...transfer,to:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="">Choose senator...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div><div><Lbl c="Resource"/><select value={transfer.kind} onChange={e=>setTransfer({...transfer,kind:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="gold">🪙 Gold</option><option value="food">🌾 Food</option></select></div><Inp label="Amount" type="number" value={transfer.amount} onChange={v=>setTransfer({...transfer,amount:v})}/><Btn onClick={sendWealth}>Send</Btn></div><Row gap="0.5rem" wrap><Btn onClick={()=>donate("gold")}>Donate 🪙 Gold to State</Btn><Btn onClick={()=>donate("food")}>Donate 🌾 Food to State</Btn><Btn v="dark" onClick={sellFood}>Sell Personal Food</Btn></Row></Card>
@@ -1692,7 +1711,6 @@ function ABusinesses({D,onRefresh}){
   const destroyAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);const reason=prompt(`Reason for destroying ${biz.name} in ${asset.regionName||asset.regionId}?`,"Destroyed by war / Hannibal");if(reason===null)return;const next=assets.filter(a=>a.id!==asset.id);setAssets(next);await db.set("spqr_assets",next);await addHistory(asset.ownerId,"Property Destroyed",`${biz.name} in ${asset.regionName||asset.regionId} was destroyed. Reason: ${reason||"War damage"}.`,"estate_destroyed");setMsg("Property destroyed and recorded in senator history.");setTimeout(()=>setMsg(""),3000);};
   const donationTotal=(kind)=>donations.filter(d=>d.kind===kind).reduce((a,d)=>a+Number(d.amount||0),0);
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Private Economy Control" sub="Personal wealth is private from other players. This is the GM balance sheet for all senators."/><div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem"}}><Stat label="Business Types" value={businesses.length}/><Stat label="Properties Owned" value={assets.length}/><Stat label="Gold Donated" value={`🪙 ${fmt(donationTotal("gold"))}T`} color={RES.gold.color}/><Stat label="Food Donated" value={`🌾 ${fmt(donationTotal("food"))}M`} color={RES.food.color}/></div><Row gap="0.5rem" wrap><Btn v="green" onClick={addBiz}>＋ Add Business Type</Btn><Btn v="dark" onClick={applyBalancedPreset}>⚖️ Load Balanced Preset</Btn><Btn onClick={save}>💾 Save Private Economy Rules</Btn></Row></Card>
     <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the amount of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 State Food Market Stock" type="number" value={game.foodMarketStock??0} onChange={v=>setGame({...game,foodMarketStock:Number(v)||0})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame(game)}>Save Market & Tax Rules</Btn></Row></Card>
@@ -2055,24 +2073,17 @@ function PlayerApp({user:initUser,onLogout}){
   const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#F3E8FF":tone==="office"?(pos?.bg||T.surf):"#FFF0D6";
 
   return(
-    <div className={pos?"spqr-office-theme":""} style={{minHeight:"100vh",background:pos?`linear-gradient(180deg, ${officeBg} 0%, ${T.bg} 22%, ${T.bg} 100%)`:T.bg,borderTop:pos?`5px solid ${officeAccent}`:undefined}}>
+    <div style={{minHeight:"100vh",background:T.bg,borderTop:`5px solid ${T.red}`}}>
       <style>{CSS}</style>
-      {pos&&<style>{`
-        .spqr-office-theme .spqr-topbar{border-bottom-color:${officeAccent}!important; box-shadow:0 3px 0 ${officeAccent}22;}
-        .spqr-office-theme .spqr-tab-groups{border-bottom-color:${officeAccent}55!important;}
-        .spqr-office-theme .spqr-tabs{border-bottom-color:${officeAccent}55!important;}
-        .spqr-office-theme .spqr-card{border-color:${officeAccent}44;}
-        .spqr-office-theme .spqr-card .spqr-title{color:${officeAccent};}
-        .spqr-office-theme input:focus,.spqr-office-theme textarea:focus,.spqr-office-theme select:focus{border-color:${officeAccent}!important; box-shadow:0 0 0 2px ${officeAccent}22;}
-      `}</style>}
       <div className="spqr-topbar" style={{background:pos?`linear-gradient(90deg, ${officeBg}, ${T.surf} 45%, ${officeBg})`:T.surf,borderBottom:`2px solid ${pos?officeAccent:T.border}`,padding:"0.5rem 1rem",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:"0.6rem",position:"sticky",top:0,zIndex:100}}>
         <div style={{display:"flex",alignItems:"center",gap:"0.65rem",minWidth:0,flexWrap:"wrap"}}>
           <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
+          <SeasonTopBadge game={D.game}/>
           {pos&&<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.68rem",fontWeight:900,letterSpacing:"0.08em",color:officeAccent,border:`1px solid ${officeAccent}`,background:officeBg,padding:"0.16rem 0.38rem",whiteSpace:"nowrap"}}>{pos.emoji} Magistrate of {pos.title}</span>}
         </div>
         <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>} 
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
@@ -2087,7 +2098,6 @@ function PlayerApp({user:initUser,onLogout}){
         {activeTabs.map(it=>{const tone=it.tone||activeGroup.tone;return <button key={it.k} onClick={()=>jumpTab(it.k)} style={{padding:"0.52rem 0.9rem",background:tab===it.k?"#fff":"transparent",color:tab===it.k?toneColor(tone):T.mut,border:"none",borderBottom:tab===it.k?`2px solid ${toneColor(tone)}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>})}
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
-        <SeasonBanner game={D.game}/>
         <ErrorBoundary key={tab}>
         {tab==="senate"    &&<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>}
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
@@ -2575,6 +2585,10 @@ function AResources({D,onRefresh}){
       </div>
       <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
     </Card>
+    <Card><STit c="Season Effects" sub="Control how each season affects state and private production. 100% means normal production; Winter is set to 75% food by default."/>
+      <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Season","Gold income %","Food income %","Public note / effect"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{SEASONS.map(se=>{const eff={...(DEFAULT_SEASON_EFFECTS[se]||{}),...((g.seasonEffects||{})[se]||{})};const setEff=(k,v)=>setG(x=>({...x,seasonEffects:{...(x.seasonEffects||DEFAULT_SEASON_EFFECTS),[se]:{...eff,[k]:v}}}));return <tr key={se}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{seasonInfo({...g,season:se}).emoji} {se}</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={Math.round(Number(eff.goldMod??1)*100)} onChange={e=>setEff("goldMod",Number(e.target.value)/100)} style={{width:"100px",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={Math.round(Number(eff.foodMod??1)*100)} onChange={e=>setEff("foodMod",Number(e.target.value)/100)} style={{width:"100px",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input value={eff.note||""} onChange={e=>setEff("note",e.target.value)} style={{width:"100%",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td></tr>})}</tbody></table></div>
+      <Row gap="0.5rem" wrap><Btn onClick={save}>💾 Save Season Effects</Btn><Btn v="ghost" onClick={()=>setG(x=>({...x,seasonEffects:DEFAULT_SEASON_EFFECTS}))}>Reset Default Effects</Btn></Row>
+    </Card>
     <ABackupRestore onRefresh={onRefresh}/>
     {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(seasonIndex(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${totalGoldIncome}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${totalFoodIncome}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+totalGoldIncome-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+totalFoodIncome-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
@@ -2596,7 +2610,7 @@ function AResources({D,onRefresh}){
       <Btn onClick={save}>💾 Save Stockpile and Regions</Btn>
     </Card>
     <Card><STit c="Edit Provinces / Regions"/><Row gap="0.5rem" wrap><Btn v="green" onClick={addRegion}>＋ Add Province</Btn><Btn onClick={save}>💾 Save</Btn></Row></Card>
-    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><Inp label="Capital" value={r.capital||""} onChange={v=>updReg(i,"capital",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Population"/><input type="number" value={r.pop||0} onChange={e=>updReg(i,"pop",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {Math.floor((r.bG||0)*st.m)}T / {Math.floor((r.bF||0)*st.m)}M</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:"0.55rem"}}>{regs.map((r,i)=>{const st=RS[r.s]||RS.roman;return <Card key={r.id||i} style={{borderLeft:`4px solid ${st.c}`}}><Inp label="Province Name" value={r.name} onChange={v=>updReg(i,"name",v)}/><Inp label="Capital" value={r.capital||""} onChange={v=>updReg(i,"capital",v)}/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.4rem"}}><div><Lbl c="Population"/><input type="number" value={r.pop||0} onChange={e=>updReg(i,"pop",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Gold"/><input type="number" value={r.bG} onChange={e=>updReg(i,"bG",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div><div><Lbl c="Base Food"/><input type="number" value={r.bF} onChange={e=>updReg(i,"bF",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem"}}/></div></div><div style={{marginTop:"0.5rem"}}><Lbl c="Control"/><select value={r.s} onChange={e=>updReg(i,"s",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${st.c}`,color:T.text,padding:"0.4rem"}}>{Object.entries(RS).map(([k,v])=><option key={k} value={k}>{v.l}</option>)}</select></div><div style={{marginTop:"0.5rem",color:st.c,fontFamily:"'Cinzel',serif"}}>Effective: {effectiveGoldIncome((r.bG||0)*st.m,g)}T / {effectiveFoodIncome((r.bF||0)*st.m,g)}M{winterFoodMark((r.bF||0)*st.m,g)}</div><div style={{marginTop:"0.5rem"}}><Btn v="red" sm onClick={()=>delRegion(i)}>Delete Province</Btn></div></Card>})}</div>
   </div>;
 }
 
@@ -2938,7 +2952,6 @@ function AElections({D,onRefresh}){
   };
   const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
       <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
@@ -3080,20 +3093,12 @@ function AdminApp({onLogout}){
   const chooseGroup=(g)=>{setGroup(g.key); if(!g.tabs.some(t=>t.k===tab))setTab(g.tabs[0].k);};
 
   return(
-    <div className={pos?"spqr-office-theme":""} style={{minHeight:"100vh",background:pos?`linear-gradient(180deg, ${officeBg} 0%, ${T.bg} 22%, ${T.bg} 100%)`:T.bg,borderTop:pos?`5px solid ${officeAccent}`:undefined}}>
+    <div style={{minHeight:"100vh",background:T.bg,borderTop:`5px solid ${T.red}`}}>
       <style>{CSS}</style>
-      {pos&&<style>{`
-        .spqr-office-theme .spqr-topbar{border-bottom-color:${officeAccent}!important; box-shadow:0 3px 0 ${officeAccent}22;}
-        .spqr-office-theme .spqr-tab-groups{border-bottom-color:${officeAccent}55!important;}
-        .spqr-office-theme .spqr-tabs{border-bottom-color:${officeAccent}55!important;}
-        .spqr-office-theme .spqr-card{border-color:${officeAccent}44;}
-        .spqr-office-theme .spqr-card .spqr-title{color:${officeAccent};}
-        .spqr-office-theme input:focus,.spqr-office-theme textarea:focus,.spqr-office-theme select:focus{border-color:${officeAccent}!important; box-shadow:0 0 0 2px ${officeAccent}22;}
-      `}</style>}
       <div className="spqr-topbar" style={{background:"#0A0600",borderBottom:`2px solid ${T.red}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
-        <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><Badge c="GM PANEL" color={T.rhi}/></Row>
+        <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><SeasonTopBadge game={D.game}/><Badge c="GM PANEL" color={T.rhi}/></Row>
         <Row gap="0.5rem" wrap>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
           <NotifBell userId="gm"/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit Panel</Btn>
@@ -3106,7 +3111,6 @@ function AdminApp({onLogout}){
         {activeTabs.map(it=><button key={it.k} onClick={()=>setTab(it.k)} style={{padding:"0.55rem 0.9rem",background:tab===it.k?T.card:"transparent",color:tab===it.k?toneColor(activeGroup.tone):T.mut,border:"none",borderBottom:tab===it.k?`3px solid ${toneColor(activeGroup.tone)}`:"3px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>)}
       </div>
       <div className="spqr-shell" style={{maxWidth:1180,margin:"0 auto",padding:"1rem"}}>
-        <SeasonBanner game={D.game}/>
         <ErrorBoundary key={tab}>
         {tab==="overview"  &&<AOverview D={D}/>} 
         {tab==="senators"  &&<ASenators D={D} onRefresh={refresh}/>} 
