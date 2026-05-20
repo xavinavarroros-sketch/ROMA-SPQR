@@ -120,6 +120,8 @@ const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
     Autumn:{goldMod:1,foodMod:1,note:"Autumn: normal production before winter pressure."},
     Winter:{goldMod:1,foodMod:0.75,note:"Winter: food production is reduced by 25%."}
   }};
+// Global safety fallback: prevents legacy panels from crashing if an old generated component still references `g`.
+const g=DEF_GAME; // global safety fallback
 
 const DEF_LEGIONS=["I","II","III","IV"].map((id)=>
   ({id,name:`Legio ${id}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned"}));
@@ -1091,6 +1093,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
             <Btn onClick={proposeTreasuryAction}>Submit for Other Quaestor Approval</Btn>
           </div>
           <div style={{marginTop:"0.8rem"}}><STit c="Pending Quaestor Approvals"/>{pendingTreasury.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No pending treasury actions.</div>:pendingTreasury.map(a=><div key={a.id} style={{padding:"0.55rem",border:`1px solid ${T.border}`,background:T.bg,marginBottom:"0.4rem"}}><b>{treasuryActionText(a)}</b><br/><small>Proposed by {a.proposerName} · {a.session}{a.note?` · ${a.note}`:""}</small><Row gap="0.35rem" wrap><Btn sm v="green" disabled={a.proposerRole===qKey} onClick={()=>approveTreasuryAction(a)}>Approve</Btn><Btn sm v="red" disabled={a.proposerRole===qKey} onClick={()=>rejectTreasuryAction(a)}>Reject</Btn>{a.proposerRole===qKey&&<span style={{fontSize:"0.8rem",color:T.mut}}>Waiting for the other Quaestor</span>}</Row></div>)}</div>
+          <div style={{marginTop:"0.8rem"}}><STit c="Quaestor Treasury History" sub="Approved, rejected and proposed treasury measures remain visible here for both Quaestors."/>{(treasuryActions||[]).length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No treasury measures recorded yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Status","Measure","Proposed By","Approved / Rejected By","Session","Note"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{(treasuryActions||[]).slice(0,80).map(a=>{const col=a.status==="approved"?T.gre:a.status==="rejected"?T.rhi:T.gold;return <tr key={a.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:col,fontWeight:900,textTransform:"uppercase"}}>{a.status||"pending"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{treasuryActionText(a)}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.proposerName||"Unknown"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.approvedBy||a.rejectedBy||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.session||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.note||"—"}</td></tr>})}</tbody></table></div>}</div>
         </Card>
       )}
       {(isAedile)&&(
@@ -1739,7 +1742,7 @@ function PersonalWealthPanel({user,D,onRefresh}){
   const sendWealth=async()=>{const to=transfer.to,kind=transfer.kind,amt=Math.floor(Number(transfer.amount));if(!to||!amt||amt<=0){setMsg("Choose a recipient and amount.");return;}const fromW=wealthOf(wealth,user.id);if(fromW[kind]<amt){setMsg("You do not have enough personal resources.");return;}const toW=wealthOf(wealth,to);const recipient=(D.players||[]).find(p=>p.id===to);const next={...wealth,[user.id]:{...fromW,[kind]:fromW[kind]-amt},[to]:{...toW,[kind]:toW[kind]+amt}};await saveWealth(next);await addHistory(user.id,"Transfer Sent",`${user.latinName} sent ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Transfer Received",`${recipient?.latinName||"A senator"} received ${amt}${kind==="gold"?"T gold":"M food"} from ${user.latinName}.`,`wealth`);const entry={type:"transfer",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setTransfer({to:"",kind:"gold",amount:""});setMsg("Transfer completed and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   const sendProperty=async(asset)=>{const to=propTransfer[asset.id];if(!to){setMsg("Choose a recipient for the property.");return;}const recipient=(D.players||[]).find(p=>p.id===to);const biz=getBiz(businesses,asset.typeId);if(!confirm(`Transfer ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName}?`))return;const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:to,ownerName:recipient?.latinName||"Unknown"}:a);setAssets(nextAssets);await db.set("spqr_assets",nextAssets);await addHistory(user.id,"Property Transferred",`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Property Received",`${recipient?.latinName||"A senator"} received ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName}.`,`wealth`);const entry={type:"property",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setPropTransfer(x=>({...x,[asset.id]:""}));setMsg("Property transferred and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   return <div>
-    <SeasonBanner game={g}/>
+    
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Personal Wealth Balance" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}>
@@ -1808,7 +1811,7 @@ function ABusinesses({D,onRefresh}){
   const destroyAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);const reason=prompt(`Reason for destroying ${biz.name} in ${asset.regionName||asset.regionId}?`,"Destroyed by war / Hannibal");if(reason===null)return;const next=assets.filter(a=>a.id!==asset.id);setAssets(next);await db.set("spqr_assets",next);await addHistory(asset.ownerId,"Property Destroyed",`${biz.name} in ${asset.regionName||asset.regionId} was destroyed. Reason: ${reason||"War damage"}.`,"estate_destroyed");setMsg("Property destroyed and recorded in senator history.");setTimeout(()=>setMsg(""),3000);};
   const donationTotal=(kind)=>donations.filter(d=>d.kind===kind).reduce((a,d)=>a+Number(d.amount||0),0);
   return <div>
-    <SeasonBanner game={g}/>
+    
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Private Economy Control" sub="Personal wealth is private from other players. This is the GM balance sheet for all senators."/><div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem"}}><Stat label="Business Types" value={businesses.length}/><Stat label="Properties Owned" value={assets.length}/><Stat label="Gold Donated" value={`🪙 ${fmt(donationTotal("gold"))}T`} color={RES.gold.color}/><Stat label="Food Donated" value={`🌾 ${fmt(donationTotal("food"))}M`} color={RES.food.color}/></div><Row gap="0.5rem" wrap><Btn v="green" onClick={addBiz}>＋ Add Business Type</Btn><Btn v="dark" onClick={applyBalancedPreset}>⚖️ Load Balanced Preset</Btn><Btn onClick={save}>💾 Save Private Economy Rules</Btn></Row></Card>
     <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the amount of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 State Food Market Stock" type="number" value={game.foodMarketStock??0} onChange={v=>setGame({...game,foodMarketStock:Number(v)||0})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame(game)}>Save Market & Tax Rules</Btn></Row></Card>
@@ -1821,6 +1824,7 @@ function ABusinesses({D,onRefresh}){
 }
 
 function PartiesPanel({user,D,onRefresh}){
+  D=D||{}; user=user||{};
   const [parties,setParties]=useState(D.parties||[]);
   const [form,setForm]=useState({name:"",emoji:"🏛️",color:"#A32020",platform:"",description:"",history:""});
   const [msg,setMsg]=useState("");
@@ -1844,7 +1848,7 @@ function PartiesPanel({user,D,onRefresh}){
   const accept=async(partyId)=>{if(myParty){setMsg("Leave your current party first.");return;}const next=parties.map(p=>p.id===partyId?{...p,members:Array.from(new Set([...(p.members||[]),user.id])),invites:(p.invites||[]).filter(id=>id!==user.id)}:p);await saveParties(next);const pt=next.find(p=>p.id===partyId);await addHistory(user.id,"Joined Political Party",`${user.latinName} joined ${pt?.emoji||"🏛️"} ${pt?.name||"a political party"}.`,`party`);setMsg("Party joined.");};
   const leave=async()=>{if(!myParty)return;if(!confirm(`Leave ${myParty.name}?`))return;let next=parties.map(p=>p.id===myParty.id?{...p,members:(p.members||[]).filter(id=>id!==user.id)}:p);if(myParty.leaderId===user.id){const remaining=(myParty.members||[]).filter(id=>id!==user.id);next=parties.map(p=>p.id===myParty.id?{...p,members:remaining,leaderId:remaining[0]||null,leaderName:players.find(x=>x.id===remaining[0])?.latinName||"Vacant"}:p);}next=next.filter(p=>(p.members||[]).length>0);await saveParties(next);await addHistory(user.id,"Left Political Party",`${user.latinName} left ${myParty.name}.`,`party`);setMsg("You left the party.");};
   return <div>
-    <SeasonBanner game={g}/>
+    
     {msg&&<Card style={{borderLeft:`3px solid ${T.gre}`}}><div style={{color:T.gre,fontFamily:"'Cinzel',serif"}}>{msg}</div></Card>}
     <Card><STit c="Political Parties" sub="Create blocs, invite senators and make political alignments visible in the Senate."/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:"0.6rem"}}>
@@ -3051,7 +3055,7 @@ function AElections({D,onRefresh}){
   };
   const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
   return <div>
-    <SeasonBanner game={g}/>
+    
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
       <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
@@ -3086,6 +3090,7 @@ function AElections({D,onRefresh}){
 /* ══ ADMIN APP ════════════════════════════════════════════════════════════ */
 
 function AParties({D,onRefresh}){
+  D=D||{};
   const parties=D.parties||[];const players=D.players||[];
   const save=async(next)=>{await db.set("spqr_parties",next);onRefresh&&onRefresh();};
   const removeParty=async(id)=>{if(!confirm("Delete this political party?"))return;await save(parties.filter(p=>p.id!==id));};
