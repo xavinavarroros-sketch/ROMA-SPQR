@@ -661,6 +661,24 @@ function SenatePanel({players,D,onGoVote}){
   );
 }
 
+function majorityInfoForMotion(motion,players){
+  const voterCount=(players||[]).length||0;
+  const majority=voterCount?Math.floor(voterCount/2)+1:0;
+  const ayeCount=Object.values(motion?.votes||{}).filter(v=>v==="yea").length;
+  const nayCount=Object.values(motion?.votes||{}).filter(v=>v==="nay").length;
+  return {voterCount,majority,ayeCount,nayCount,ayeLeft:Math.max(majority-ayeCount,0),nayLeft:Math.max(majority-nayCount,0)};
+}
+
+function MajorityStatus({motion,players}){
+  const mi=majorityInfoForMotion(motion,players);
+  if(!mi.voterCount)return null;
+  return <div style={{marginTop:"0.45rem",display:"flex",gap:"0.5rem",flexWrap:"wrap",fontFamily:"'Cinzel',serif",fontSize:"0.78rem",alignItems:"center"}}>
+    <span style={{border:`1px solid ${T.border}`,padding:"0.2rem 0.45rem",background:T.surf,color:T.text}}>Majority needed: <b>{mi.majority}</b> / {mi.voterCount}</span>
+    <span style={{border:"1px solid #2E7D32",padding:"0.2rem 0.45rem",background:"#EAF7EA",color:"#14532D",fontWeight:900}}>AYE needs {mi.ayeLeft} more</span>
+    <span style={{border:"1px solid #B91C1C",padding:"0.2rem 0.45rem",background:"#FBEAEA",color:"#7F1D1D",fontWeight:900}}>NAY needs {mi.nayLeft} more</span>
+  </div>;
+}
+
 function VotingPanel({motions,players,user,game,onRefresh}){
   const [form,setForm]=useState({title:"",body:""});
   const [err,setErr]=useState("");const [ok,setOk]=useState("");
@@ -707,15 +725,12 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     onRefresh();setTimeout(()=>setOk(""),4000);
   };
   const autoResolveMotionIfMajority=(motion,allPlayers)=>{
-    const voterCount=(allPlayers||[]).length||0;
-    const majority=Math.floor(voterCount/2)+1;
-    const ayeCount=Object.values(motion.votes||{}).filter(v=>v==="yea").length;
-    const nayCount=Object.values(motion.votes||{}).filter(v=>v==="nay").length;
+    const {voterCount,majority,ayeCount,nayCount}=majorityInfoForMotion(motion,allPlayers);
     if(voterCount>0&&ayeCount>=majority){
-      return {...motion,status:"passed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically passed by majority: AYE ${ayeCount} / ${voterCount}.`};
+      return {...motion,status:"passed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically passed by majority: AYE ${ayeCount} reached ${majority} required votes.`};
     }
     if(voterCount>0&&nayCount>=majority){
-      return {...motion,status:"failed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically failed by majority: NAY ${nayCount} / ${voterCount}.`};
+      return {...motion,status:"failed",autoResolved:true,resolvedAt:new Date().toISOString(),resolvedBy:"automatic_majority",resultNote:`Automatically failed by majority: NAY ${nayCount} reached ${majority} required votes.`};
     }
     return motion;
   };
@@ -787,7 +802,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
                 {myVote&&<span style={{color:myVote==="yea"?T.gre:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.8rem"}}>Current: {myVote.toUpperCase()}</span>}
               </Row>
               <div style={{marginTop:"0.5rem"}}>
-                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.9rem",cursor:"pointer",fontFamily:"'Cinzel',serif"}}>
+                <MajorityStatus motion={m} players={players}/>
+                <button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.9rem",cursor:"pointer",fontFamily:"'Cinzel',serif",marginTop:"0.35rem"}}>
                   {isSel?"▲ Hide tally":"▼ Show tally"} — AYE {yeas} · NAY {nays}
                 </button>
                 {isSel&&<VotingGrid motion={m} players={players}/>}
@@ -874,6 +890,9 @@ function VotingGrid({motion,players}){
       <span style={{color:"#14532D",fontWeight:900}}>✓ AYE: {ayeCount}</span>
       <span style={{color:"#7F1D1D",fontWeight:900}}>✗ NAY: {nayCount}</span>
       <span style={{color:T.mut}}>⟳ NOT VOTED: {notCount}</span>
+      <span style={{color:T.text}}>Majority: {Math.floor((players||[]).length/2)+1}</span>
+      <span style={{color:"#14532D",fontWeight:900}}>AYE needs {Math.max(Math.floor((players||[]).length/2)+1-ayeCount,0)} more</span>
+      <span style={{color:"#7F1D1D",fontWeight:900}}>NAY needs {Math.max(Math.floor((players||[]).length/2)+1-nayCount,0)} more</span>
     </div>
   </div>;
 }
@@ -2781,7 +2800,7 @@ function AMotions({D,onRefresh}){
             </div>
             <div style={{color:T.mut,fontSize:"0.7rem",marginBottom:"0.4rem",fontFamily:"'Cinzel',serif"}}>By {m.byName} · {m.session||""}</div>
             <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,marginBottom:"0.5rem"}}>{m.body}</div>
-            {m.status==="voting"&&<div style={{color:T.mut,fontSize:"0.8rem",marginBottom:"0.4rem"}}>Votes: AYE {yeas} · NAY {nays} · Total {Object.keys(m.votes||{}).length}</div>}
+            {m.status==="voting"&&<div style={{color:T.mut,fontSize:"0.8rem",marginBottom:"0.4rem"}}>Votes: AYE {yeas} · NAY {nays} · Total {Object.keys(m.votes||{}).length}<MajorityStatus motion={m} players={D.players||[]}/></div>}
             <Row gap="0.4rem" wrap>
               {m.status==="pending"&&<><Btn v="green" sm onClick={()=>resolve(m.id,"voting")}>✓ Open to Vote</Btn><Btn v="crimson" sm onClick={()=>resolve(m.id,"rejected")}>✗ Reject</Btn></>}
               {m.status==="voting"&&<><Btn v="green" sm onClick={()=>resolve(m.id,"passed")}>✓ Pass</Btn><Btn v="red" sm onClick={()=>resolve(m.id,"failed")}>✗ Fail</Btn><Btn v="ghost" sm onClick={()=>resolve(m.id,"pending")}>← Reopen</Btn></>}
