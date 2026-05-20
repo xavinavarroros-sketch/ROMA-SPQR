@@ -11,7 +11,8 @@ img{max-width:100%}
 input,select,textarea,button{outline:none;font-size:1rem}
 button{cursor:pointer}
 .spqr-card{overflow:hidden}.spqr-region-card{min-width:0}.spqr-region-head{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap}.spqr-region-title{min-width:0;overflow-wrap:anywhere}.spqr-badge-wrap{max-width:100%;white-space:normal!important;overflow-wrap:anywhere;text-align:center}.spqr-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem}.spqr-military-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:.7rem}@media(max-width:900px){.spqr-military-grid{grid-template-columns:1fr}.spqr-field-grid{grid-template-columns:1fr}}
-@media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}}
+.election-table{width:100%;border-collapse:separate;border-spacing:0 .45rem}.election-table th{text-align:left;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:#7A4A18;text-transform:uppercase;padding:.25rem .4rem}.election-table td{background:#fff;padding:.55rem .45rem;border-top:1px solid #D6BFA3;border-bottom:1px solid #D6BFA3;vertical-align:top}.election-table td:first-child{border-left:1px solid #D6BFA3;border-radius:8px 0 0 8px}.election-table td:last-child{border-right:1px solid #D6BFA3;border-radius:0 8px 8px 0}.election-speech{white-space:pre-wrap;line-height:1.45;max-height:9rem;overflow:auto}.election-role-picker{grid-template-columns:minmax(220px,340px) 1fr}
+@media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}.election-role-picker{grid-template-columns:1fr!important}.election-table,.election-table thead,.election-table tbody,.election-table tr,.election-table th,.election-table td{display:block;width:100%}.election-table thead{display:none}.election-table tr{margin-bottom:.65rem;border:1px solid #D6BFA3;border-radius:10px;background:#fff;padding:.45rem}.election-table td{border:none!important;border-radius:0!important;padding:.35rem .25rem}.election-table td:before{content:attr(data-label);display:block;font-family:'Cinzel',serif;color:#7A4A18;font-size:.68rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.1rem}}
 `;
 const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A32020",
   gold:"#B9872B",ghi:"#8C5F16",red:"#A32020",rhi:"#D63A2E",
@@ -364,6 +365,13 @@ const SeasonBanner=({game})=>{
     <div><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:info.color,letterSpacing:"0.08em",fontSize:"1rem"}}>{info.emoji} {info.label} · Turn {(game||DEF_GAME).session||1}</div><div style={{color:T.mut,fontSize:"0.95rem"}}>{info.note}</div></div>
     {isWinterSeason(game?.season)&&<Badge c="❄️ FOOD PRODUCTION REDUCED" color={info.color}/>}
   </div>;
+};
+const SeasonPill=({game})=>{
+  const g=game||DEF_GAME;
+  const info=seasonInfo(g);
+  return <span title={info.note} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",background:info.bg,border:`1px solid ${info.border}`,color:info.color,padding:"0.22rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:900,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>
+    <span>{info.emoji}</span><span>{info.label}</span><span>· Turn {g.session||1}</span>{isWinterSeason(g.season)&&<span>❄️ -25% Food</span>}
+  </span>;
 };
 function Modal({title,children,onClose,wide}){return(<div className="spqr-modal" style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem"}}><div className="spqr-modal-box" style={{background:T.surf,border:`1px solid ${T.bhi}`,padding:"1.5rem",width:"100%",maxWidth:wide?"760px":"520px",maxHeight:"90vh",overflowY:"auto"}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:"1rem",alignItems:"center",gap:"1rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",letterSpacing:"0.18em"}}>{title}</div><button onClick={onClose} style={{background:"none",border:"none",color:T.mut,fontSize:"1.55rem"}}>✕</button></div>{children}</div></div>);}
 
@@ -744,45 +752,44 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         })}
       </div>}
       {/* All other motions */}
-      <STit c="All Motions"/>
-      {[...other].reverse().map(m=>{
-        const isSel=selMotion===m.id;
-        const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
-        const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
-        return(
-          <Card key={m.id} style={{borderLeft:`3px solid ${scol[m.status]||T.fnt}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
-              <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontWeight:600,fontSize:"0.88rem"}}>{m.title}</div>
-              <Badge c={m.status.toUpperCase()} color={scol[m.status]||T.mut} sm/>
-            </div>
-            <div style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",marginBottom:"0.3rem"}}>By {m.byName} · {m.session||""}</div>
-            <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.4rem"}}>{m.body}</div>
-            {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>Awaiting GM review…</div>}
-            {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
-            {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
-            {m.status==="rejected"&&<div style={{color:"#666",fontSize:"0.9rem"}}>Rejected by GM — not put to vote</div>}
-            {m.status==="vetoed"&&<div style={{color:T.rhi,fontSize:"0.9rem"}}>Vetoed by {m.vetoedByName||"a Tribune"}</div>}
-            {m.status==="queued"&&<div style={{color:T.gold,fontSize:"0.9rem"}}>Queued — another motion is currently being voted first.</div>}
-            {(m.status==="passed"||m.status==="failed")&&<button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.mut,fontSize:"0.7rem",cursor:"pointer",marginTop:"0.3rem"}}>
-              {isSel?"▲ Hide":"▼ Show vote record"}</button>}
-            {isSel&&<VotingGrid motion={m} players={players}/>}
-          </Card>
-        );
-      })}
+      <Card>
+        <STit c="All Motions" sub="Table view of pending, queued and concluded motions."/>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:920,fontSize:"0.9rem"}}>
+            <thead><tr style={{background:T.bg,color:T.gold,fontFamily:"'Cinzel',serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+              {['Status','Motion','Proposer','Session','Votes','Record'].map(h=><th key={h} style={{textAlign:"left",padding:"0.5rem",border:`1px solid ${T.border}`}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{[...other].reverse().map(m=>{
+              const isSel=selMotion===m.id;
+              const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
+              const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+              return <React.Fragment key={m.id}>
+                <tr style={{background:T.surf}}>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}><Badge c={String(m.status||"").toUpperCase()} color={scol[m.status]||T.mut} sm/></td>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top",minWidth:300}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{m.title}</div><div style={{color:T.mut,fontSize:"0.86rem",lineHeight:1.45,marginTop:"0.25rem"}}>{String(m.body||"").slice(0,240)}{String(m.body||"").length>240?"…":""}</div>{m.status==="queued"&&<div style={{color:T.gold,fontSize:"0.82rem",marginTop:"0.2rem"}}>Queued — another motion is currently active.</div>}{m.status==="rejected"&&<div style={{color:T.mut,fontSize:"0.82rem",marginTop:"0.2rem"}}>Rejected by GM — not put to vote.</div>}{m.status==="vetoed"&&<div style={{color:T.rhi,fontSize:"0.82rem",marginTop:"0.2rem"}}>Vetoed by {m.vetoedByName||"a Tribune"}</div>}</td>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}>{m.byName||"Unknown"}</td>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top",color:T.mut}}>{m.session||""}</td>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top",fontFamily:"'Cinzel',serif"}}>AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO":""}</td>
+                  <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}>{(m.status==="passed"||m.status==="failed"||m.status==="voting")&&<button onClick={()=>setSelMotion(isSel?null:m.id)} style={{background:"none",border:"none",color:T.blue,cursor:"pointer",fontFamily:"'Cinzel',serif",fontWeight:900}}>{isSel?"▲ Hide":"▼ Show"}</button>}</td>
+                </tr>
+                {isSel&&<tr><td colSpan={6} style={{padding:"0.65rem",border:`1px solid ${T.border}`,background:T.card}}><VotingGrid motion={m} players={players}/></td></tr>}
+              </React.Fragment>;
+            })}</tbody>
+          </table>
+        </div>
+      </Card>
       <Card>
         <STit c="Motion Registry" sub="Passed, failed, rejected and vetoed motions remain here as a permanent voting record."/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>
-          {motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).slice().reverse().map(m=>{
-            const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
-            const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
-            return <div key={`reg-${m.id}`} style={{background:T.surf,border:`1px solid ${scol[m.status]||T.border}`,borderLeft:`5px solid ${scol[m.status]||T.border}`,padding:"0.65rem"}}>
-              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{m.title}</div>
-              <div style={{fontSize:"0.85rem",color:T.mut}}>By {m.byName} · {m.session||""}</div>
-              <Badge c={String(m.status||"").toUpperCase()} color={scol[m.status]||T.mut} sm/>
-              <div style={{marginTop:"0.35rem",fontSize:"0.9rem",color:T.mut}}>AYE {yeas} · NAY {nays}{m.vetoedByName?` · Vetoed by ${m.vetoedByName}`:""}</div>
-            </div>
-          })}
-          {motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No concluded motions yet.</div>}
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:760,fontSize:"0.9rem"}}>
+            <thead><tr style={{background:T.bg,color:T.gold,fontFamily:"'Cinzel',serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{['Result','Motion','Proposer','Session','Votes / Notes'].map(h=><th key={h} style={{textAlign:"left",padding:"0.5rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
+            <tbody>{motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).slice().reverse().map(m=>{
+              const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
+              const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+              return <tr key={`reg-${m.id}`} style={{background:T.surf}}><td style={{padding:"0.5rem",border:`1px solid ${T.border}`}}><Badge c={String(m.status||"").toUpperCase()} color={scol[m.status]||T.mut} sm/></td><td style={{padding:"0.5rem",border:`1px solid ${T.border}`,fontFamily:"'Cinzel',serif",fontWeight:900}}>{m.title}</td><td style={{padding:"0.5rem",border:`1px solid ${T.border}`}}>{m.byName||"Unknown"}</td><td style={{padding:"0.5rem",border:`1px solid ${T.border}`,color:T.mut}}>{m.session||""}</td><td style={{padding:"0.5rem",border:`1px solid ${T.border}`}}>AYE {yeas} · NAY {nays}{m.vetoedByName?` · Vetoed by ${m.vetoedByName}`:""}{m.autoResolved?" · Auto-majority":""}</td></tr>
+            })}</tbody>
+          </table>
+          {motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).length===0&&<div style={{color:T.mut,fontStyle:"italic",padding:"0.6rem"}}>No concluded motions yet.</div>}
         </div>
       </Card>
       {motions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No motions have been proposed yet.</div>}
@@ -1161,18 +1168,19 @@ function CharacterPanel({user,onUpdate}){
 
 function LawsPanel({laws}){
   const list=(laws&&laws.length?laws:LAWS);
+  const th={textAlign:"left",padding:"0.55rem",border:`1px solid ${T.border}`,background:T.bg,color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.78rem",letterSpacing:"0.08em",textTransform:"uppercase"};
+  const td={padding:"0.6rem",border:`1px solid ${T.border}`,verticalAlign:"top",lineHeight:1.55};
   return(
     <div>
       <Card style={{borderLeft:`3px solid ${T.gold}`}}>
-        <STit c="Leges Romanae — Laws of the Roman Republic"/>
-        <div style={{fontSize:"1rem",color:T.mut,marginBottom:"0.75rem",lineHeight:1.6}}>These laws govern the Republic and all who hold office within it. Ignorance is no defence before the law.</div>
+        <STit c="Leges Romanae — Laws of the Roman Republic" sub="Table registry of active laws. Ignorance is no defence before the law."/>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",minWidth:760,fontSize:"0.95rem"}}>
+            <thead><tr><th style={{...th,width:70}}>No.</th><th style={th}>Law</th><th style={th}>Text / Effect</th></tr></thead>
+            <tbody>{list.map((l,i)=><tr key={i} style={{background:i%2?T.surf:T.card}}><td style={{...td,color:T.mut,fontFamily:"'Cinzel',serif",fontWeight:900}}>{i+1}</td><td style={{...td,color:T.gold,fontFamily:"'Cinzel',serif",fontWeight:900,minWidth:240}}>{l.t}</td><td style={{...td,color:T.text,whiteSpace:"pre-wrap"}}>{l.b}</td></tr>)}</tbody>
+          </table>
+        </div>
       </Card>
-      {list.map((l,i)=>(
-        <Card key={i}>
-          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:800,marginBottom:"0.45rem"}}>{l.t}</div>
-          <div style={{fontSize:"1.05rem",lineHeight:1.7,color:T.text,whiteSpace:"pre-wrap"}}>{l.b}</div>
-        </Card>
-      ))}
     </div>
   );
 }
@@ -1417,13 +1425,45 @@ function MagistratesPanel({players=[]}){
 
 function ElectionRoleTabs({elections,selectedId,onSelect}){
   const active=(elections||[]).filter(e=>e&&e.status!=="closed");
-  if(active.length<=1)return null;
-  return <Card style={{padding:"0.45rem",marginBottom:"0.75rem"}}>
-    <div style={{display:"flex",gap:"0.45rem",overflowX:"auto",paddingBottom:"0.15rem"}}>
-      {active.map(e=>{const o=POS[e.office]||{};const on=e.id===selectedId;const candCount=(e.candidates||[]).length;const voteCount=Object.keys(e.votes||{}).length;return <button key={e.id} onClick={()=>onSelect(e.id)} style={{whiteSpace:"nowrap",padding:"0.55rem 0.75rem",border:`1px solid ${on?(o.color||T.gold):T.border}`,background:on?(o.bg||"#fff7e6"):T.card,color:on?(o.color||T.gold):T.text,fontFamily:"'Cinzel',serif",fontWeight:on?900:700,letterSpacing:"0.04em",cursor:"pointer",boxShadow:on?"0 2px 10px rgba(0,0,0,0.08)":"none"}}>
-        {o.emoji||"🏛️"} {o.abbr||o.title||e.office} <span style={{fontFamily:"Georgia,serif",fontSize:"0.82rem",color:on?(o.color||T.gold):T.mut}}>· {e.status}{e.status==="candidacy"?` · ${candCount} cand.`:` · ${voteCount} votes`}</span>
-      </button>})}
+  if(active.length===0)return null;
+  const current=active.find(e=>e.id===selectedId)||active[0];
+  const co=POS[current?.office]||{};
+  return <Card style={{padding:"0.75rem",marginBottom:"0.75rem",borderLeft:`6px solid ${co.color||T.gold}`,background:"#fffdf7"}}>
+    <div style={{display:"grid",gridTemplateColumns:"minmax(220px,340px) 1fr",gap:"0.75rem",alignItems:"center"}} className="electionRolePicker">
+      <div>
+        <Lbl c="Select Magistracy"/>
+        <select value={current?.id||""} onChange={e=>onSelect(e.target.value)} style={{width:"100%",padding:"0.7rem 0.75rem",border:`2px solid ${co.color||T.gold}`,background:"#ffffff",color:T.text,fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:"0.95rem",borderRadius:8}}>
+          {active.map(e=>{const o=POS[e.office]||{};const candCount=(e.candidates||[]).length;const voteCount=Object.keys(e.votes||{}).length;return <option key={e.id} value={e.id}>{o.emoji||"🏛️"} {o.title||e.office} — {e.status}{e.status==="candidacy"?` · ${candCount} candidates`:` · ${voteCount} votes`}</option>})}
+        </select>
+      </div>
+      <div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",alignItems:"center"}}>
+        {active.map(e=>{const o=POS[e.office]||{};const on=e.id===current?.id;return <span key={e.id} style={{padding:"0.28rem 0.45rem",border:`1px solid ${on?(o.color||T.gold):T.border}`,background:on?(o.bg||"#fff4dc"):"#fff",color:on?(o.color||T.text):T.mut,borderRadius:999,fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:on?900:700}}>{o.emoji||"🏛️"} {o.abbr||o.title||e.office}</span>})}
+      </div>
     </div>
+  </Card>;
+}
+
+
+function ElectionVoteRecord({election,players,onSelect}){
+  const candidates=election.candidates||[];
+  const votes=election.votes||{};
+  const groups={};
+  candidates.forEach(c=>groups[c.playerId]=[]);
+  Object.entries(votes).forEach(([voterId,candId])=>{
+    if(!groups[candId])groups[candId]=[];
+    const voter=players.find(p=>p.id===voterId);
+    if(voter)groups[candId].push(voter);
+  });
+  return <Card style={{background:"#fffdf7",border:`1px solid ${T.border}`,marginTop:"0.6rem"}}>
+    <STit c="Election Vote Record" sub="Visible only when expanded. Senators may still change or withdraw votes while voting is open."/>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:"0.55rem"}}>
+      {candidates.map(c=>{const cp=players.find(p=>p.id===c.playerId);const voters=groups[c.playerId]||[];return <div key={c.playerId} style={{background:"#ffffff",border:`1px solid ${T.border}`,borderRadius:10,padding:"0.65rem"}}>
+        <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text,marginBottom:"0.35rem"}}>🏛️ {c.name||getPlayerName(players,c.playerId)} <span style={{color:T.gold}}>({voters.length})</span></div>
+        {voters.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>No votes yet.</div>}
+        {voters.map(v=>{const ci=getClassInfo(v.charClass);return <button key={v.id} onClick={()=>onSelect&&onSelect(v)} style={{display:"block",width:"100%",textAlign:"left",marginBottom:"0.25rem",padding:"0.35rem 0.45rem",background:ci.bg,border:`1px solid ${ci.color}`,borderRadius:8,cursor:"pointer",color:T.text}}><span style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:ci.color}}>{ci.emoji} {v.latinName}</span></button>})}
+      </div>})}
+    </div>
+    <div style={{marginTop:"0.55rem",color:T.mut,fontSize:"0.88rem"}}>Not voted: <b>{Math.max(0,(players||[]).length-Object.keys(votes).length)}</b></div>
   </Card>;
 }
 
@@ -1432,6 +1472,7 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
   const players=D.players||[];
   const [speechBy,setSpeechBy]=useState({});
   const [selected,setSelected]=useState(null);
+  const [showVotes,setShowVotes]=useState({});
   const active=elections.filter(e=>e&&e.status!=="closed");
   const [activeElectionId,setActiveElectionId]=useState(null);
   useEffect(()=>{if(active.length && (!activeElectionId || !active.some(e=>e.id===activeElectionId)))setActiveElectionId(active[0].id);},[active.length,activeElectionId]);
@@ -1493,9 +1534,21 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
         <STit c={`${office?.emoji||"🏛️"} Election: ${office?.title||election.office}`} sub={`Phase: ${election.status.toUpperCase()} · Round ${election.round||1}`}/>
         <div style={{color:T.mut,lineHeight:1.6,marginBottom:"0.65rem"}}>{election.status==="candidacy"?"Declare your candidacy before the GM opens voting.":"Vote for one candidate. Each senator has one vote for this office."}</div>
         {election.status==="candidacy"&&<div style={{marginBottom:"0.8rem"}}>{isCandidate?(()=>{const mine=(election.candidates||[]).find(c=>c.playerId===user.id);return <><div style={{color:T.gre,fontFamily:"'Cinzel',serif",marginBottom:"0.35rem"}}>✓ You are a candidate for this office. You may edit or withdraw before voting opens.</div><Inp label="Edit Candidacy Speech" value={speechBy[election.id]??mine?.speech??""} onChange={v=>setSpeechBy({...speechBy,[election.id]:v})} rows={3}/><Row gap="0.5rem" wrap><Btn sm onClick={()=>updateCandidacy(election)}>Save Speech</Btn><Btn v="crimson" sm onClick={()=>dropCandidacy(election)}>Withdraw Candidacy</Btn></Row></>})():<><Inp label="Short Speech" value={speechBy[election.id]||""} onChange={v=>setSpeechBy({...speechBy,[election.id]:v})} rows={3} placeholder="Fathers of the Senate..."/><Btn onClick={()=>stand(election)}>Stand for {office?.title||"Office"}</Btn></>}</div>}
-        <STit c="Candidates"/>
+        <STit c="Candidates" sub="Candidate list is displayed as a table. Vote record is hidden by default and can be expanded."/>
         {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
-        {(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <Card key={c.playerId} style={{background:T.card,border:`1px solid ${office?.color||T.border}`}}><div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1.05rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{cp&&<div style={{marginTop:"0.2rem"}}><ClassBadge cls={cp.charClass} sm/></div>}<div style={{color:T.mut,whiteSpace:"pre-wrap",marginTop:"0.35rem"}}>{c.speech}</div></div><div>{election.status==="voting"&&<><Btn sm disabled={myVote===c.playerId} onClick={()=>vote(election,c.playerId)}>{myVote===c.playerId?"Current Vote":"Vote"}</Btn>{myVote===c.playerId&&<div style={{marginTop:"0.35rem"}}><Btn v="ghost" sm onClick={()=>vote(election,"withdraw")}>Withdraw</Btn></div>}</>}<div style={{marginTop:"0.4rem",textAlign:"center",color:T.ghi,fontFamily:"'Cinzel',serif"}}>{counts[c.playerId]||0} votes</div></div></div></Card>})}
+        {(election.candidates||[]).length>0&&<div style={{overflowX:"auto"}}>
+          <table className="election-table">
+            <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th><th>Action</th></tr></thead>
+            <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
+              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
+              <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
+              <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
+              <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
+              <td data-label="Action">{election.status==="voting"&&<><Btn sm disabled={myVote===c.playerId} onClick={()=>vote(election,c.playerId)}>{myVote===c.playerId?"Current Vote":"Vote"}</Btn>{myVote===c.playerId&&<div style={{marginTop:"0.35rem"}}><Btn v="ghost" sm onClick={()=>vote(election,"withdraw")}>Withdraw</Btn></div>}</>}</td>
+            </tr>})}</tbody>
+          </table>
+        </div>}
+        {(election.candidates||[]).length>0&&<div style={{marginTop:"0.55rem"}}><button onClick={()=>setShowVotes({...showVotes,[election.id]:!showVotes[election.id]})} style={{background:"none",border:"none",color:T.blue,fontFamily:"'Cinzel',serif",fontWeight:900,cursor:"pointer",fontSize:"0.9rem"}}>{showVotes[election.id]?"▲ Hide vote record":"▼ Show vote record"}</button>{showVotes[election.id]&&<ElectionVoteRecord election={election} players={players} onSelect={setSelected}/>}</div>}
         {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
       </Card>;
     })}
@@ -1553,7 +1606,6 @@ function PersonalWealthPanel({user,D,onRefresh}){
   const sendWealth=async()=>{const to=transfer.to,kind=transfer.kind,amt=Math.floor(Number(transfer.amount));if(!to||!amt||amt<=0){setMsg("Choose a recipient and amount.");return;}const fromW=wealthOf(wealth,user.id);if(fromW[kind]<amt){setMsg("You do not have enough personal resources.");return;}const toW=wealthOf(wealth,to);const recipient=(D.players||[]).find(p=>p.id===to);const next={...wealth,[user.id]:{...fromW,[kind]:fromW[kind]-amt},[to]:{...toW,[kind]:toW[kind]+amt}};await saveWealth(next);await addHistory(user.id,"Transfer Sent",`${user.latinName} sent ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Transfer Received",`${recipient?.latinName||"A senator"} received ${amt}${kind==="gold"?"T gold":"M food"} from ${user.latinName}.`,`wealth`);const entry={type:"transfer",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setTransfer({to:"",kind:"gold",amount:""});setMsg("Transfer completed and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   const sendProperty=async(asset)=>{const to=propTransfer[asset.id];if(!to){setMsg("Choose a recipient for the property.");return;}const recipient=(D.players||[]).find(p=>p.id===to);const biz=getBiz(businesses,asset.typeId);if(!confirm(`Transfer ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName}?`))return;const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:to,ownerName:recipient?.latinName||"Unknown"}:a);setAssets(nextAssets);await db.set("spqr_assets",nextAssets);await addHistory(user.id,"Property Transferred",`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Property Received",`${recipient?.latinName||"A senator"} received ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName}.`,`wealth`);const entry={type:"property",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setPropTransfer(x=>({...x,[asset.id]:""}));setMsg("Property transferred and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Personal Wealth Balance" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}>
@@ -1622,7 +1674,6 @@ function ABusinesses({D,onRefresh}){
   const destroyAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);const reason=prompt(`Reason for destroying ${biz.name} in ${asset.regionName||asset.regionId}?`,"Destroyed by war / Hannibal");if(reason===null)return;const next=assets.filter(a=>a.id!==asset.id);setAssets(next);await db.set("spqr_assets",next);await addHistory(asset.ownerId,"Property Destroyed",`${biz.name} in ${asset.regionName||asset.regionId} was destroyed. Reason: ${reason||"War damage"}.`,"estate_destroyed");setMsg("Property destroyed and recorded in senator history.");setTimeout(()=>setMsg(""),3000);};
   const donationTotal=(kind)=>donations.filter(d=>d.kind===kind).reduce((a,d)=>a+Number(d.amount||0),0);
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Private Economy Control" sub="Personal wealth is private from other players. This is the GM balance sheet for all senators."/><div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem"}}><Stat label="Business Types" value={businesses.length}/><Stat label="Properties Owned" value={assets.length}/><Stat label="Gold Donated" value={`🪙 ${fmt(donationTotal("gold"))}T`} color={RES.gold.color}/><Stat label="Food Donated" value={`🌾 ${fmt(donationTotal("food"))}M`} color={RES.food.color}/></div><Row gap="0.5rem" wrap><Btn v="green" onClick={addBiz}>＋ Add Business Type</Btn><Btn v="dark" onClick={applyBalancedPreset}>⚖️ Load Balanced Preset</Btn><Btn onClick={save}>💾 Save Private Economy Rules</Btn></Row></Card>
     <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the amount of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 State Food Market Stock" type="number" value={game.foodMarketStock??0} onChange={v=>setGame({...game,foodMarketStock:Number(v)||0})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame(game)}>Save Market & Tax Rules</Btn></Row></Card>
@@ -1748,32 +1799,39 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
       <Inp label="Requested Ruling / Punishment" value={form.request} onChange={v=>setForm(f=>({...f,request:v}))} rows={2}/>
       <Btn onClick={submitCase}>Submit Case to Court</Btn>
     </Card>
-    <Card><STit c="Court Case Registry" sub="Official legal archive of the Republic."/>
+    <Card><STit c="Court Case Registry" sub="Official legal archive of the Republic — table view for faster reading."/>
       <div style={{display:"flex",gap:"0.5rem",alignItems:"end",flexWrap:"wrap",marginBottom:"0.7rem"}}><div><Lbl c="Filter Status"/><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}><option value="all">All cases</option>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
       {filtered.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No court cases yet.</div>}
-      {filtered.map(c=>{const isEditing=!!edit[c.id];const local=edit[c.id]||c;const canEditOwnSubmitted=!isGM&&!isPraetor&&c.status==="Submitted"&&c.accuserId===user?.id;return <div key={c.id} style={{border:`1px solid ${T.border}`,borderLeft:`6px solid ${courtColor(c.status)}`,background:T.surf,padding:"0.75rem",marginBottom:"0.65rem"}}>
-        <div style={{display:"flex",justifyContent:"space-between",gap:"0.6rem",flexWrap:"wrap",alignItems:"center"}}><div><Badge c={c.status} color={courtColor(c.status)}/> <span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{caseTitle(c)}</span></div><div style={{color:T.mut,fontSize:"0.82rem"}}>{c.session||""}</div></div>
-        <div style={{marginTop:"0.35rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.45rem"}}>
-          <div><b>Accuser:</b> {c.accuserName||pname(c.accuserId)}</div><div><b>Accused:</b> {c.accusedName||pname(c.accusedId)}</div><div><b>Praetor:</b> {c.praetorName||"Not assigned"}</div>
-        </div>
-        {isEditing&&(canAdmin||canEditOwnSubmitted)?<div style={{marginTop:"0.65rem"}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.55rem"}}>
-            <Inp label="Case Title" value={local.title||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,title:v}}))}/>
-            <div><Lbl c="Status"/><select value={local.status||"Submitted"} onChange={e=>setEdit(x=>({...x,[c.id]:{...local,status:e.target.value}}))} disabled={!canAdmin} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-            <Inp label="Discord Thread Link" value={local.threadLink||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,threadLink:v}}))}/>
-          </div>
-          <Inp label="Law Broken" value={local.law||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,law:v}}))}/>
-          <Inp label="Summary" value={local.summary||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,summary:v}}))} rows={3}/>
-          <Inp label="Evidence / Witnesses" value={local.evidence||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,evidence:v}}))} rows={2}/>
-          <Inp label="Praetor Notes" value={local.notes||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,notes:v}}))} rows={2}/>
-          <Inp label="Final Ruling" value={local.ruling||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,ruling:v}}))} rows={3}/>
-          <Inp label="Punishment / Consequence" value={local.punishment||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,punishment:v}}))} rows={2}/>
-          <Row gap="0.45rem" wrap><Btn onClick={async()=>{const patch=(canAdmin?local:{...c,title:local.title,law:local.law,summary:local.summary,evidence:local.evidence,request:local.request,updated:Date.now()});await patchCase(c.id,patch,true);setEdit(e=>{const n={...e};delete n[c.id];return n;});}}>Save Case</Btn><Btn v="ghost" onClick={()=>setEdit(e=>{const n={...e};delete n[c.id];return n;})}>Cancel</Btn>{canEditOwnSubmitted&&<Btn v="crimson" onClick={async()=>{if(confirm("Withdraw this submitted case before review?")){await removeCase(c.id);}}}>Withdraw Case</Btn>}{isGM&&<Btn v="red" onClick={()=>removeCase(c.id)}>Delete</Btn>}</Row>
-        </div>:<div style={{marginTop:"0.55rem",lineHeight:1.5}}>
-          {c.law&&<div><b>Law:</b> {c.law}</div>}<div><b>Accusation:</b> {c.summary}</div>{c.evidence&&<div><b>Evidence:</b> {c.evidence}</div>}{c.request&&<div><b>Requested ruling:</b> {c.request}</div>}{c.threadLink&&<div><b>Discord thread:</b> <a href={c.threadLink} target="_blank" rel="noreferrer" style={{color:T.blue}}>Open court thread</a></div>}{c.notes&&<div><b>Praetor notes:</b> {c.notes}</div>}{c.ruling&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#F0FFF4",border:`1px solid ${T.gre}`}}><b>Ruling:</b> {c.ruling}</div>}{c.punishment&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`}}><b>Punishment / consequence:</b> {c.punishment}</div>}
-        </div>}
-        {(canAdmin||canEditOwnSubmitted)&&!isEditing&&<Row gap="0.45rem" wrap><Btn sm onClick={()=>setEdit(e=>({...e,[c.id]:c}))}>{canEditOwnSubmitted?"Edit / Rewrite Submitted Case":"Edit / Manage Case"}</Btn>{isPraetor&&!c.praetorId&&<Btn sm v="dark" onClick={()=>assignPraetor(c.id)}>Assign Myself as Praetor</Btn>}</Row>}
-      </div>})}
+      <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:1040,fontSize:"0.9rem"}}>
+        <thead><tr style={{background:T.bg,color:T.gold,fontFamily:"'Cinzel',serif",textTransform:"uppercase",letterSpacing:"0.06em"}}>{['Status','Case','Accuser','Accused','Praetor','Session','Actions'].map(h=><th key={h} style={{textAlign:"left",padding:"0.5rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
+        <tbody>{filtered.map(c=>{const isEditing=!!edit[c.id];const local=edit[c.id]||c;const canEditOwnSubmitted=!isGM&&!isPraetor&&c.status==="Submitted"&&c.accuserId===user?.id;return <React.Fragment key={c.id}>
+          <tr style={{background:T.surf}}>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}><Badge c={c.status} color={courtColor(c.status)}/></td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top",minWidth:300}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{caseTitle(c)}</div><div style={{color:T.mut,fontSize:"0.86rem",lineHeight:1.4,marginTop:"0.25rem"}}>{String(c.summary||"").slice(0,180)}{String(c.summary||"").length>180?"…":""}</div>{c.threadLink&&<a href={c.threadLink} target="_blank" rel="noreferrer" style={{color:T.blue,fontSize:"0.85rem"}}>Open Discord court thread</a>}</td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}>{c.accuserName||pname(c.accuserId)}</td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}>{c.accusedName||pname(c.accusedId)}</td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}>{c.praetorName||"Not assigned"}</td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top",color:T.mut}}>{c.session||""}</td>
+            <td style={{padding:"0.5rem",border:`1px solid ${T.border}`,verticalAlign:"top"}}><Row gap="0.35rem" wrap>{(canAdmin||canEditOwnSubmitted)&&!isEditing&&<Btn sm onClick={()=>setEdit(e=>({...e,[c.id]:c}))}>{canEditOwnSubmitted?"Edit / Rewrite":"Manage"}</Btn>}{isPraetor&&!c.praetorId&&<Btn sm v="dark" onClick={()=>assignPraetor(c.id)}>Assign Self</Btn>}<Btn sm v="ghost" onClick={()=>setEdit(e=>({...e,[`view_${c.id}`]:!e[`view_${c.id}`]}))}>{edit[`view_${c.id}`]?"Hide":"View"}</Btn></Row></td>
+          </tr>
+          {(edit[`view_${c.id}`]||isEditing)&&<tr><td colSpan={7} style={{padding:"0.75rem",border:`1px solid ${T.border}`,background:T.card}}>
+            {isEditing&&(canAdmin||canEditOwnSubmitted)?<div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.55rem"}}>
+                <Inp label="Case Title" value={local.title||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,title:v}}))}/>
+                <div><Lbl c="Status"/><select value={local.status||"Submitted"} onChange={e=>setEdit(x=>({...x,[c.id]:{...local,status:e.target.value}}))} disabled={!canAdmin} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+                <Inp label="Discord Thread Link" value={local.threadLink||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,threadLink:v}}))}/>
+              </div>
+              <Inp label="Law Broken" value={local.law||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,law:v}}))}/>
+              <Inp label="Summary" value={local.summary||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,summary:v}}))} rows={3}/>
+              <Inp label="Evidence / Witnesses" value={local.evidence||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,evidence:v}}))} rows={2}/>
+              <Inp label="Praetor Notes" value={local.notes||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,notes:v}}))} rows={2}/>
+              <Inp label="Final Ruling" value={local.ruling||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,ruling:v}}))} rows={3}/>
+              <Inp label="Punishment / Consequence" value={local.punishment||""} onChange={v=>setEdit(e=>({...e,[c.id]:{...local,punishment:v}}))} rows={2}/>
+              <Row gap="0.45rem" wrap><Btn onClick={async()=>{const patch=(canAdmin?local:{...c,title:local.title,law:local.law,summary:local.summary,evidence:local.evidence,request:local.request,updated:Date.now()});await patchCase(c.id,patch,true);setEdit(e=>{const n={...e};delete n[c.id];return n;});}}>Save Case</Btn><Btn v="ghost" onClick={()=>setEdit(e=>{const n={...e};delete n[c.id];return n;})}>Cancel</Btn>{canEditOwnSubmitted&&<Btn v="crimson" onClick={async()=>{if(confirm("Withdraw this submitted case before review?")){await removeCase(c.id);}}}>Withdraw Case</Btn>}{isGM&&<Btn v="red" onClick={()=>removeCase(c.id)}>Delete</Btn>}</Row>
+            </div>:<div style={{lineHeight:1.55}}>{c.law&&<div><b>Law:</b> {c.law}</div>}<div><b>Accusation:</b> {c.summary}</div>{c.evidence&&<div><b>Evidence:</b> {c.evidence}</div>}{c.request&&<div><b>Requested ruling:</b> {c.request}</div>}{c.notes&&<div><b>Praetor notes:</b> {c.notes}</div>}{c.ruling&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#F0FFF4",border:`1px solid ${T.gre}`}}><b>Ruling:</b> {c.ruling}</div>}{c.punishment&&<div style={{marginTop:"0.35rem",padding:"0.45rem",background:"#FFF1F1",border:`1px solid ${T.rhi}`}}><b>Punishment / consequence:</b> {c.punishment}</div>}</div>}
+          </td></tr>}
+        </React.Fragment>})}</tbody>
+      </table></div>
     </Card>
   </div>;
 }
@@ -1986,10 +2044,10 @@ function PlayerApp({user:initUser,onLogout}){
     <div style={{minHeight:"100vh",background:T.bg}}>
       <style>{CSS}</style>
       <div className="spqr-topbar" style={{background:T.surf,borderBottom:`2px solid ${T.border}`,padding:"0.5rem 1rem",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:"0.6rem",position:"sticky",top:0,zIndex:100}}>
-        <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
+        <div style={{display:"flex",alignItems:"center",gap:"0.6rem",minWidth:0}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><SeasonPill game={D.game}/></div>
         <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>} 
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
@@ -2004,7 +2062,6 @@ function PlayerApp({user:initUser,onLogout}){
         {activeTabs.map(it=>{const tone=it.tone||activeGroup.tone;return <button key={it.k} onClick={()=>jumpTab(it.k)} style={{padding:"0.52rem 0.9rem",background:tab===it.k?"#fff":"transparent",color:tab===it.k?toneColor(tone):T.mut,border:"none",borderBottom:tab===it.k?`2px solid ${toneColor(tone)}`:"2px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>})}
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
-        <SeasonBanner game={D.game}/>
         <ErrorBoundary key={tab}>
         {tab==="senate"    &&<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>}
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
@@ -2524,8 +2581,8 @@ function ARegions({D,onRefresh}){
   if(!regs)return null;
   const upd=(i,k,v)=>setRegs(rs=>rs.map((r,j)=>j===i?{...r,[k]:isNaN(Number(v))&&k!=="s"?v:k==="s"?v:Number(v)}:r));
   const save=async()=>{await db.set("spqr_r",regs);setMsg("Saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
-  const inc=calcInc(regs,g);
   const g={...DEF_GAME,...(D.game||{})};
+  const inc=calcInc(regs,g);
   const privateTaxes=totalPrivateTaxProjection(D.players||[],D.assets||[],D.businesses||DEF_BUSINESSES,D.wealth||{},g);
   const totalGoldIncome=inc.gold+privateTaxes.gold;
   const totalFoodIncome=inc.food+privateTaxes.food;
@@ -2804,6 +2861,7 @@ function AElections({D,onRefresh}){
   const [office,setOffice]=useState("consul_1");
   const [msg,setMsg]=useState("");
   const [selected,setSelected]=useState(null);
+  const [showVotes,setShowVotes]=useState({});
   const players=D.players||[];
   const active=elections.filter(e=>e&&e.status!=="closed");
   const [activeElectionId,setActiveElectionId]=useState(null);
@@ -2854,7 +2912,6 @@ function AElections({D,onRefresh}){
   };
   const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
   return <div>
-    <SeasonBanner game={D.game||DEF_GAME}/>
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
       <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
@@ -2866,10 +2923,20 @@ function AElections({D,onRefresh}){
       const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
       return <Card key={election.id} style={{borderLeft:`6px solid ${officeInfo?.color||T.gold}`,background:officeInfo?.bg||T.card}}>
         <Row gap="0.5rem" wrap><Badge c={`${officeInfo?.emoji||"🏛️"} ${officeInfo?.title||election.office} — ${election.status.toUpperCase()} — Round ${election.round||1}`} color={officeInfo?.color||T.gold}/>{election.status==="candidacy"&&<Btn onClick={()=>openVoting(election)}>Open Voting Phase</Btn>}{election.status==="voting"&&<Btn v="green" onClick={()=>closeElection(election)}>Close & Assign Winner</Btn>}<Btn v="red" onClick={()=>cancel(election)}>Cancel</Btn></Row>
-        <STit c="Candidates and Votes"/>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <Card key={c.playerId} style={{borderLeft:`4px solid ${officeInfo?.color||T.gold}`}}><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{cp&&<div style={{marginTop:"0.2rem"}}><ClassBadge cls={cp.charClass} sm/></div>}<div style={{color:T.mut,whiteSpace:"pre-wrap",margin:"0.35rem 0"}}>{c.speech}</div><Stat label="Votes" value={counts[c.playerId]||0}/></Card>})}</div>
+        <STit c="Candidates" sub="Candidate table with speeches. Vote record is hidden by default and can be expanded."/>
         {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
-        <Card><STit c="Voters"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"0.35rem"}}>{players.map(p=>{const voted=!!election.votes?.[p.id];const ci=getClassInfo(p.charClass);return <button key={p.id} onClick={()=>setSelected(p)} style={{textAlign:"left",padding:"0.45rem",background:ci.bg,border:`1px solid ${ci.color}`,fontSize:"0.9rem",cursor:"pointer",color:T.text}}><span style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:ci.color}}>{ci.emoji} {p.latinName}</span>: <span style={{color:voted?T.gre:T.rhi}}>{voted?"Voted":"Not voted"}</span></button>})}</div></Card>
+        {(election.candidates||[]).length>0&&<div style={{overflowX:"auto"}}>
+          <table className="election-table">
+            <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th></tr></thead>
+            <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
+              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
+              <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
+              <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
+              <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontSize:"1.15rem",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
+            </tr>})}</tbody>
+          </table>
+        </div>}
+        {(election.candidates||[]).length>0&&<div style={{marginTop:"0.55rem"}}><button onClick={()=>setShowVotes({...showVotes,[election.id]:!showVotes[election.id]})} style={{background:"none",border:"none",color:T.blue,fontFamily:"'Cinzel',serif",fontWeight:900,cursor:"pointer",fontSize:"0.9rem"}}>{showVotes[election.id]?"▲ Hide vote record":"▼ Show vote record"}</button>{showVotes[election.id]&&<ElectionVoteRecord election={election} players={players} onSelect={setSelected}/>}</div>}
         {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
       </Card>;
     })}
@@ -2989,9 +3056,9 @@ function AdminApp({onLogout}){
     <div style={{minHeight:"100vh",background:T.bg}}>
       <style>{CSS}</style>
       <div className="spqr-topbar" style={{background:"#0A0600",borderBottom:`2px solid ${T.red}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
-        <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><Badge c="GM PANEL" color={T.rhi}/></Row>
+        <Row gap="0.6rem" wrap><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><SeasonPill game={D.game}/><Badge c="GM PANEL" color={T.rhi}/></Row>
         <Row gap="0.5rem" wrap>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
           <NotifBell userId="gm"/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit Panel</Btn>
@@ -3004,7 +3071,6 @@ function AdminApp({onLogout}){
         {activeTabs.map(it=><button key={it.k} onClick={()=>setTab(it.k)} style={{padding:"0.55rem 0.9rem",background:tab===it.k?T.card:"transparent",color:tab===it.k?toneColor(activeGroup.tone):T.mut,border:"none",borderBottom:tab===it.k?`3px solid ${toneColor(activeGroup.tone)}`:"3px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.86rem",letterSpacing:"0.08em",whiteSpace:"nowrap",flexShrink:0}}>{it.l}</button>)}
       </div>
       <div className="spqr-shell" style={{maxWidth:1180,margin:"0 auto",padding:"1rem"}}>
-        <SeasonBanner game={D.game}/>
         <ErrorBoundary key={tab}>
         {tab==="overview"  &&<AOverview D={D}/>} 
         {tab==="senators"  &&<ASenators D={D} onRefresh={refresh}/>} 
