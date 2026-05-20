@@ -387,6 +387,16 @@ const Badge=({c,color=T.gold,sm})=><span style={{display:"inline-block",backgrou
 const STit=({c,sub})=><div style={{marginBottom:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.22em",borderBottom:`1px solid ${T.border}`,paddingBottom:"0.3rem",textTransform:"uppercase"}}>{c}</div>{sub&&<div style={{color:T.mut,fontSize:"0.9rem",marginTop:"0.25rem",fontStyle:"italic"}}>{sub}</div>}</div>;
 const Row=({children,gap="0.4rem",wrap})=><div style={{display:"flex",gap,alignItems:"center",flexWrap:wrap?"wrap":"nowrap"}}>{children}</div>;
 const Stat=({label,value,color=T.ghi})=><div style={{textAlign:"center",padding:"0.45rem 0.6rem",background:T.card,border:`1px solid ${T.border}`}}><div style={{fontSize:"1.55rem",fontFamily:"'Cinzel',serif",fontWeight:700,color}}>{value}</div><div style={{fontSize:"0.72rem",color:T.mut,letterSpacing:"0.12em",textTransform:"uppercase",marginTop:"0.08rem"}}>{label}</div></div>;
+const SeasonTopBadge=({game})=>{
+  const g=game||DEF_GAME;
+  const info=seasonInfo(g);
+  const goldPct=Math.round(Number(g.seasonGoldPct??seasonMods(g).gold??1)*100);
+  const foodPct=Math.round(Number(g.seasonFoodPct??seasonMods(g).food??1)*100);
+  const modTxt=(goldPct!==100||foodPct!==100)?` · 🪙 ${goldPct}% · 🌾 ${foodPct}%`:"";
+  return <span style={{display:"inline-flex",alignItems:"center",gap:"0.25rem",border:`1px solid ${info.border}`,background:info.bg,color:info.color,padding:"0.14rem 0.38rem",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",fontWeight:900,letterSpacing:"0.08em",whiteSpace:"nowrap",lineHeight:1.1}}>
+    <span>{info.emoji}</span><span>{info.label} · Turn {g.session||1}{modTxt}</span>
+  </span>;
+};
 const SeasonBanner=({game})=>{
   const info=seasonInfo(game||DEF_GAME);
   return <div style={{background:info.bg,border:`2px solid ${info.border}`,borderLeft:`8px solid ${info.color}`,padding:"0.75rem 0.9rem",marginBottom:"0.85rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"0.75rem",flexWrap:"wrap"}}>
