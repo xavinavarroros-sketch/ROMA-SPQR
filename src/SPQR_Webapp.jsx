@@ -2031,6 +2031,8 @@ function PlayerApp({user:initUser,onLogout}){
   useEffect(()=>{const h=e=>{if(e.detail?.tab)setTab(e.detail.tab);};window.addEventListener("spqr-nav",h);return()=>window.removeEventListener("spqr-nav",h);},[]);
 
   const pos=user.role?POS[user.role]:null;
+  const officeAccent=pos?.color||T.gold;
+  const officeBg=pos?.bg||T.bg;
   const votingCount=D.motions.filter(m=>m.status==="voting").length;
   const newResolutions=(D.orders||[]).filter(o=>o.playerId===user.id&&o.status==="resolved"&&!o.seenByPlayer).length;
 
@@ -2053,10 +2055,21 @@ function PlayerApp({user:initUser,onLogout}){
   const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#F3E8FF":tone==="office"?(pos?.bg||T.surf):"#FFF0D6";
 
   return(
-    <div style={{minHeight:"100vh",background:T.bg}}>
+    <div className={pos?"spqr-office-theme":""} style={{minHeight:"100vh",background:pos?`linear-gradient(180deg, ${officeBg} 0%, ${T.bg} 22%, ${T.bg} 100%)`:T.bg,borderTop:pos?`5px solid ${officeAccent}`:undefined}}>
       <style>{CSS}</style>
-      <div className="spqr-topbar" style={{background:T.surf,borderBottom:`2px solid ${T.border}`,padding:"0.5rem 1rem",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:"0.6rem",position:"sticky",top:0,zIndex:100}}>
-        <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
+      {pos&&<style>{`
+        .spqr-office-theme .spqr-topbar{border-bottom-color:${officeAccent}!important; box-shadow:0 3px 0 ${officeAccent}22;}
+        .spqr-office-theme .spqr-tab-groups{border-bottom-color:${officeAccent}55!important;}
+        .spqr-office-theme .spqr-tabs{border-bottom-color:${officeAccent}55!important;}
+        .spqr-office-theme .spqr-card{border-color:${officeAccent}44;}
+        .spqr-office-theme .spqr-card .spqr-title{color:${officeAccent};}
+        .spqr-office-theme input:focus,.spqr-office-theme textarea:focus,.spqr-office-theme select:focus{border-color:${officeAccent}!important; box-shadow:0 0 0 2px ${officeAccent}22;}
+      `}</style>}
+      <div className="spqr-topbar" style={{background:pos?`linear-gradient(90deg, ${officeBg}, ${T.surf} 45%, ${officeBg})`:T.surf,borderBottom:`2px solid ${pos?officeAccent:T.border}`,padding:"0.5rem 1rem",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:"0.6rem",position:"sticky",top:0,zIndex:100}}>
+        <div style={{display:"flex",alignItems:"center",gap:"0.65rem",minWidth:0,flexWrap:"wrap"}}>
+          <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div>
+          {pos&&<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.68rem",fontWeight:900,letterSpacing:"0.08em",color:officeAccent,border:`1px solid ${officeAccent}`,background:officeBg,padding:"0.16rem 0.38rem",whiteSpace:"nowrap"}}>{pos.emoji} Magistrate of {pos.title}</span>}
+        </div>
         <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
           <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · {D.game.season} · Turn {D.game.session}</span>
@@ -3067,8 +3080,16 @@ function AdminApp({onLogout}){
   const chooseGroup=(g)=>{setGroup(g.key); if(!g.tabs.some(t=>t.k===tab))setTab(g.tabs[0].k);};
 
   return(
-    <div style={{minHeight:"100vh",background:T.bg}}>
+    <div className={pos?"spqr-office-theme":""} style={{minHeight:"100vh",background:pos?`linear-gradient(180deg, ${officeBg} 0%, ${T.bg} 22%, ${T.bg} 100%)`:T.bg,borderTop:pos?`5px solid ${officeAccent}`:undefined}}>
       <style>{CSS}</style>
+      {pos&&<style>{`
+        .spqr-office-theme .spqr-topbar{border-bottom-color:${officeAccent}!important; box-shadow:0 3px 0 ${officeAccent}22;}
+        .spqr-office-theme .spqr-tab-groups{border-bottom-color:${officeAccent}55!important;}
+        .spqr-office-theme .spqr-tabs{border-bottom-color:${officeAccent}55!important;}
+        .spqr-office-theme .spqr-card{border-color:${officeAccent}44;}
+        .spqr-office-theme .spqr-card .spqr-title{color:${officeAccent};}
+        .spqr-office-theme input:focus,.spqr-office-theme textarea:focus,.spqr-office-theme select:focus{border-color:${officeAccent}!important; box-shadow:0 0 0 2px ${officeAccent}22;}
+      `}</style>}
       <div className="spqr-topbar" style={{background:"#0A0600",borderBottom:`2px solid ${T.red}`,padding:"0.5rem 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",position:"sticky",top:0,zIndex:100}}>
         <Row gap="0.6rem"><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><Badge c="GM PANEL" color={T.rhi}/></Row>
         <Row gap="0.5rem" wrap>
