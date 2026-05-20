@@ -11,8 +11,8 @@ img{max-width:100%}
 input,select,textarea,button{outline:none;font-size:1rem}
 button{cursor:pointer}
 .spqr-card{overflow:hidden}.spqr-region-card{min-width:0}.spqr-region-head{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap}.spqr-region-title{min-width:0;overflow-wrap:anywhere}.spqr-badge-wrap{max-width:100%;white-space:normal!important;overflow-wrap:anywhere;text-align:center}.spqr-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem}.spqr-military-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:.7rem}@media(max-width:900px){.spqr-military-grid{grid-template-columns:1fr}.spqr-field-grid{grid-template-columns:1fr}}
-.election-table{width:100%;border-collapse:separate;border-spacing:0 .45rem}.election-table th{text-align:left;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:#7A4A18;text-transform:uppercase;padding:.25rem .4rem}.election-table td{background:#fff;padding:.55rem .45rem;border-top:1px solid #D6BFA3;border-bottom:1px solid #D6BFA3;vertical-align:top}.election-table td:first-child{border-left:1px solid #D6BFA3;border-radius:8px 0 0 8px}.election-table td:last-child{border-right:1px solid #D6BFA3;border-radius:0 8px 8px 0}.election-speech{white-space:pre-wrap;line-height:1.45;max-height:9rem;overflow:auto}.election-role-picker{grid-template-columns:minmax(220px,340px) 1fr}
-@media(max-width:720px){html{font-size:18px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}.election-role-picker{grid-template-columns:1fr!important}.election-table,.election-table thead,.election-table tbody,.election-table tr,.election-table th,.election-table td{display:block;width:100%}.election-table thead{display:none}.election-table tr{margin-bottom:.65rem;border:1px solid #D6BFA3;border-radius:10px;background:#fff;padding:.45rem}.election-table td{border:none!important;border-radius:0!important;padding:.35rem .25rem}.election-table td:before{content:attr(data-label);display:block;font-family:'Cinzel',serif;color:#7A4A18;font-size:.68rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.1rem}}
+.election-table{width:100%;border-collapse:separate;border-spacing:0 .45rem}.election-table th{text-align:left;font-family:'Cinzel',serif;font-size:.72rem;letter-spacing:.08em;color:#7A4A18;text-transform:uppercase;padding:.25rem .4rem}.election-table td{background:#fff;padding:.55rem .45rem;border-top:1px solid #D6BFA3;border-bottom:1px solid #D6BFA3;vertical-align:top}.election-table td:first-child{border-left:1px solid #D6BFA3;border-radius:8px 0 0 8px}.election-table td:last-child{border-right:1px solid #D6BFA3;border-radius:0 8px 8px 0}.election-speech{white-space:pre-wrap;line-height:1.35;max-height:6.8rem;overflow:auto;font-size:.88rem;color:#3d2b20}.election-role-picker{display:grid;grid-template-columns:minmax(220px,420px);gap:.75rem;align-items:center}
+@media(max-width:720px){html{font-size:17px}body{overflow-x:hidden}.spqr-shell{padding:0.65rem!important}.spqr-topbar{position:static!important;display:grid!important;grid-template-columns:1fr auto!important;grid-template-areas:"brand actions" "party actions"!important;gap:.22rem .45rem!important;padding:.45rem .55rem!important;align-items:start!important}.spqr-brand-season{grid-area:brand;flex-wrap:wrap!important;gap:.25rem!important}.spqr-party-center{grid-area:party;justify-self:start!important;text-align:left!important;max-width:100%!important}.spqr-top-actions{grid-area:actions;justify-content:flex-end!important;gap:.25rem!important;align-self:start!important;max-width:145px}.spqr-yearturn{font-size:.64rem!important;width:100%;text-align:right;white-space:normal}.spqr-player-name{font-size:.7rem!important;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.spqr-season-pill{font-size:.58rem!important;padding:.08rem .22rem!important;gap:.12rem!important;max-width:190px;overflow:hidden;text-overflow:ellipsis}.spqr-party-badge{font-size:.58rem!important;padding:.04rem .28rem!important;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.spqr-tab-groups{position:static!important;top:auto!important}.spqr-tabs{position:static!important;top:auto!important}.spqr-senate-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:0.4rem}.spqr-modal{align-items:flex-start!important;padding:0.5rem!important}.spqr-modal-box{max-height:96vh!important;padding:1rem!important}.spqr-card-grid{grid-template-columns:1fr!important}.spqr-stat-grid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))!important}.spqr-resource-grid{grid-template-columns:1fr!important}.election-role-picker{grid-template-columns:1fr!important}.election-table,.election-table thead,.election-table tbody,.election-table tr,.election-table th,.election-table td{display:block;width:100%}.election-table thead{display:none}.election-table tr{margin-bottom:.65rem;border:1px solid #D6BFA3;border-radius:10px;background:#fff;padding:.45rem}.election-table td{border:none!important;border-radius:0!important;padding:.32rem .25rem}.election-table td:before{content:attr(data-label);display:block;font-family:'Cinzel',serif;color:#7A4A18;font-size:.66rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.1rem}.election-speech{font-size:.86rem!important;line-height:1.32!important;max-height:7.5rem!important;overflow:auto!important;background:#fffdf7;border:1px solid #E7D5BD;border-radius:8px;padding:.4rem}}
 `;
 const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A32020",
   gold:"#B9872B",ghi:"#8C5F16",red:"#A32020",rhi:"#D63A2E",
@@ -230,7 +230,7 @@ const personalBalanceFor=(userId,role,assets,businesses,wealth,game={})=>{
   return {gross,tax,taxGold,taxFood,salary:{gold:0,food:0},houseGold,houseFood,netGold:gross.gold-taxGold-houseGold,netFood:gross.food-taxFood-houseFood};
 };
 const partyOf=(parties,userId)=>(parties||[]).find(pt=>(pt.members||[]).includes(userId));
-const PartyBadge=({party,sm})=>party?<span style={{display:"inline-block",background:`${party.color||T.blue}18`,border:`1px solid ${party.color||T.blue}`,color:party.color||T.blue,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{party.emoji||"🏛️"} {party.name}</span>:null;
+const PartyBadge=({party,sm})=>party?<span className="spqr-party-badge" style={{display:"inline-block",background:`${party.color||T.blue}18`,border:`1px solid ${party.color||T.blue}`,color:party.color||T.blue,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap",maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis"}}>{party.emoji||"🏛️"} {party.name}</span>:null;
 const getBiz=(businesses,id)=>(businesses||DEF_BUSINESSES).find(b=>b.id===id)||DEF_BUSINESSES[0];
 const getRegion=(regions,id)=>(regions||DEF_REGIONS).find(r=>r.id===id)||{id,name:id,capital:"Unknown"};
 const personalIncomeFor=(userId,assets,businesses,game={})=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=Number(b.incomeGold||0);acc.food+=effectiveFoodIncome(b.incomeFood,game);return acc;},{gold:0,food:0});
@@ -369,7 +369,7 @@ const SeasonBanner=({game})=>{
 const SeasonPill=({game})=>{
   const g=game||DEF_GAME;
   const info=seasonInfo(g);
-  return <span title={info.note} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",background:info.bg,border:`1px solid ${info.border}`,color:info.color,padding:"0.22rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:900,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>
+  return <span className="spqr-season-pill" title={info.note} style={{display:"inline-flex",alignItems:"center",gap:"0.35rem",background:info.bg,border:`1px solid ${info.border}`,color:info.color,padding:"0.22rem 0.5rem",fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:900,letterSpacing:"0.08em",whiteSpace:"nowrap"}}>
     <span>{info.emoji}</span><span>{info.label}</span><span>· Turn {g.session||1}</span>{isWinterSeason(g.season)&&<span>❄️ -25% Food</span>}
   </span>;
 };
@@ -1429,15 +1429,12 @@ function ElectionRoleTabs({elections,selectedId,onSelect}){
   const current=active.find(e=>e.id===selectedId)||active[0];
   const co=POS[current?.office]||{};
   return <Card style={{padding:"0.75rem",marginBottom:"0.75rem",borderLeft:`6px solid ${co.color||T.gold}`,background:"#fffdf7"}}>
-    <div style={{display:"grid",gridTemplateColumns:"minmax(220px,340px) 1fr",gap:"0.75rem",alignItems:"center"}} className="electionRolePicker">
+    <div className="election-role-picker">
       <div>
         <Lbl c="Select Magistracy"/>
         <select value={current?.id||""} onChange={e=>onSelect(e.target.value)} style={{width:"100%",padding:"0.7rem 0.75rem",border:`2px solid ${co.color||T.gold}`,background:"#ffffff",color:T.text,fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:"0.95rem",borderRadius:8}}>
           {active.map(e=>{const o=POS[e.office]||{};const candCount=(e.candidates||[]).length;const voteCount=Object.keys(e.votes||{}).length;return <option key={e.id} value={e.id}>{o.emoji||"🏛️"} {o.title||e.office} — {e.status}{e.status==="candidacy"?` · ${candCount} candidates`:` · ${voteCount} votes`}</option>})}
         </select>
-      </div>
-      <div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",alignItems:"center"}}>
-        {active.map(e=>{const o=POS[e.office]||{};const on=e.id===current?.id;return <span key={e.id} style={{padding:"0.28rem 0.45rem",border:`1px solid ${on?(o.color||T.gold):T.border}`,background:on?(o.bg||"#fff4dc"):"#fff",color:on?(o.color||T.text):T.mut,borderRadius:999,fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:on?900:700}}>{o.emoji||"🏛️"} {o.abbr||o.title||e.office}</span>})}
       </div>
     </div>
   </Card>;
@@ -1540,7 +1537,7 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
           <table className="election-table">
             <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th><th>Action</th></tr></thead>
             <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
-              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
+              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"0.9rem",textDecoration:cp?"underline":"none",lineHeight:1.2}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
               <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
               <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
               <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
@@ -2044,12 +2041,12 @@ function PlayerApp({user:initUser,onLogout}){
     <div style={{minHeight:"100vh",background:T.bg}}>
       <style>{CSS}</style>
       <div className="spqr-topbar" style={{background:T.surf,borderBottom:`2px solid ${T.border}`,padding:"0.5rem 1rem",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",gap:"0.6rem",position:"sticky",top:0,zIndex:100}}>
-        <div style={{display:"flex",alignItems:"center",gap:"0.6rem",minWidth:0}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><SeasonPill game={D.game}/></div>
-        <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
+        <div className="spqr-brand-season" style={{display:"flex",alignItems:"center",gap:"0.6rem",minWidth:0}}><div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"1rem",fontWeight:900,letterSpacing:"0.22em"}}>SPQR</div><SeasonPill game={D.game}/></div>
+        <div className="spqr-party-center" style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span className="spqr-party-badge" style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
+        <div className="spqr-top-actions" style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
+          <span className="spqr-yearturn" style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>} 
-          <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
+          <span className="spqr-player-name" style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit</Btn>
@@ -2929,7 +2926,7 @@ function AElections({D,onRefresh}){
           <table className="election-table">
             <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th></tr></thead>
             <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
-              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
+              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"0.9rem",textDecoration:cp?"underline":"none",lineHeight:1.2}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
               <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
               <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
               <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontSize:"1.15rem",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
