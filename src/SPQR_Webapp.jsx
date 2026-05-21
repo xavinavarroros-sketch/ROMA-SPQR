@@ -240,6 +240,14 @@ const personalBalanceFor=(userId,role,assets,businesses,wealth,game={})=>{
 };
 const partyOf=(parties,userId)=>(parties||[]).find(pt=>(pt.members||[]).includes(userId));
 const PartyBadge=({party,sm})=>party?<span style={{display:"inline-block",background:`${party.color||T.blue}18`,border:`1px solid ${party.color||T.blue}`,color:party.color||T.blue,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{party.emoji||"🏛️"} {party.name}</span>:null;
+const Avatar=({p,size=42})=>{
+  const name=p?.latinName||p?.name||"?";
+  const cls=p?.charClass||"";
+  const ci=getClassInfo(cls);
+  if(p?.avatar){return <img src={p.avatar} style={{width:size,height:size,objectFit:"cover",borderRadius:"50%",border:`2px solid ${ci.color||T.border}`,background:T.surf,display:"inline-block"}} alt=""/>;}
+  return <span style={{width:size,height:size,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",background:`${ci.color||T.gold}22`,border:`2px solid ${ci.color||T.border}`,color:ci.color||T.ghi,fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:Math.max(12,Math.round(size*0.42)),lineHeight:1,verticalAlign:"middle"}}>{String(name).trim().charAt(0).toUpperCase()||"?"}</span>;
+};
+
 const getBiz=(businesses,id)=>(businesses||DEF_BUSINESSES).find(b=>b.id===id)||DEF_BUSINESSES[0];
 const getRegion=(regions,id)=>(regions||DEF_REGIONS).find(r=>r.id===id)||{id,name:id,capital:"Unknown"};
 const personalIncomeFor=(userId,assets,businesses,game={})=> (assets||[]).filter(a=>a.ownerId===userId).reduce((acc,a)=>{const b=getBiz(businesses,a.typeId);acc.gold+=effectiveGoldIncome(b.incomeGold,game);acc.food+=effectiveFoodIncome(b.incomeFood,game);return acc;},{gold:0,food:0});
@@ -781,7 +789,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
   const openAll=[...motions].filter(m=>m.status==="voting").sort((a,b)=>String(a.created||a.id).localeCompare(String(b.created||b.id)));
   const voting=openAll.slice(0,1);
   const queuedVoting=openAll.slice(1);
-  const other=motions.filter(m=>m.status!=="voting").concat(queuedVoting.map(m=>({...m,status:"queued"})));
+  const pendingLike=motions.filter(m=>["pending","rejected"].includes(m.status)).concat(queuedVoting.map(m=>({...m,status:"queued"})));
+  const concluded=motions.filter(m=>["passed","failed","vetoed"].includes(m.status));
   return(
     <div>
       <Card>
@@ -838,8 +847,8 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         })}
       </div>}
       {/* All other motions */}
-      <STit c="All Motions"/>
-      {[...other].reverse().map(m=>{
+      <STit c="Pending / Queued Motions" sub="Motions awaiting GM approval, rejected by GM, or queued behind the active motion."/>
+      {[...pendingLike].reverse().map(m=>{
         const isSel=selMotion===m.id;
         const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
         const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
@@ -869,7 +878,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
       <Card>
         <STit c="Motion Registry" sub="Passed, failed, rejected and vetoed motions remain here as a permanent voting record."/>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>
-          {motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).slice().reverse().map(m=>{
+          {concluded.slice().reverse().map(m=>{
             const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
             const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
             return <div key={`reg-${m.id}`} style={{background:T.surf,border:`1px solid ${scol[m.status]||T.border}`,borderLeft:`5px solid ${scol[m.status]||T.border}`,padding:"0.65rem"}}>
@@ -879,7 +888,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
               <div style={{marginTop:"0.35rem",fontSize:"0.9rem",color:T.mut}}>AYE {yeas} · NAY {nays}{m.vetoedByName?` · Vetoed by ${m.vetoedByName}`:""}</div>
             </div>
           })}
-          {motions.filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No concluded motions yet.</div>}
+          {concluded.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No concluded motions yet.</div>}
         </div>
       </Card>
       {motions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No motions have been proposed yet.</div>}
