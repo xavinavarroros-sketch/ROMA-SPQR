@@ -278,7 +278,7 @@ const DAY_MS=24*60*60*1000;
 const INACTIVE_AFTER_DAYS=4;
 const lastActiveTs=p=>Number(p?.lastSeenAt||p?.lastLoginAt||(p?.joined?new Date(p.joined).getTime():0)||0);
 const inactiveDays=p=>lastActiveTs(p)?Math.floor((Date.now()-lastActiveTs(p))/DAY_MS):999;
-const isInactiveSenator=p=>inactiveDays(p)>=INACTIVE_AFTER_DAYS;
+const isInactiveSenator=p=>!!p?.inactiveWarning||inactiveDays(p)>=INACTIVE_AFTER_DAYS;
 const timeAgo=ts=>{const t=Number(ts||0);if(!t)return "Never";const ms=Date.now()-t;const d=Math.floor(ms/DAY_MS);if(d>0)return `${d}d ago`;const h=Math.floor(ms/(60*60*1000));if(h>0)return `${h}h ago`;const m=Math.floor(ms/(60*1000));return `${Math.max(1,m)}m ago`;};
 const getClientPublicIp=async()=>{try{const r=await fetch("https://api.ipify.org?format=json",{cache:"no-store"});if(!r.ok)return null;const j=await r.json();return j?.ip||null;}catch{return null;}};
 const activityPatch=async()=>({lastSeenAt:Date.now(),lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown",lastIp:(await getClientPublicIp())||undefined});
@@ -707,6 +707,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
   const [form,setForm]=useState({title:"",body:"",speech:"",effects:"",implementationOffice:"",sector:""});
   const [err,setErr]=useState("");const [ok,setOk]=useState("");
   const [selMotion,setSelMotion]=useState(null);
+  const [showMotionForm,setShowMotionForm]=useState(false);
   const gForTurnLabel = game || DEF_GAME;
   const currSessionLabel = (()=>{try{return sLab(gForTurnLabel);}catch{return "";}})();
   const myMotionThisTurn=motions.find(m=>m.byId===user.id&&m.session===currSessionLabel);
@@ -794,7 +795,11 @@ function VotingPanel({motions,players,user,game,onRefresh}){
   return(
     <div>
       <Card>
-        <STit c="Propose a Motion" sub={`Limit: one motion per senator per turn. Current turn: ${currSessionLabel}`}/>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"0.75rem",alignItems:"center",flexWrap:"wrap"}}>
+          <STit c="Motions of the Senate" sub={`Limit: one motion per senator per turn. Current turn: ${currSessionLabel}`}/>
+          <Btn onClick={()=>setShowMotionForm(v=>!v)}>{showMotionForm?"Hide Motion Form":"+ Propose Motion"}</Btn>
+        </div>
+        {showMotionForm&&<div style={{marginTop:"0.75rem"}}>
         {motionLocked&&<div style={{padding:"0.65rem 0.8rem",background:"#1a1000",border:`1px solid ${T.gold}`,color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.82rem",marginBottom:"0.75rem",lineHeight:1.5}}>
           ⚖ Motion already accepted or resolved this turn: <span style={{color:T.text}}>{myMotionThisTurn.title}</span>. It can no longer be edited or withdrawn.
         </div>}
@@ -809,6 +814,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         {err&&<div style={{color:T.rhi,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{err}</div>}
         {ok&&<div style={{color:T.gre,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{ok}</div>}
         <Row gap="0.5rem" wrap><Btn onClick={propose} disabled={motionLocked}>{motionLocked?"Motion Locked After GM Approval":myPendingMotion?"Save Pending Motion Changes":"Submit to GM for Approval"}</Btn>{myPendingMotion&&<Btn v="red" onClick={cancelPendingMotion}>Withdraw Pending Motion</Btn>}</Row>
+        </div>}
       </Card>
       {/* Active votes */}
       {voting.length>0&&<div>
@@ -889,6 +895,21 @@ function VotingPanel({motions,players,user,game,onRefresh}){
             </div>
           })}
           {concluded.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No concluded motions yet.</div>}
+        </div>
+      </Card>
+      <Card>
+        <STit c="All Motion History" sub="Full archive of every motion proposed, pending, queued, rejected, voted, vetoed or concluded."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>
+          {motions.slice().sort((a,b)=>String(b.created||b.id).localeCompare(String(a.created||a.id))).map(m=>{
+            const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
+            const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+            return <div key={`hist-${m.id}`} style={{background:T.card,border:`1px solid ${scol[m.status]||T.border}`,borderLeft:`5px solid ${scol[m.status]||T.border}`,padding:"0.65rem"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{m.title||"Untitled Motion"}</div>
+              <div style={{fontSize:"0.82rem",color:T.mut}}>By {m.byName||"Unknown"} · {m.session||""}</div>
+              <div style={{display:"flex",gap:"0.35rem",flexWrap:"wrap",marginTop:"0.3rem"}}><Badge c={String(m.status||"pending").toUpperCase()} color={scol[m.status]||T.mut} sm/><span style={{fontSize:"0.8rem",color:T.mut}}>AYE {yeas} · NAY {nays}</span></div>
+            </div>
+          })}
+          {motions.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No motion history yet.</div>}
         </div>
       </Card>
       {motions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No motions have been proposed yet.</div>}
@@ -1293,6 +1314,16 @@ function CharacterPanel({user,onUpdate}){
     setAv(b64);setMsg("Avatar updated.");setTimeout(()=>setMsg(""),3000);
     onUpdate&&onUpdate(updatedUser);
   };
+  const markActiveNow=async()=>{
+    const players=await db.get("spqr_p")||[];
+    const patch={lastSeenAt:Date.now(),lastLoginAt:Date.now(),lastActiveConfirmedAt:Date.now(),inactiveWarning:false};
+    const updated=players.map(p=>p.id===user.id?{...p,...patch}:p);
+    await db.set("spqr_p",updated);
+    const me=updated.find(p=>p.id===user.id);
+    if(me)setUser(me);
+    setInactivePrompt(false);
+  };
+
   const pos=user.role?POS[user.role]:null;
   return(
     <div>
@@ -1968,6 +1999,7 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
   const courts=Array.isArray(D.courts)?D.courts:[];
   const [form,setForm]=useState({title:"",accuserId:user?.id||"",accusedId:"",law:"",summary:"",evidence:"",request:""});
   const [filter,setFilter]=useState("all");
+  const [showCaseForm,setShowCaseForm]=useState(false);
   const [edit,setEdit]=useState({});
   const isPraetor=user?.role==="praetor_1";
   const canAdmin=isGM||isPraetor;
@@ -2000,7 +2032,12 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
       <STit c="⚖️ Courts of Rome" sub="The app records official legal cases. The actual trial can happen in Discord threads; paste the thread link into the case record."/>
       <div style={{color:T.mut,lineHeight:1.55}}>The <b>Praetor Urbanus</b> may accept cases, create the Discord court thread, add the thread link, manage status and issue rulings. Submitted cases may be rewritten or withdrawn by the accuser before approval. The Game Master can control all cases.</div>
     </Card>
-    <Card><STit c="Submit an Accusation / Legal Petition" sub="Senators may submit cases for review by the Praetor Urbanus."/>
+    <Card>
+      <div style={{display:"flex",justifyContent:"space-between",gap:"0.75rem",alignItems:"center",flexWrap:"wrap"}}>
+        <STit c="Court Petitions" sub="Submit new legal cases only when needed; all previous cases remain in the registry below."/>
+        <Btn onClick={()=>setShowCaseForm(v=>!v)}>{showCaseForm?"Hide Case Form":"+ Open Case"}</Btn>
+      </div>
+      {showCaseForm&&<div style={{marginTop:"0.75rem"}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem"}}>
         <Inp label="Case Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Accusation of illegal treasury use"/>
         <div><Lbl c="Accuser"/><select value={form.accuserId} onChange={e=>setForm(f=>({...f,accuserId:e.target.value}))} disabled={!isGM} style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{players.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div>
@@ -2011,6 +2048,7 @@ function CourtsPanel({user,D,onRefresh,isGM=false}){
       <Inp label="Evidence / Witnesses" value={form.evidence} onChange={v=>setForm(f=>({...f,evidence:v}))} rows={2}/>
       <Inp label="Requested Ruling / Punishment" value={form.request} onChange={v=>setForm(f=>({...f,request:v}))} rows={2}/>
       <Btn onClick={submitCase}>Submit Case to Court</Btn>
+      </div>}
     </Card>
     <Card><STit c="Court Case Registry" sub="Official legal archive of the Republic."/>
       <div style={{display:"flex",gap:"0.5rem",alignItems:"end",flexWrap:"wrap",marginBottom:"0.7rem"}}><div><Lbl c="Filter Status"/><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}><option value="all">All cases</option>{COURT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div></div>
@@ -2208,6 +2246,7 @@ function PlayerApp({user:initUser,onLogout}){
   const [tab,setTab]=useState("senate");
   const [group,setGroup]=useState("gov");
   const [user,setUser]=useState(initUser);
+  const [inactivePrompt,setInactivePrompt]=useState(()=>isInactiveSenator(initUser));
   const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES,treasuryActions:[]});
 
   const refresh=useCallback(async()=>{
@@ -2218,7 +2257,7 @@ function PlayerApp({user:initUser,onLogout}){
     const allElections=normalizeElections(elections,election);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
       motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[]});
-    if(players){const me=players.find(p=>p.id===user.id);if(me)setUser(me);}
+    if(players){const me=players.find(p=>p.id===user.id);if(me){setUser(me); if(isInactiveSenator(me))setInactivePrompt(true);}}
   },[user.id]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
@@ -2278,6 +2317,15 @@ function PlayerApp({user:initUser,onLogout}){
           <Btn v="ghost" sm onClick={onLogout}>Exit</Btn>
         </div>
       </div>
+      {inactivePrompt&&<div style={{maxWidth:780,margin:"0.75rem auto 0",background:"#FFF7ED",border:`2px solid ${T.gold}`,borderLeft:`8px solid ${T.gold}`,padding:"0.85rem 1rem",boxShadow:"0 4px 14px rgba(0,0,0,0.08)",fontFamily:"Georgia,serif"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"1rem",alignItems:"center",flexWrap:"wrap"}}>
+          <div>
+            <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.gold,letterSpacing:"0.08em"}}>💤 Inactivity Check</div>
+            <div style={{marginTop:"0.25rem"}}>You were marked as inactive/sleeping. Are you still active in the game?</div>
+          </div>
+          <Btn v="green" onClick={markActiveNow}>✅ I am active</Btn>
+        </div>
+      </div>}
       <div className="spqr-tab-groups" style={{display:"flex",borderBottom:`1px solid ${T.border}`,background:T.surf,overflowX:"auto",position:"sticky",top:"45px",zIndex:99}}>
         {GROUPS.map(g=><button key={g.key} onClick={()=>{setGroup(g.key); if(!g.tabs.some(t=>t.k===tab))setTab(g.tabs[0].k);}} style={{padding:"0.62rem 1.05rem",background:group===g.key?toneBg(g.tone):"transparent",color:group===g.key?toneColor(g.tone):T.mut,border:"none",borderTop:group===g.key?`3px solid ${toneColor(g.tone)}`:"3px solid transparent",fontFamily:"'Cinzel',serif",fontSize:"0.9rem",fontWeight:900,letterSpacing:"0.12em",whiteSpace:"nowrap",flexShrink:0}}>{g.label}</button>)}
       </div>
@@ -2442,8 +2490,8 @@ function ASenators({D,onRefresh}){
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.88rem"}}>
-            <thead><tr style={{fontFamily:"'Cinzel',serif",color:T.ghi,textAlign:"left"}}><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Senator</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Status</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last Seen</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Logins</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last IP</th></tr></thead>
-            <tbody>{allPlayers.slice().sort((a,b)=>lastActiveTs(a)-lastActiveTs(b)).map(p=><tr key={p.id}><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}><button onClick={()=>setSelected(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:"'Cinzel',serif",color:T.blue,textDecoration:"underline"}}>{p.latinName}</button></td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{isInactiveSenator(p)?"💤 Sleeping":"🟢 Active"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{lastActiveTs(p)?`${new Date(lastActiveTs(p)).toLocaleString()} (${timeAgo(lastActiveTs(p))})`:"Never"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{p.loginCount||0}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`,fontFamily:"monospace"}}>{p.lastIp||"Unavailable"}</td></tr>)}</tbody>
+            <thead><tr style={{fontFamily:"'Cinzel',serif",color:T.ghi,textAlign:"left"}}><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Senator</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Status</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last Seen</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Confirmed Active</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Logins</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last IP</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Action</th></tr></thead>
+            <tbody>{allPlayers.slice().sort((a,b)=>lastActiveTs(a)-lastActiveTs(b)).map(p=><tr key={p.id}><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}><button onClick={()=>setSelected(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:"'Cinzel',serif",color:T.blue,textDecoration:"underline"}}>{p.latinName}</button></td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{isInactiveSenator(p)?"💤 Sleeping":"🟢 Active"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{lastActiveTs(p)?`${new Date(lastActiveTs(p)).toLocaleString()} (${timeAgo(lastActiveTs(p))})`:"Never"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{p.lastActiveConfirmedAt?new Date(p.lastActiveConfirmedAt).toLocaleString():"—"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{p.loginCount||0}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`,fontFamily:"monospace"}}>{p.lastIp||"Unavailable"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}><Btn sm v={isInactiveSenator(p)?"green":"red"} onClick={async()=>{const ps=await db.get("spqr_p")||[];await db.set("spqr_p",ps.map(x=>x.id===p.id?{...x,inactiveWarning:!isInactiveSenator(p),lastActiveConfirmedAt:isInactiveSenator(p)?Date.now():x.lastActiveConfirmedAt}:x));onRefresh&&onRefresh();}}>{isInactiveSenator(p)?"Mark Active":"Mark Sleeping"}</Btn></td></tr>)}</tbody>
           </table>
         </div>
       </Card>
@@ -3357,8 +3405,9 @@ function LoginScreen({onLogin,onAdmin}){
     const p=ps.find(x=>x.username.toLowerCase()===f.u.toLowerCase()&&x.password===f.p);
     setLoading(false);
     if(!p)return setErr("Unknown senator or incorrect password.");
+    const wasInactive=isInactiveSenator(p);
     const ip=await getClientPublicIp();
-    const updated={...p,lastLoginAt:Date.now(),lastSeenAt:Date.now(),loginCount:Number(p.loginCount||0)+1,lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown"};
+    const updated={...p,lastLoginAt:Date.now(),lastSeenAt:Date.now(),loginCount:Number(p.loginCount||0)+1,lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown",inactiveWarning:wasInactive?true:!!p.inactiveWarning};
     if(ip)updated.lastIp=ip;
     await db.set("spqr_p",ps.map(x=>x.id===p.id?updated:x));
     onLogin(updated);
