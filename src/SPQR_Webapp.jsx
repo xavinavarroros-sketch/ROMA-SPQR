@@ -266,6 +266,15 @@ const debtSessionExpired=(since,currentSession)=>since&&Number(currentSession||0
 const wealthOf=(wealth,userId)=>({ ...DEF_WEALTH, ...((wealth||{})[userId]||{}) });
 const addHistory=async(playerId,title,body,type="event")=>{const all=await db.get("spqr_history")||[];all.push({id:Date.now().toString()+Math.random().toString(36).slice(2),playerId,title,body,type,ts:Date.now()});await db.set("spqr_history",all.slice(-500));};
 
+const DAY_MS=24*60*60*1000;
+const INACTIVE_AFTER_DAYS=4;
+const lastActiveTs=p=>Number(p?.lastSeenAt||p?.lastLoginAt||(p?.joined?new Date(p.joined).getTime():0)||0);
+const inactiveDays=p=>lastActiveTs(p)?Math.floor((Date.now()-lastActiveTs(p))/DAY_MS):999;
+const isInactiveSenator=p=>inactiveDays(p)>=INACTIVE_AFTER_DAYS;
+const timeAgo=ts=>{const t=Number(ts||0);if(!t)return "Never";const ms=Date.now()-t;const d=Math.floor(ms/DAY_MS);if(d>0)return `${d}d ago`;const h=Math.floor(ms/(60*60*1000));if(h>0)return `${h}h ago`;const m=Math.floor(ms/(60*1000));return `${Math.max(1,m)}m ago`;};
+const getClientPublicIp=async()=>{try{const r=await fetch("https://api.ipify.org?format=json",{cache:"no-store"});if(!r.ok)return null;const j=await r.json();return j?.ip||null;}catch{return null;}};
+const activityPatch=async()=>({lastSeenAt:Date.now(),lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown",lastIp:(await getClientPublicIp())||undefined});
+
 const LAWS=[
   {t:"Lex Duodecim Tabularum (451 BC) — The Twelve Tables",b:"The foundation of Roman law. Citizens may not be punished without trial. All citizens are equal before these written laws. Justice must be seen, not merely administered in darkness."},
   {t:"Provocatio ad Populum — Right of Appeal",b:"Any Roman citizen facing execution or corporal punishment may appeal to the popular assembly. No magistrate possesses absolute power over a citizen's life without this process."},
@@ -481,6 +490,10 @@ function SenatorProfileModal({player,onClose}){
           {player.username&&<div style={{color:T.mut,marginBottom:"0.2rem"}}>Username: {player.username}</div>}
           {player.discord&&<div style={{color:"#7289DA",marginBottom:"0.2rem"}}>Discord: {player.discord}</div>}
           {player.joined&&<div style={{color:T.fnt}}>Enrolled: {new Date(player.joined).toLocaleDateString()}</div>}
+          <div style={{marginTop:"0.35rem",display:"flex",gap:"0.35rem",flexWrap:"wrap",alignItems:"center"}}>
+            {isInactiveSenator(player)?<Badge c={`💤 Sleeping / Inactive · ${inactiveDays(player)}d`} color={T.mut}/>:<Badge c={`🟢 Active · ${timeAgo(lastActiveTs(player))}`} color={T.gre}/>}
+            <span style={{color:T.fnt,fontSize:"0.8rem"}}>Last seen: {lastActiveTs(player)?new Date(lastActiveTs(player)).toLocaleString():"Never"}</span>
+          </div>
           <div style={{marginTop:"0.7rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"0.45rem"}}>
             <Stat label="Personal Gold" value="Private" color={RES.gold.color}/>
             <Stat label="Personal Food" value="Private" color={RES.food.color}/>
@@ -683,7 +696,7 @@ function MajorityStatus({motion,players}){
 }
 
 function VotingPanel({motions,players,user,game,onRefresh}){
-  const [form,setForm]=useState({title:"",body:""});
+  const [form,setForm]=useState({title:"",body:"",speech:"",effects:"",implementationOffice:"",sector:""});
   const [err,setErr]=useState("");const [ok,setOk]=useState("");
   const [selMotion,setSelMotion]=useState(null);
   const gForTurnLabel = game || DEF_GAME;
@@ -692,7 +705,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
   const myPendingMotion=myMotionThisTurn?.status==="pending"?myMotionThisTurn:null;
   const motionLocked=!!myMotionThisTurn && myMotionThisTurn.status!=="pending";
   useEffect(()=>{
-    if(myPendingMotion){setForm({title:myPendingMotion.title||"",body:myPendingMotion.body||""});}
+    if(myPendingMotion){setForm({title:myPendingMotion.title||"",body:myPendingMotion.body||"",speech:myPendingMotion.speech||"",effects:myPendingMotion.effects||"",implementationOffice:myPendingMotion.implementationOffice||"",sector:myPendingMotion.sector||""});}
   },[myPendingMotion?.id]);
   const propose=async()=>{
     if(motionLocked){setErr(`Your motion for this turn has already been accepted or resolved (${currSessionLabel}). It can no longer be edited or cancelled.`);return;}
@@ -703,16 +716,16 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     const existing=all.find(m=>m.byId===user.id&&m.session===liveSession);
     if(existing&&existing.status!=="pending"){setErr(`Your motion for this turn has already been accepted or resolved (${liveSession}).`);return;}
     if(existing&&existing.status==="pending"){
-      const updated={...existing,title:form.title.trim(),body:form.body.trim(),editedAt:new Date().toISOString()};
+      const updated={...existing,title:form.title.trim(),body:form.body.trim(),speech:(form.speech||"").trim(),effects:(form.effects||"").trim(),implementationOffice:form.implementationOffice||"",sector:(form.sector||"").trim(),editedAt:new Date().toISOString()};
       await db.set("spqr_m",all.map(m=>m.id===existing.id?updated:m));
       await pushN("Motion Edited",`${user.latinName} edited his pending motion: "${updated.title}"`,"gm");
       setErr("");setOk("Pending motion updated. It can still be edited until the GM approves it.");
       onRefresh();setTimeout(()=>setOk(""),4000);return;
     }
-    const nm={id:Date.now().toString(),byId:user.id,byName:user.latinName,title:form.title.trim(),body:form.body.trim(),status:"pending",votes:{},created:new Date().toISOString(),session:liveSession};
+    const nm={id:Date.now().toString(),byId:user.id,byName:user.latinName,title:form.title.trim(),body:form.body.trim(),speech:(form.speech||"").trim(),effects:(form.effects||"").trim(),implementationOffice:form.implementationOffice||"",sector:(form.sector||"").trim(),status:"pending",votes:{},created:new Date().toISOString(),session:liveSession};
     await db.set("spqr_m",[...all,nm]);
     await pushN("Motion Proposed",`${user.latinName} has proposed: "${form.title}"` ,"gm");
-    setForm({title:"",body:""});setErr("");setOk("Motion submitted — awaiting GM approval. You can edit or withdraw it until the GM approves it.");
+    setForm({title:"",body:"",speech:"",effects:"",implementationOffice:"",sector:""});setErr("");setOk("Motion submitted — awaiting GM approval. You can edit or withdraw it until the GM approves it.");
     onRefresh();setTimeout(()=>setOk(""),4000);
   };
   const cancelPendingMotion=async()=>{
@@ -724,7 +737,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     if(!confirm("Withdraw this pending motion before GM approval?"))return;
     await db.set("spqr_m",all.filter(m=>m.id!==existing.id));
     await pushN("Motion Withdrawn",`${user.latinName} withdrew his pending motion: "${existing.title}"`,"gm");
-    setForm({title:"",body:""});setErr("");setOk("Pending motion withdrawn before GM approval.");
+    setForm({title:"",body:"",speech:"",effects:"",implementationOffice:"",sector:""});setErr("");setOk("Pending motion withdrawn before GM approval.");
     onRefresh();setTimeout(()=>setOk(""),4000);
   };
   const autoResolveMotionIfMajority=(motion,allPlayers)=>{
@@ -778,6 +791,12 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         </div>}
         <Inp label="Motion Title" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Raise Legio VII immediately" disabled={motionLocked}/>
         <Inp label="Motion Text — be specific and persuasive" value={form.body} onChange={v=>setForm(f=>({...f,body:v}))} rows={3} disabled={motionLocked}/>
+        <Inp label="Speech before the Senate" value={form.speech||""} onChange={v=>setForm(f=>({...f,speech:v}))} rows={3} placeholder="Write the speech you will make in support of this motion..." disabled={motionLocked}/>
+        <Inp label="Desired Effects / Outcome" value={form.effects||""} onChange={v=>setForm(f=>({...f,effects:v}))} rows={3} placeholder="Explain what practical effect this motion should have if passed..." disabled={motionLocked}/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:"0.6rem"}}>
+          <div><Lbl c="Responsible Magistrate"/><select value={form.implementationOffice||""} disabled={motionLocked} onChange={e=>setForm(f=>({...f,implementationOffice:e.target.value}))} style={{width:"100%",padding:"0.55rem",border:`1px solid ${T.border}`,background:T.card,color:T.text,fontFamily:"\'Cinzel\',serif"}}><option value="">GM / Senate decides</option>{roleEntries().map(r=><option key={r.key} value={r.key}>{r.emoji} {r.title}</option>)}</select></div>
+          <Inp label="Sector affected" value={form.sector||""} onChange={v=>setForm(f=>({...f,sector:v}))} placeholder="e.g. Army, Treasury, Food, Courts, Diplomacy" disabled={motionLocked}/>
+        </div>
         {err&&<div style={{color:T.rhi,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{err}</div>}
         {ok&&<div style={{color:T.gre,fontSize:"1.05rem",marginBottom:"0.5rem"}}>{ok}</div>}
         <Row gap="0.5rem" wrap><Btn onClick={propose} disabled={motionLocked}>{motionLocked?"Motion Locked After GM Approval":myPendingMotion?"Save Pending Motion Changes":"Submit to GM for Approval"}</Btn>{myPendingMotion&&<Btn v="red" onClick={cancelPendingMotion}>Withdraw Pending Motion</Btn>}</Row>
@@ -797,7 +816,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
                 <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap"}}><Badge c="OPEN TO VOTE" color={T.gold}/>{["tribune_1","tribune_2"].includes(user.role)&&<Btn v="crimson" sm onClick={()=>vetoMotion(m)}>Tribune Veto</Btn>}</div>
               </div>
               <div style={{color:T.mut,fontSize:"0.9rem",fontFamily:"'Cinzel',serif",marginBottom:"0.4rem"}}>Proposed by {m.byName} · {m.session||""}</div>
-              <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,marginBottom:"0.65rem"}}>{m.body}</div>
+              <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,marginBottom:"0.45rem",whiteSpace:"pre-wrap"}}>{m.body}</div>
+              {m.speech&&<div style={{background:T.surf,border:`1px solid ${T.border}`,padding:"0.55rem",marginBottom:"0.45rem"}}><b style={{fontFamily:"'Cinzel',serif",color:T.gold}}>Senate Speech:</b><div style={{whiteSpace:"pre-wrap",marginTop:"0.25rem"}}>{m.speech}</div></div>}
+              {m.effects&&<div style={{background:"#F4FFF0",border:`1px solid ${T.gre}55`,padding:"0.55rem",marginBottom:"0.45rem"}}><b style={{fontFamily:"'Cinzel',serif",color:T.gre}}>Desired Effects:</b><div style={{whiteSpace:"pre-wrap",marginTop:"0.25rem"}}>{m.effects}</div></div>}
+              {(m.implementationOffice||m.sector)&&<div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",marginBottom:"0.55rem"}}>{m.implementationOffice&&<Badge c={`To implement: ${POS[m.implementationOffice]?.title||m.implementationOffice}`} color={POS[m.implementationOffice]?.color||T.gold}/>} {m.sector&&<Badge c={`Sector: ${m.sector}`} color={T.blue}/>}</div>}
               <Row gap="0.5rem" wrap>
                 <Btn v="green" sm disabled={myVote==="yea"} onClick={()=>vote(m.id,"yea")}>✓ AYE</Btn>
                 <Btn v="crimson" sm disabled={myVote==="nay"} onClick={()=>vote(m.id,"nay")}>✗ NAY</Btn>
@@ -828,7 +850,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
               <Badge c={m.status.toUpperCase()} color={scol[m.status]||T.mut} sm/>
             </div>
             <div style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",marginBottom:"0.3rem"}}>By {m.byName} · {m.session||""}</div>
-            <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.4rem"}}>{m.body}</div>
+            <div style={{fontSize:"0.85rem",lineHeight:1.5,color:T.text,marginBottom:"0.35rem",whiteSpace:"pre-wrap"}}>{m.body}</div>
+            {m.speech&&<div style={{fontSize:"0.82rem",background:T.surf,border:`1px solid ${T.border}`,padding:"0.45rem",marginBottom:"0.35rem"}}><b style={{color:T.gold}}>Speech:</b> <span style={{whiteSpace:"pre-wrap"}}>{m.speech}</span></div>}
+            {m.effects&&<div style={{fontSize:"0.82rem",background:"#F4FFF0",border:`1px solid ${T.gre}55`,padding:"0.45rem",marginBottom:"0.35rem"}}><b style={{color:T.gre}}>Effects:</b> <span style={{whiteSpace:"pre-wrap"}}>{m.effects}</span></div>}
+            {(m.implementationOffice||m.sector)&&<div style={{display:"flex",gap:"0.35rem",flexWrap:"wrap",marginBottom:"0.35rem"}}>{m.implementationOffice&&<Badge c={`Implement: ${POS[m.implementationOffice]?.abbr||POS[m.implementationOffice]?.title||m.implementationOffice}`} color={POS[m.implementationOffice]?.color||T.gold} sm/>}{m.sector&&<Badge c={m.sector} color={T.blue} sm/>}</div>}
             {m.status==="pending"&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.9rem"}}>Awaiting GM review…</div>}
             {m.status==="passed"&&<div style={{color:T.gre,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✓ PASSED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
             {m.status==="failed"&&<div style={{color:T.rhi,fontFamily:"'Cinzel',serif",fontSize:"0.9rem"}}>✗ FAILED — AYE {yeas} · NAY {nays}{m.autoResolved?" · AUTO-MAJORITY":""}</div>}
@@ -938,7 +963,7 @@ function OrdersPanel({orders,game,players}){
   );
 }
 
-function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,deadline,treasuryActions=[],onRefresh}){
+function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,deadline,treasuryActions=[],motions=[],onRefresh}){
   const role=user.role;
   const pos=POS[role];
   const [text,setText]=useState("");
@@ -1119,6 +1144,18 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           </div>
         </Card>
       )}
+      {motions.filter(m=>m.status==="passed"&&m.implementationOffice===role).length>0&&(
+        <Card>
+          <STit c="Senate Decisions to Implement" sub="Passed motions assigned to this magistracy. These are the Senate's expectations for your office."/>
+          {motions.filter(m=>m.status==="passed"&&m.implementationOffice===role).slice().reverse().map(m=><div key={`impl-${m.id}`} style={{border:`1px solid ${pos.color}66`,borderLeft:`5px solid ${pos.color}`,background:T.surf,padding:"0.7rem",marginBottom:"0.5rem"}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:pos.color}}>{m.title}</div>
+            <div style={{fontSize:"0.85rem",color:T.mut}}>Passed in {m.session||"current session"} · Proposed by {m.byName}</div>
+            {m.effects&&<div style={{marginTop:"0.35rem",whiteSpace:"pre-wrap"}}><b>Expected effects:</b> {m.effects}</div>}
+            {m.sector&&<div style={{marginTop:"0.25rem"}}><Badge c={`Sector: ${m.sector}`} color={T.blue} sm/></div>}
+          </div>)}
+        </Card>
+      )}
+
       {/* Deadline */}
       <Card>
         <STit c={`Submit Orders — ${currSess}`}/>
@@ -1603,6 +1640,39 @@ function ElectionVoteRecord({election,players,onSelect}){
   </Card>;
 }
 
+
+function ElectionProgressGraph({election,players,onSelect}){
+  const candidates=election?.candidates||[];
+  if(!candidates.length)return null;
+  const votes=election?.votes||{};
+  const counts={};candidates.forEach(c=>counts[c.playerId]=0);Object.values(votes).forEach(id=>{counts[id]=(counts[id]||0)+1;});
+  const max=Math.max(1,...candidates.map(c=>counts[c.playerId]||0));
+  const office=POS[election.office]||{};
+  return <Card style={{background:"#fffdf7",borderLeft:`6px solid ${office.color||T.gold}`}}>
+    <STit c="Election Progress" sub="Live vote graph for this magistracy. Candidate portraits appear above their vote column."/>
+    <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.max(candidates.length,1)}, minmax(90px,1fr))`,gap:"0.65rem",alignItems:"end",overflowX:"auto",paddingTop:"0.4rem"}}>
+      {candidates.map(c=>{const cp=players.find(p=>p.id===c.playerId);const n=counts[c.playerId]||0;const h=34+Math.round((n/max)*130);const ci=getClassInfo(cp?.charClass||c.charClass);return <button key={c.playerId} onClick={()=>cp&&onSelect&&onSelect(cp)} style={{border:"none",background:"transparent",cursor:cp?"pointer":"default",minWidth:90,textAlign:"center",padding:0}}>
+        <Avatar p={cp||{latinName:c.name,avatar:null}} size={42}/>
+        <div style={{height:160,display:"flex",alignItems:"end",justifyContent:"center",marginTop:"0.25rem"}}><div style={{height:h,width:"70%",border:`1px solid ${office.color||T.gold}`,background:`linear-gradient(180deg, ${office.bg||"#FFF4DC"}, #fff)`,borderBottom:`7px solid ${office.color||T.gold}`,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:"1.35rem",color:office.color||T.ghi}}>{n}</div></div>
+        <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text,fontSize:"0.75rem",lineHeight:1.15,marginTop:"0.25rem"}}>{c.name||cp?.latinName||"Candidate"}</div>
+        <div style={{fontSize:"0.7rem",color:ci.color}}>{ci.emoji} {ci.label}</div>
+      </button>})}
+    </div>
+  </Card>;
+}
+
+function ElectionCandidateCards({election,players,user,myVote,onVote,onSelect}){
+  const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+  const office=POS[election.office]||{};
+  return <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(270px,1fr))",gap:"0.75rem"}}>
+    {(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <div key={c.playerId} style={{background:"#fff7f7",border:`1px solid ${T.border}`,borderLeft:`6px solid ${office.color||T.rhi}`,padding:"0.8rem",minHeight:260}}>
+      <div style={{display:"flex",gap:"0.7rem",alignItems:"flex-start"}}><Avatar p={cp||{latinName:c.name,avatar:null}} size={58}/><div style={{flex:1}}><button onClick={()=>cp&&onSelect&&onSelect(cp)} style={{background:"none",border:"none",padding:0,textAlign:"left",cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1.05rem",textDecoration:cp?"underline":"none"}}>{c.name||cp?.latinName||"Candidate"}</button>{cp&&<div style={{marginTop:"0.25rem"}}><ClassBadge cls={cp.charClass} sm/></div>}{c.discord&&<div style={{color:"#5865F2",fontSize:"0.8rem",marginTop:"0.25rem"}}>{c.discord}</div>}</div><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,fontSize:"1.5rem",color:T.ghi,textAlign:"center"}}>{counts[c.playerId]||0}<div style={{fontSize:"0.65rem",letterSpacing:"0.12em",color:T.mut}}>votes</div></div></div>
+      <div style={{marginTop:"0.8rem",borderTop:`1px solid ${T.border}`,paddingTop:"0.6rem"}}><div style={{fontFamily:"'Cinzel',serif",letterSpacing:"0.12em",color:T.gold,fontSize:"0.78rem",fontWeight:900,marginBottom:"0.35rem"}}>SPEECH</div><div style={{whiteSpace:"pre-wrap",lineHeight:1.45,color:T.text,maxHeight:210,overflowY:"auto"}}>{c.speech||"No speech recorded."}</div></div>
+      {election.status==="voting"&&<div style={{marginTop:"0.75rem",display:"flex",gap:"0.4rem",flexWrap:"wrap"}}><Btn sm disabled={myVote===c.playerId} onClick={()=>onVote(election,c.playerId)}>{myVote===c.playerId?"Current Vote":"Vote"}</Btn>{myVote===c.playerId&&<Btn v="ghost" sm onClick={()=>onVote(election,"withdraw")}>Withdraw</Btn>}</div>}
+    </div>})}
+  </div>;
+}
+
 function ElectionsPlayerPanel({user,D,onRefresh}){
   const elections=D.elections||normalizeElections(null,D.election);
   const players=D.players||[];
@@ -1670,24 +1740,18 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
         <STit c={`${office?.emoji||"🏛️"} Election: ${office?.title||election.office}`} sub={`Phase: ${election.status.toUpperCase()} · Round ${election.round||1}`}/>
         <div style={{color:T.mut,lineHeight:1.6,marginBottom:"0.65rem"}}>{election.status==="candidacy"?"Declare your candidacy before the GM opens voting.":"Vote for one candidate. Each senator has one vote for this office."}</div>
         {election.status==="candidacy"&&<div style={{marginBottom:"0.8rem"}}>{isCandidate?(()=>{const mine=(election.candidates||[]).find(c=>c.playerId===user.id);return <><div style={{color:T.gre,fontFamily:"'Cinzel',serif",marginBottom:"0.35rem"}}>✓ You are a candidate for this office. You may edit or withdraw before voting opens.</div><Inp label="Edit Candidacy Speech" value={speechBy[election.id]??mine?.speech??""} onChange={v=>setSpeechBy({...speechBy,[election.id]:v})} rows={3}/><Row gap="0.5rem" wrap><Btn sm onClick={()=>updateCandidacy(election)}>Save Speech</Btn><Btn v="crimson" sm onClick={()=>dropCandidacy(election)}>Withdraw Candidacy</Btn></Row></>})():<><Inp label="Short Speech" value={speechBy[election.id]||""} onChange={v=>setSpeechBy({...speechBy,[election.id]:v})} rows={3} placeholder="Fathers of the Senate..."/><Btn onClick={()=>stand(election)}>Stand for {office?.title||"Office"}</Btn></>}</div>}
-        <STit c="Candidates" sub="Candidate list is displayed as a table. Vote record is hidden by default and can be expanded."/>
+        <ElectionProgressGraph election={election} players={players} onSelect={setSelected}/>
+        <STit c="Candidates" sub="Candidate speeches are displayed as campaign cards. Vote record is hidden by default and can be expanded."/>
         {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
-        {(election.candidates||[]).length>0&&<div style={{overflowX:"auto"}}>
-          <table className="election-table">
-            <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th><th>Action</th></tr></thead>
-            <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
-              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
-              <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
-              <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
-              <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
-              <td data-label="Action">{election.status==="voting"&&<><Btn sm disabled={myVote===c.playerId} onClick={()=>vote(election,c.playerId)}>{myVote===c.playerId?"Current Vote":"Vote"}</Btn>{myVote===c.playerId&&<div style={{marginTop:"0.35rem"}}><Btn v="ghost" sm onClick={()=>vote(election,"withdraw")}>Withdraw</Btn></div>}</>}</td>
-            </tr>})}</tbody>
-          </table>
-        </div>}
+        {(election.candidates||[]).length>0&&<ElectionCandidateCards election={election} players={players} user={user} myVote={myVote} onVote={vote} onSelect={setSelected}/>}
         {(election.candidates||[]).length>0&&<div style={{marginTop:"0.55rem"}}><button onClick={()=>setShowVotes({...showVotes,[election.id]:!showVotes[election.id]})} style={{background:"none",border:"none",color:T.blue,fontFamily:"'Cinzel',serif",fontWeight:900,cursor:"pointer",fontSize:"0.9rem"}}>{showVotes[election.id]?"▲ Hide vote record":"▼ Show vote record"}</button>{showVotes[election.id]&&<ElectionVoteRecord election={election} players={players} onSelect={setSelected}/>}</div>}
         {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
       </Card>;
     })}
+    <Card><STit c="Election History & Next Annual Reminder" sub="Closed elections remain here as the record of the year. Elections normally return next year unless the GM calls an extraordinary vote."/>
+      {elections.filter(e=>e.status==="closed").length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No closed elections recorded yet.</div>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>{elections.filter(e=>e.status==="closed").slice().reverse().map(e=>{const o=POS[e.office]||{};const counts={};Object.values(e.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);const winner=(e.candidates||[]).slice().sort((a,b)=>(counts[b.playerId]||0)-(counts[a.playerId]||0))[0];return <div key={`hist-${e.id}`} style={{border:`1px solid ${o.color||T.border}`,background:o.bg||T.surf,padding:"0.65rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:o.color||T.text}}>{o.emoji||"🏛️"} {o.title||e.office}</div><div style={{fontSize:"0.88rem",color:T.mut}}>{e.session||"Current year"} · Round {e.round||1}</div><div style={{marginTop:"0.35rem"}}>Winner: <b>{winner?.name||"Not assigned"}</b>{winner?` (${counts[winner.playerId]||0} votes)`:""}</div></div>})}</div>}
+      <div style={{marginTop:"0.65rem",color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.82rem"}}>⏳ Reminder: prepare candidacies and alliances before the next annual elections.</div>
+    </Card>
   </div>;
 }
 
@@ -2149,6 +2213,18 @@ function PlayerApp({user:initUser,onLogout}){
   },[user.id]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
+  useEffect(()=>{
+    let alive=true;
+    const touch=async()=>{
+      if(!user?.id||!alive)return;
+      const players=await db.get("spqr_p")||[];
+      const patch=await activityPatch();
+      await db.set("spqr_p",players.map(p=>p.id===user.id?{...p,...patch}:p));
+    };
+    touch();
+    const t=setInterval(touch,5*60*1000);
+    return()=>{alive=false;clearInterval(t);};
+  },[user?.id]);
   useEffect(()=>{const h=e=>{if(e.detail?.tab)setTab(e.detail.tab);};window.addEventListener("spqr-nav",h);return()=>window.removeEventListener("spqr-nav",h);},[]);
 
   const pos=user.role?POS[user.role]:null;
@@ -2209,7 +2285,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
         {tab==="courts"&&<CourtsPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="elections" &&<ElectionsPlayerPanel user={user} D={D} onRefresh={refresh}/>} 
-        {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} treasuryActions={D.treasuryActions||[]} onRefresh={refresh}/>}
+        {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} treasuryActions={D.treasuryActions||[]} motions={D.motions||[]} onRefresh={refresh}/>}
         {tab==="wealth"    &&<PersonalWealthPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="reputation"&&<ReputationPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="forum"&&<ForumPanel D={D}/>}
@@ -2349,6 +2425,20 @@ function ASenators({D,onRefresh}){
       </Card>
       {adminMsg&&<Card style={{borderLeft:`3px solid ${T.gre}`}}><div style={{color:T.gre,fontFamily:"'Cinzel',serif"}}>{adminMsg}</div></Card>}
       <Card>
+        <STit c="Activity / Inactivity Monitor" sub="Senators are marked Sleeping (💤) after 4 days without access. IP capture uses a client-side public IP lookup and may be unavailable if blocked."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"0.5rem",marginBottom:"0.65rem"}}>
+          <Stat label="Active" value={allPlayers.filter(p=>!isInactiveSenator(p)).length} color={T.gre}/>
+          <Stat label="Sleeping" value={allPlayers.filter(isInactiveSenator).length} color={T.mut}/>
+          <Stat label="Threshold" value={`${INACTIVE_AFTER_DAYS} days`} color={T.gold}/>
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.88rem"}}>
+            <thead><tr style={{fontFamily:"'Cinzel',serif",color:T.ghi,textAlign:"left"}}><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Senator</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Status</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last Seen</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Logins</th><th style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>Last IP</th></tr></thead>
+            <tbody>{allPlayers.slice().sort((a,b)=>lastActiveTs(a)-lastActiveTs(b)).map(p=><tr key={p.id}><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}><button onClick={()=>setSelected(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:"'Cinzel',serif",color:T.blue,textDecoration:"underline"}}>{p.latinName}</button></td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{isInactiveSenator(p)?"💤 Sleeping":"🟢 Active"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{lastActiveTs(p)?`${new Date(lastActiveTs(p)).toLocaleString()} (${timeAgo(lastActiveTs(p))})`:"Never"}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`}}>{p.loginCount||0}</td><td style={{padding:"0.35rem",borderBottom:`1px solid ${T.border}`,fontFamily:"monospace"}}>{p.lastIp||"Unavailable"}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </Card>
+      <Card>
         <STit c="Senate Seating" sub="GM view: click any occupied seat to open the senator profile. Only occupied senator seats are shown; vacant magistracies remain visible."/>
         <SenateMap players={D.players||[]} parties={D.parties||[]} onSelectPlayer={setSelected}/>
         {(D.parties||[]).length>0&&<div style={{display:"flex",gap:"0.4rem",flexWrap:"wrap",marginTop:"0.55rem"}}>{(D.parties||[]).map(pt=><PartyBadge key={pt.id} party={pt} sm/>)}</div>}
@@ -2374,8 +2464,9 @@ function ASenators({D,onRefresh}){
                 <div>
                   <button onClick={()=>setSelected(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:"'Cinzel',serif",color:T.blue,fontWeight:800,fontSize:"1rem",textDecoration:"underline"}}>{p.latinName}</button>
                   <div style={{color:T.mut,fontSize:"0.75rem"}}>{p.username}</div>
-                  <div style={{marginTop:"0.15rem"}}><ClassBadge cls={p.charClass} sm/></div>
+                  <div style={{marginTop:"0.15rem",display:"flex",gap:"0.25rem",flexWrap:"wrap",alignItems:"center"}}><ClassBadge cls={p.charClass} sm/>{isInactiveSenator(p)&&<Badge c="💤 Sleeping" color={T.mut} sm/>}</div>
                   {p.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem"}}>{p.discord}</div>}
+                  <div style={{color:T.fnt,fontSize:"0.78rem"}}>Last seen: {timeAgo(lastActiveTs(p))}</div>
                 </div>
               </div>
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
@@ -3084,6 +3175,10 @@ function AElections({D,onRefresh}){
         {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
       </Card>;
     })}
+    <Card><STit c="Election History & Next Annual Reminder" sub="Closed elections remain here as the record of the year. Elections normally return next year unless the GM calls an extraordinary vote."/>
+      {elections.filter(e=>e.status==="closed").length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No closed elections recorded yet.</div>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>{elections.filter(e=>e.status==="closed").slice().reverse().map(e=>{const o=POS[e.office]||{};const counts={};Object.values(e.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);const winner=(e.candidates||[]).slice().sort((a,b)=>(counts[b.playerId]||0)-(counts[a.playerId]||0))[0];return <div key={`hist-${e.id}`} style={{border:`1px solid ${o.color||T.border}`,background:o.bg||T.surf,padding:"0.65rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:o.color||T.text}}>{o.emoji||"🏛️"} {o.title||e.office}</div><div style={{fontSize:"0.88rem",color:T.mut}}>{e.session||"Current year"} · Round {e.round||1}</div><div style={{marginTop:"0.35rem"}}>Winner: <b>{winner?.name||"Not assigned"}</b>{winner?` (${counts[winner.playerId]||0} votes)`:""}</div></div>})}</div>}
+      <div style={{marginTop:"0.65rem",color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.82rem"}}>⏳ Reminder: prepare candidacies and alliances before the next annual elections.</div>
+    </Card>
   </div>;
 }
 
@@ -3253,7 +3348,11 @@ function LoginScreen({onLogin,onAdmin}){
     const p=ps.find(x=>x.username.toLowerCase()===f.u.toLowerCase()&&x.password===f.p);
     setLoading(false);
     if(!p)return setErr("Unknown senator or incorrect password.");
-    onLogin(p);
+    const ip=await getClientPublicIp();
+    const updated={...p,lastLoginAt:Date.now(),lastSeenAt:Date.now(),loginCount:Number(p.loginCount||0)+1,lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown"};
+    if(ip)updated.lastIp=ip;
+    await db.set("spqr_p",ps.map(x=>x.id===p.id?updated:x));
+    onLogin(updated);
   };
   const doReg=async()=>{
     if(!f.u||!f.p||!f.lat){setErr("All fields are required.");return;}
@@ -3264,7 +3363,8 @@ function LoginScreen({onLogin,onAdmin}){
     const ps=await db.get("spqr_p")||[];
     if(ps.find(x=>x.username.toLowerCase()===f.u.toLowerCase())){setLoading(false);setErr("That username is already taken.");return;}
     if(ps.find(x=>x.discord?.toLowerCase()===f.discord.toLowerCase())){setLoading(false);setErr("A senator with that Discord account already exists.");return;}
-    const np={id:Date.now().toString(),username:f.u,password:f.p,latinName:f.lat,charClass:f.cls,discord:f.discord,role:null,avatar:null,joined:new Date().toISOString()};
+    const ip=await getClientPublicIp();
+    const np={id:Date.now().toString(),username:f.u,password:f.p,latinName:f.lat,charClass:f.cls,discord:f.discord,role:null,avatar:null,joined:new Date().toISOString(),lastLoginAt:Date.now(),lastSeenAt:Date.now(),loginCount:1,lastUserAgent:navigator.userAgent,lastTimezone:Intl.DateTimeFormat().resolvedOptions().timeZone||"Unknown",...(ip?{lastIp:ip}:{})};
     await db.set("spqr_p",[...ps,np]);
     const wealth=await db.get("spqr_wealth")||{};
     await db.set("spqr_wealth",{...wealth,[np.id]:startingWealthForClass(np.charClass)});
