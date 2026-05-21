@@ -1594,6 +1594,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   </div>;
   return(
     <div>
+      <SeasonBanner game={g}/>
       <Card style={{borderLeft:`4px solid ${T.red}`}}>
         <STit c="Economy of the Republic" sub="Balance sheet: stockpiles, income, military upkeep and net result per turn."/>
         <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.55rem",marginBottom:"0.85rem"}}>
@@ -2512,7 +2513,7 @@ function PlayerApp({user:initUser,onLogout}){
         </div>
         <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{D.game.year} BC · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {D.game.year} BC · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>} 
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
