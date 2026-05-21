@@ -112,7 +112,7 @@ const DEF_GAME={session:1,sessionInSeason:1,year:218,season:"Winter",
   cgold:420,cfood:260,cpop:2000,cturns:1,
   fgold:55,ffood:25,fpop:200,fturns:2,
   privateTaxGoldPct:10,privateTaxFoodPct:5,
-  foodMarketStock:600,foodMarketPrice:2,
+  foodMarketStock:600,foodMarketPct:20,foodMarketPrice:2,
   seasonEffects:{
     Spring:{goldMod:1,foodMod:1,note:"Spring: normal recovery of farms and trade."},
     "Early Summer":{goldMod:1,foodMod:1,note:"Early Summer: normal harvest and trade conditions."},
@@ -225,6 +225,18 @@ const activeScandalsFor=(rep,playerId)=>(((rep||{})[playerId]?.scandals)||[]).fi
 const addRepLog=async(entry)=>{const all=await db.get("spqr_replog")||[];all.push({id:Date.now().toString()+Math.random().toString(36).slice(2),ts:Date.now(),...entry});await db.set("spqr_replog",all.slice(-500));};
 
 const foodSaleRate=0.5;
+
+const clampPct=v=>Math.max(0,Math.min(100,Number(v)||0));
+const marketFoodAvailable=game=>{
+  const food=Math.max(0,Number(game?.food||0));
+  if(game?.foodMarketPct!==undefined&&game?.foodMarketPct!==null)return Math.floor(food*clampPct(game.foodMarketPct)/100);
+  return Math.min(food,Math.max(0,Number(game?.foodMarketStock||0)));
+};
+const marketFoodPct=game=>{
+  if(game?.foodMarketPct!==undefined&&game?.foodMarketPct!==null)return clampPct(game.foodMarketPct);
+  const food=Math.max(0,Number(game?.food||0));
+  return food>0?Math.round(Math.min(food,Math.max(0,Number(game?.foodMarketStock||0)))/food*100):0;
+};
 const salaryFor=()=>({gold:0,food:0});
 const addWealthLog=async(entry)=>{const all=await db.get("spqr_wealthlog")||[];all.push({id:Date.now().toString()+Math.random().toString(36).slice(2),ts:Date.now(),...entry});await db.set("spqr_wealthlog",all.slice(-500));};
 const privateTaxRates=game=>({gold:Number(game?.privateTaxGoldPct??10),food:Number(game?.privateTaxFoodPct??5)});
@@ -263,11 +275,74 @@ const normalizeAssetsList=(assets=[])=>{
 };
 
 const ownedSlots=(assets,typeId,regionId)=>(assets||[]).filter(a=>a.typeId===typeId&&a.regionId===regionId).length;
+const STATE_OWNER_ID="__state__";
+const STATE_OWNER_NAME="Roman State";
+const isStateOwner=id=>id===STATE_OWNER_ID||id==="state"||id==="roman_state";
+const ownerNameFor=(players=[],ownerId,ownerName)=>isStateOwner(ownerId)?STATE_OWNER_NAME:(ownerName||players.find(p=>p.id===ownerId)?.latinName||"Unknown Owner");
+const activeAssetAuctions=(auctions=[])=>auctions.filter(a=>a.status==="active");
+const assetInActiveAuction=(auctions=[],assetId)=>activeAssetAuctions(auctions).some(a=>a.assetId===assetId);
+const qPurchaseKey=(role,game)=>`${role||"quaestor"}__${sLab(game||DEF_GAME)}`;
+const qPurchasesThisSeason=(limits,role,game)=>Number((limits||{})[qPurchaseKey(role,game)]||0);
+const propertyCostText=biz=>`🪙 ${fmt(biz.costGold||0)}T / 🌾 ${fmt(biz.costFood||0)}M`;
+const transferDeadPlayerEstateToState=async(player,gameFallback=DEF_GAME)=>{
+  if(!player?.id)return;
+  const [g0,wealth0,assets0]=await Promise.all([db.get("spqr_g"),db.get("spqr_wealth"),db.get("spqr_assets")]);
+  const g={...DEF_GAME,...(g0||gameFallback||{})};
+  const wealth=wealth0||{};
+  const w=wealthOf(wealth,player.id);
+  const deadGold=Math.max(0,Number(w.gold||0));
+  const deadFood=Math.max(0,Number(w.food||0));
+  const assets=normalizeAssetsList(assets0||[]);
+  const inherited=assets.filter(a=>a.ownerId===player.id).length;
+  const nextAssets=assets.map(a=>a.ownerId===player.id?{...a,ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,inheritedFrom:player.latinName,inheritedAt:sLab(g),inheritedTs:Date.now()}:a);
+  const nextWealth={...wealth,[player.id]:{...w,gold:0,food:0}};
+  const nextGame={...g,gold:Number(g.gold||0)+deadGold,food:Number(g.food||0)+deadFood,foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)+deadFood})};
+  await db.set("spqr_assets",nextAssets);
+  await db.set("spqr_wealth",nextWealth);
+  await db.set("spqr_g",nextGame);
+  if(deadGold||deadFood||inherited){
+    await addWealthLog({type:"inheritance-to-state",playerId:player.id,session:sLab(g),text:`${player.latinName} died. The Roman State inherited ${deadGold}T gold, ${deadFood}M food and ${inherited} properties/estates.`});
+  }
+};
+const resolveExpiredAuctions=async(players=[],businesses=DEF_BUSINESSES,gameFallback=DEF_GAME)=>{
+  const auctions=await db.get("spqr_auctions")||[];
+  const now=Date.now();
+  const active=auctions.filter(a=>a.status==="active"&&Number(a.endsAt||0)<=now);
+  if(!active.length)return auctions;
+  let assets=normalizeAssetsList((await db.get("spqr_assets"))||[]);
+  let wealth=await db.get("spqr_wealth")||{};
+  let g={...DEF_GAME,...((await db.get("spqr_g"))||gameFallback||{})};
+  const resolvedIds=new Set();
+  for(const auc of active){
+    const bids=(auc.bids||[]).slice().sort((a,b)=>Number(b.amount||0)-Number(a.amount||0)||Number(a.ts||0)-Number(b.ts||0));
+    const asset=assets.find(a=>a.id===auc.assetId);
+    if(!asset){auc.status="cancelled";auc.resolution="Property no longer exists.";auc.resolvedAt=now;resolvedIds.add(auc.id);continue;}
+    if(!bids.length){auc.status="closed_no_bids";auc.resolution="Auction ended with no bids.";auc.resolvedAt=now;resolvedIds.add(auc.id);await addWealthLog({type:"property-auction",session:auc.session||sLab(g),text:`Auction closed with no bids for ${auc.assetName||"a property"} in ${auc.regionName||asset.regionName||asset.regionId}.`});continue;}
+    const win=bids[0];
+    const winner=players.find(p=>p.id===win.bidderId);
+    const winnerW=wealthOf(wealth,win.bidderId);
+    const amount=Math.floor(Number(win.amount||0));
+    if(!winner||Number(winnerW.gold||0)<amount){auc.status="failed";auc.resolution="Highest bidder no longer has enough gold.";auc.resolvedAt=now;resolvedIds.add(auc.id);await addWealthLog({type:"property-auction",session:auc.session||sLab(g),text:`Auction failed for ${auc.assetName||"a property"}: highest bidder could not pay.`});continue;}
+    const sellerIsState=isStateOwner(asset.ownerId)||isStateOwner(auc.sellerId);
+    wealth={...wealth,[win.bidderId]:{...winnerW,gold:Number(winnerW.gold||0)-amount}};
+    if(sellerIsState){g={...g,gold:Number(g.gold||0)+amount};}
+    else{
+      const sellerW=wealthOf(wealth,asset.ownerId);
+      wealth={...wealth,[asset.ownerId]:{...sellerW,gold:Number(sellerW.gold||0)+amount}};
+    }
+    assets=assets.map(a=>a.id===asset.id?{...a,ownerId:win.bidderId,ownerName:winner.latinName,auctionBoughtAt:sLab(g),auctionPrice:amount}:a);
+    auc.status="closed";auc.winnerId=win.bidderId;auc.winnerName=winner.latinName;auc.finalPrice=amount;auc.resolvedAt=now;auc.resolution=`Assigned to ${winner.latinName} for ${amount}T gold.`;resolvedIds.add(auc.id);
+    await addHistory(win.bidderId,"Auction Won",`${winner.latinName} won ${auc.assetName||"a property"} in ${auc.regionName||asset.regionName||asset.regionId} for ${amount}T gold.`,"estate");
+    if(!sellerIsState)await addHistory(asset.ownerId,"Auction Sold",`${asset.ownerName||"A senator"} sold ${auc.assetName||"a property"} in ${auc.regionName||asset.regionName||asset.regionId} to ${winner.latinName} for ${amount}T gold.`,"estate");
+    await addWealthLog({type:"property-auction",playerId:win.bidderId,session:auc.session||sLab(g),text:`Auction closed: ${winner.latinName} bought ${auc.assetName||"a property"} in ${auc.regionName||asset.regionName||asset.regionId} for ${amount}T gold.`});
+    await pushN("Property Auction Closed",`${winner.latinName} won ${auc.assetName||"a property"} for ${amount}T gold.`);
+  }
+  const nextAuctions=auctions.map(a=>resolvedIds.has(a.id)?(active.find(x=>x.id===a.id)||a):a);
+  await db.set("spqr_assets",assets);await db.set("spqr_wealth",wealth);await db.set("spqr_g",g);await db.set("spqr_auctions",nextAuctions);
+  return nextAuctions;
+};
 const estateSlotDetails=(assets,typeId,regionId,players=[])=>{
-  const owners=(assets||[]).filter(a=>a.typeId===typeId&&a.regionId===regionId).map(a=>{
-    const p=(players||[]).find(x=>x.id===a.ownerId);
-    return p?.latinName||a.ownerName||"Unknown";
-  });
+  const owners=(assets||[]).filter(a=>a.typeId===typeId&&a.regionId===regionId).map(a=>ownerNameFor(players,a.ownerId,a.ownerName));
   return owners;
 };
 const debtSessionExpired=(since,currentSession)=>since&&Number(currentSession||0)>Number(since||0);
@@ -1025,9 +1100,12 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   const isQuaestor=role.startsWith("quaestor");
   const isEmergency=role.startsWith("dictator")||role.startsWith("magister_equitum");
   const isAedile=role.startsWith("aedile");
-  const [market,setMarket]=useState({foodMarketStock:Number(game.foodMarketStock||0),foodMarketPrice:Number(game.foodMarketPrice||2)});
-  useEffect(()=>{setMarket({foodMarketStock:Number(game.foodMarketStock||0),foodMarketPrice:Number(game.foodMarketPrice||2)});},[game.foodMarketStock,game.foodMarketPrice]);
-  const saveMarket=async()=>{const g=await db.get("spqr_g")||game||DEF_GAME;const ng={...g,foodMarketStock:Math.max(0,Number(market.foodMarketStock)||0),foodMarketPrice:Math.max(0,Number(market.foodMarketPrice)||0)};await db.set("spqr_g",ng);await addWealthLog({type:"market-control",session:sLab(ng),text:`${user.latinName} updated the Roman food market: ${ng.foodMarketStock}M available at ${ng.foodMarketPrice}T per 1M.`});await pushN("State Food Market Updated",`${user.latinName} updated the Roman food market: ${ng.foodMarketStock}M available at ${ng.foodMarketPrice}T per 1M.`);onRefresh&&onRefresh();};
+  const [market,setMarket]=useState({foodMarketPct:marketFoodPct(game),foodMarketPrice:Number(game.foodMarketPrice||2)});
+  const [economicLog,setEconomicLog]=useState([]);
+  useEffect(()=>{setMarket({foodMarketPct:marketFoodPct(game),foodMarketPrice:Number(game.foodMarketPrice||2)});},[game.foodMarketPct,game.foodMarketStock,game.foodMarketPrice,game.food]);
+  useEffect(()=>{let alive=true;(async()=>{const wl=await db.get("spqr_wealthlog")||[];if(alive)setEconomicLog(wl);})();return()=>{alive=false};},[game.gold,game.food,game.foodMarketPct,game.foodMarketPrice,treasuryActions]);
+  const saveMarket=async()=>{const g=await db.get("spqr_g")||game||DEF_GAME;const pct=clampPct(market.foodMarketPct);const ng={...g,foodMarketPct:pct,foodMarketStock:marketFoodAvailable({...g,foodMarketPct:pct}),foodMarketPrice:Math.max(0,Number(market.foodMarketPrice)||0)};await db.set("spqr_g",ng);const available=marketFoodAvailable(ng);await addWealthLog({type:"market-control",session:sLab(ng),text:`${user.latinName} set the Roman food market to ${pct}% of the state stockpile: ${available}M currently available at ${ng.foodMarketPrice}T per 1M.`});const wl=await db.get("spqr_wealthlog")||[];setEconomicLog(wl);await pushN("State Food Market Updated",`${user.latinName} set ${pct}% of state food for the market: ${available}M currently available at ${ng.foodMarketPrice}T per 1M.`);onRefresh&&onRefresh();};
+  const officeEconomicLog=(economicLog||[]).filter(e=>["market","state-food-sale","state-food-transfer","market-control","donation","quaestor-approved","quaestor-request"].includes(e.type)).slice(-60).reverse();
 
   const [foodGrant,setFoodGrant]=useState({playerId:"",amount:""});
   useEffect(()=>{ if(!foodGrant.playerId && players?.length) setFoodGrant(f=>({...f,playerId:players[0].id})); },[players]);
@@ -1046,6 +1124,37 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   const [qAct,setQAct]=useState({type:"gold-transfer",playerId:"",amount:"",goldTax:"",foodTax:"",note:""});
   useEffect(()=>{ if(!qAct.playerId && players?.length) setQAct(f=>({...f,playerId:players[0].id})); },[players]);
   const qKey=role==="quaestor_1"?"quaestor_1":role==="quaestor_2"?"quaestor_2":"";
+  const [estateData,setEstateData]=useState({assets:[],businesses:DEF_BUSINESSES,regions:DEF_REGIONS,limits:{}});
+  const [stateBuy,setStateBuy]=useState({typeId:"market_stall",regionId:"latium"});
+  const loadEstateData=useCallback(async()=>{
+    const [biz,ass,regs,limits]=await Promise.all([db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_r"),db.get("spqr_quaestor_property_buys")]);
+    setEstateData({businesses:(biz&&biz.length)?biz:DEF_BUSINESSES,assets:normalizeAssetsList(ass||[]),regions:regs||DEF_REGIONS,limits:limits||{}});
+  },[]);
+  useEffect(()=>{if(isQuaestor)loadEstateData();},[isQuaestor,loadEstateData,game.gold,game.food]);
+  const qBuyUsed=qPurchasesThisSeason(estateData.limits,qKey,game||DEF_GAME);
+  const qBuyBiz=getBiz(estateData.businesses,stateBuy.typeId);
+  const qBuyRegion=getRegion(estateData.regions,stateBuy.regionId);
+  const qBuyCap=Number((qBuyBiz.regionCaps||{})[stateBuy.regionId]||0);
+  const qBuyUsedSlots=ownedSlots(estateData.assets,qBuyBiz.id,stateBuy.regionId);
+  const buyPropertyForState=async()=>{
+    if(!qKey)return alert("Only a Quaestor can buy property for the state.");
+    const [bizList,assetList,regList,limits0,g0]=await Promise.all([db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_r"),db.get("spqr_quaestor_property_buys"),db.get("spqr_g")]);
+    const businesses=(bizList&&bizList.length)?bizList:DEF_BUSINESSES, assets=normalizeAssetsList(assetList||[]), regs=regList||DEF_REGIONS;
+    const biz=getBiz(businesses,stateBuy.typeId), region=getRegion(regs,stateBuy.regionId), max=Number((biz.regionCaps||{})[stateBuy.regionId]||0);
+    if(max<=0)return alert("This property type is not available in that province.");
+    if(ownedSlots(assets,biz.id,stateBuy.regionId)>=max)return alert("No available slots remain for that property in this province.");
+    const limits=limits0||{}; const used=qPurchasesThisSeason(limits,qKey,g0||game||DEF_GAME);
+    if(used>=4)return alert("This Quaestor has already bought 4 state properties this season.");
+    const g={...DEF_GAME,...(g0||game||{})};
+    if(Number(g.gold||0)<Number(biz.costGold||0)||Number(g.food||0)<Number(biz.costFood||0))return alert("The state treasury does not have enough gold/food to buy this property.");
+    const newAsset={id:Date.now().toString()+Math.random().toString(36).slice(2),ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,typeId:biz.id,regionId:region.id,regionName:region.name,boughtAt:sLab(g),ts:Date.now(),boughtByQuaestor:user.latinName};
+    const nextGame={...g,gold:Number(g.gold||0)-Number(biz.costGold||0),food:Number(g.food||0)-Number(biz.costFood||0),foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)-Number(biz.costFood||0)})};
+    const nextLimits={...limits,[qPurchaseKey(qKey,g)]:used+1};
+    await db.set("spqr_assets",[...assets,newAsset]);await db.set("spqr_g",nextGame);await db.set("spqr_quaestor_property_buys",nextLimits);
+    await addWealthLog({type:"state-property-buy",session:sLab(g),text:`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State for ${biz.costGold}T gold and ${biz.costFood}M food. Quaestor seasonal purchases: ${used+1}/4.`});
+    await pushN("State Property Purchased",`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State.`);
+    await loadEstateData();onRefresh&&onRefresh();
+  };
   const pendingTreasury=(treasuryActions||[]).filter(a=>a.status==="pending");
   const proposeTreasuryAction=async()=>{
     const acts=await db.get("spqr_treasury_actions")||[]; const g=await db.get("spqr_g")||game||DEF_GAME;
@@ -1147,8 +1256,19 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
             <Inp label="Public Note" value={qAct.note} onChange={v=>setQAct({...qAct,note:v})}/>
             <Btn onClick={proposeTreasuryAction}>Submit for Other Quaestor Approval</Btn>
           </div>
+          <div style={{marginTop:"0.8rem",padding:"0.75rem",background:T.bg,border:`1px solid ${T.gold}`}}>
+            <STit c="State Property Purchases" sub="Each Quaestor may independently buy up to 4 available properties per season for the Roman State. Cost is paid from the state treasury."/>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+              <Stat label="This Quaestor" value={`${qBuyUsed}/4`} color={qBuyUsed>=4?T.rhi:T.gre}/>
+              <div><Lbl c="Property Type"/><select value={stateBuy.typeId} onChange={e=>setStateBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{estateData.businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div>
+              <div><Lbl c="Province"/><select value={stateBuy.regionId} onChange={e=>setStateBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{estateData.regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+              <Btn v="green" disabled={qBuyUsed>=4||qBuyCap<=0||qBuyUsedSlots>=qBuyCap} onClick={buyPropertyForState}>Buy for State</Btn>
+            </div>
+            <div style={{marginTop:"0.5rem",color:T.mut}}>Selected: <b>{qBuyBiz.emoji} {qBuyBiz.name}</b> in <b>{qBuyRegion.name}</b> · Cost {propertyCostText(qBuyBiz)} · Slots {qBuyUsedSlots}/{qBuyCap}.</div>
+          </div>
           <div style={{marginTop:"0.8rem"}}><STit c="Pending Quaestor Approvals"/>{pendingTreasury.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No pending treasury actions.</div>:pendingTreasury.map(a=><div key={a.id} style={{padding:"0.55rem",border:`1px solid ${T.border}`,background:T.bg,marginBottom:"0.4rem"}}><b>{treasuryActionText(a)}</b><br/><small>Proposed by {a.proposerName} · {a.session}{a.note?` · ${a.note}`:""}</small><Row gap="0.35rem" wrap><Btn sm v="green" disabled={a.proposerRole===qKey} onClick={()=>approveTreasuryAction(a)}>Approve</Btn><Btn sm v="red" disabled={a.proposerRole===qKey} onClick={()=>rejectTreasuryAction(a)}>Reject</Btn>{a.proposerRole===qKey&&<span style={{fontSize:"0.8rem",color:T.mut}}>Waiting for the other Quaestor</span>}</Row></div>)}</div>
           <div style={{marginTop:"0.8rem"}}><STit c="Quaestor Treasury History" sub="Approved, rejected and proposed treasury measures remain visible here for both Quaestors."/>{(treasuryActions||[]).length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No treasury measures recorded yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Status","Measure","Proposed By","Approved / Rejected By","Session","Note"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{(treasuryActions||[]).slice(0,80).map(a=>{const col=a.status==="approved"?T.gre:a.status==="rejected"?T.rhi:T.gold;return <tr key={a.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:col,fontWeight:900,textTransform:"uppercase"}}>{a.status||"pending"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{treasuryActionText(a)}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.proposerName||"Unknown"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.approvedBy||a.rejectedBy||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.session||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.note||"—"}</td></tr>})}</tbody></table></div>}</div>
+          <div style={{marginTop:"0.8rem"}}><STit c="State Market & Food Transaction Ledger" sub="Shows state market purchases, senator food sales to the state, donations, grants and market-rule changes."/>{officeEconomicLog.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No market or state food transactions recorded yet.</div>:officeEconomicLog.map(e=><div key={e.id||e.ts} style={{padding:"0.4rem 0",borderBottom:`1px solid ${T.border}`}}>{e.session&&<b>{e.session}: </b>}{e.text}</div>)}</div>
         </Card>
       )}
       {(isAedile)&&(
@@ -1156,13 +1276,14 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           <STit c="Aedile Food Supply & Market" sub="The Aedile Curule may manage Rome's food market and send emergency food relief to senators. Every action is publicly recorded."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.4rem"}}>
             <Stat label="🌾 State Food" value={`${fmt(game.food)}M`} color={RES.food.color}/>
-            <Stat label="🌾 Market Food Available" value={`${fmt(game.foodMarketStock||0)}M`} color={RES.food.color}/>
+            <Stat label="🌾 Market Food Available" value={`${fmt(marketFoodAvailable(game))}M`} color={RES.food.color}/>
+            <Stat label="📊 Market Share" value={`${fmt(marketFoodPct(game))}% of state food`} color={T.blue}/>
             <Stat label="🪙 Market Price" value={`${fmt(game.foodMarketPrice||2)}T / 1M`} color={RES.gold.color}/>
             <Stat label="Population" value={fmt(game.pop)} color={T.mut}/>
           </div>
-          <STit c="Market Rules" sub="Set how much state food is available to senators and the sale price."/>
+          <STit c="Market Rules" sub="Set what percentage of the state food stockpile is available to senators and the sale price. The market is not extra food; it is drawn from the state stockpile."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.55rem",alignItems:"end"}}>
-            <Inp label="🌾 Food Available for Sale" type="number" value={market.foodMarketStock} onChange={v=>setMarket({...market,foodMarketStock:v})}/>
+            <Inp label="🌾 % of State Food Available" type="number" value={market.foodMarketPct} onChange={v=>setMarket({...market,foodMarketPct:v})}/>
             <Inp label="🪙 Price per 1M Food" type="number" value={market.foodMarketPrice} onChange={v=>setMarket({...market,foodMarketPrice:v})}/>
             <Btn onClick={saveMarket}>Save Food Market</Btn>
           </div>
@@ -1172,6 +1293,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
             <Inp label="🌾 Food Amount" type="number" value={foodGrant.amount} onChange={v=>setFoodGrant({...foodGrant,amount:v})}/>
             <Btn v="green" onClick={grantFood}>Send State Food</Btn>
           </div>
+          <div style={{marginTop:"0.8rem"}}><STit c="State Market & Food Transaction Ledger" sub="Shows state market purchases, senator food sales to the state, donations, grants and market-rule changes."/>{officeEconomicLog.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No market or state food transactions recorded yet.</div>:officeEconomicLog.map(e=><div key={e.id||e.ts} style={{padding:"0.4rem 0",borderBottom:`1px solid ${T.border}`}}>{e.session&&<b>{e.session}: </b>}{e.text}</div>)}</div>
         </Card>
       )}
       {motions.filter(m=>m.status==="passed"&&m.implementationOffice===role).length>0&&(
@@ -1796,6 +1918,38 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
 }
 
 
+
+function EstateSlotsByProvince({title="Estate Slots by Province",sub="See which businesses are available and which senators already control slots in each province.",assets=[],businesses=[],regions=[],players=[],defaultOpen=false}){
+  const [open,setOpen]=useState({});
+  const isOpen=(id)=>open[id]??defaultOpen;
+  const setAll=(value)=>setOpen(Object.fromEntries((regions||[]).map(r=>[r.id,value])));
+  const totalsFor=(region)=>businesses.reduce((acc,bz)=>{const max=Number((bz.regionCaps||{})[region.id]||0);if(max>0){const owners=estateSlotDetails(assets,bz.id,region.id,players);acc.max+=max;acc.used+=owners.length;}return acc;},{used:0,max:0});
+  return <Card>
+    <div style={{display:"flex",justifyContent:"space-between",gap:"0.6rem",alignItems:"flex-start",flexWrap:"wrap"}}>
+      <STit c={title} sub={sub}/>
+      <Row gap="0.4rem" wrap><Btn sm v="dark" onClick={()=>setAll(true)}>Open all</Btn><Btn sm v="dark" onClick={()=>setAll(false)}>Close all</Btn></Row>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>
+      {regions.map(r=>{const totals=totalsFor(r);const expanded=isOpen(r.id);return <div key={r.id} style={{border:`1px solid ${T.border}`,background:T.surf,borderRadius:"10px",overflow:"hidden"}}>
+        <button onClick={()=>setOpen(x=>({...x,[r.id]:!expanded}))} style={{width:"100%",border:"none",background:T.bg,padding:"0.65rem",textAlign:"left",display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center"}}>
+          <span style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.ghi}}>{expanded?"▾":"▸"} {r.name}</span>
+          <span style={{fontSize:"0.82rem",color:totals.used<totals.max?T.gre:T.mut,fontWeight:900}}>{totals.used}/{totals.max} used</span>
+        </button>
+        {expanded&&<div style={{padding:"0.6rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:"0.45rem"}}>
+          {businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,players);const openSlots=Math.max(0,max-owners.length);return <div key={bz.id} style={{border:`1px solid ${T.border}`,background:T.card,padding:"0.55rem",borderRadius:"8px",minHeight:"92px"}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.mut,fontSize:"0.86rem"}}>{bz.emoji} {bz.name}</div>
+            {max<=0?<div style={{color:T.mut,fontStyle:"italic",marginTop:"0.25rem"}}>Unavailable</div>:<>
+              <div style={{marginTop:"0.22rem"}}><b>{owners.length}/{max}</b> occupied</div>
+              <div style={{fontSize:"0.86rem",color:owners.length?T.text:T.gre,overflowWrap:"anywhere"}}>{owners.length?owners.join(", "):"Available"}</div>
+              {openSlots>0&&<div style={{color:T.gre,fontSize:"0.82rem",marginTop:"0.18rem"}}>Open slots: {openSlots}</div>}
+            </>}
+          </div>})}
+        </div>}
+      </div>})}
+    </div>
+  </Card>;
+}
+
 function PersonalWealthPanel({user,D,onRefresh}){
   const [businesses,setBusinesses]=useState(DEF_BUSINESSES);
   const [assets,setAssets]=useState([]);
@@ -1839,22 +1993,22 @@ function PersonalWealthPanel({user,D,onRefresh}){
   };
   const byRegion=myAssets.reduce((acc,a)=>{const k=a.regionId||"unknown";(acc[k] ||= []).push(a);return acc;},{});
   const buyAsset=async()=>{const biz=getBiz(businesses,buy.typeId),region=getRegion(regions,buy.regionId),max=Number((biz.regionCaps||{})[buy.regionId]||0);if(max<=0){setMsg("This business is not available in that province.");return;}if(ownedSlots(assets,biz.id,buy.regionId)>=max){setMsg("No available slots remain for that business in this province.");return;}const w=wealthOf(wealth,user.id);if(w.gold<Number(biz.costGold||0)||w.food<Number(biz.costFood||0)){setMsg("Insufficient personal wealth to buy this property.");return;}const newAsset={id:Date.now().toString()+Math.random().toString(36).slice(2),ownerId:user.id,ownerName:user.latinName,typeId:biz.id,regionId:region.id,regionName:region.name,boughtAt:sLab(D.game||DEF_GAME),ts:Date.now()};const nextAssets=[...assets,newAsset];const nextWealth={...wealth,[user.id]:{...w,gold:w.gold-Number(biz.costGold||0),food:w.food-Number(biz.costFood||0)}};await db.set("spqr_assets",nextAssets);await saveWealth(nextWealth);await addHistory(user.id,`Bought ${biz.name}`,`${user.latinName} bought ${biz.name} in ${region.name}.`,`estate`);setAssets(nextAssets);setMsg("Property purchased.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
-  const sellAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);if(!confirm(`Sell ${biz.name} in ${asset.regionName||asset.regionId}? You receive 60% of the original cost.`))return;const w=wealthOf(wealth,user.id);const refundG=Math.floor(Number(biz.costGold||0)*0.6),refundF=Math.floor(Number(biz.costFood||0)*0.6);const nextAssets=assets.filter(a=>a.id!==asset.id);const nextWealth={...wealth,[user.id]:{...w,gold:w.gold+refundG,food:w.food+refundF}};await db.set("spqr_assets",nextAssets);await saveWealth(nextWealth);await addHistory(user.id,`Sold ${biz.name}`,`${user.latinName} sold ${biz.name} in ${asset.regionName||asset.regionId}.`,`estate`);setAssets(nextAssets);setMsg("Property sold.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
+  const sellAsset=async(asset)=>{const biz=getBiz(businesses,asset.typeId);if(assetInActiveAuction(D.auctions||[],asset.id)){setMsg("This property is already in an active auction.");return;}if(!confirm(`Sell ${biz.name} in ${asset.regionName||asset.regionId} to the Roman State for 60% of the original cost? For competitive sales, use the Forum auction system.`))return;const w=wealthOf(wealth,user.id);const refundG=Math.floor(Number(biz.costGold||0)*0.6),refundF=Math.floor(Number(biz.costFood||0)*0.6);const g={...DEF_GAME,...((await db.get("spqr_g"))||D.game||{})};if(Number(g.gold||0)<refundG||Number(g.food||0)<refundF){setMsg("The state does not have enough gold/food to buy this property back.");return;}const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,boughtFrom:user.latinName,boughtAt:sLab(g)}:a);const nextWealth={...wealth,[user.id]:{...w,gold:w.gold+refundG,food:w.food+refundF}};const nextGame={...g,gold:Number(g.gold||0)-refundG,food:Number(g.food||0)-refundF,foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)-refundF})};await db.set("spqr_assets",nextAssets);await db.set("spqr_g",nextGame);await saveWealth(nextWealth);await addHistory(user.id,`Sold ${biz.name} to the State`,`${user.latinName} sold ${biz.name} in ${asset.regionName||asset.regionId} to the Roman State for ${refundG}T and ${refundF}M.`,`estate`);await addWealthLog({type:"state-property-buyback",playerId:user.id,session:sLab(g),text:`The Roman State bought ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName} for ${refundG}T and ${refundF}M.`});setAssets(nextAssets);setMsg("Property sold to the Roman State.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
   const donate=async(kind)=>{const w=wealthOf(wealth,user.id);const raw=prompt(`How much ${kind==="gold"?"gold":"food"} do you want to donate to the Republic?`);const amt=Math.floor(Number(raw));if(!amt||amt<=0)return;if(w[kind]<amt){setMsg("You do not have enough personal resources.");return;}const g=await db.get("spqr_g")||DEF_GAME;const nextGame={...g,[kind]:(Number(g[kind]||0)+amt)};const nextWealth={...wealth,[user.id]:{...w,[kind]:w[kind]-amt}};const entry={id:Date.now().toString()+Math.random().toString(36).slice(2),playerId:user.id,playerName:user.latinName,kind,amount:amt,session:sLab(D.game||DEF_GAME),ts:Date.now()};await db.set("spqr_g",nextGame);await saveWealth(nextWealth);await db.set("spqr_donations",[...donations,entry].slice(-300));await addHistory(user.id,`Donation to the Republic`,`${user.latinName} donated ${amt}${kind==="gold"?"T gold":"M food"} to the state.`,`donation`);await pushN("Donation to the State",`${user.latinName} donated ${amt}${kind==="gold"?"T gold":"M food"} to the Republic.`);setDonations(d=>[...d,entry]);setMsg("Donation made to the state treasury.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
-  const sellFood=async()=>{const w=wealthOf(wealth,user.id);const raw=prompt(`How much food do you want to sell? Current rate: 1M food = ${foodSaleRate}T gold.`);const amt=Math.floor(Number(raw));if(!amt||amt<=0)return;if(w.food<amt){setMsg("You do not have enough personal food.");return;}const gold=Math.floor(amt*foodSaleRate);const next={...wealth,[user.id]:{...w,gold:w.gold+gold,food:w.food-amt}};await saveWealth(next);await addHistory(user.id,"Sold Food",`${user.latinName} sold ${amt}M food for ${gold}T gold.`,`wealth`);setMsg(`Sold ${amt}M food for ${gold}T gold.`);setTimeout(()=>setMsg(""),3000);};
-  const buyFoodFromState=async()=>{const amt=Math.floor(Number(foodBuy));const g={...DEF_GAME,...(await db.get("spqr_g")||D.game||{})};const price=Number(g.foodMarketPrice??2);const stock=Math.max(0,Number(g.foodMarketStock??0));if(!amt||amt<=0){setMsg("Enter how much food to buy.");return;}if(amt>stock||amt>Number(g.food||0)){setMsg("The state market does not have that much food available.");return;}const cost=Math.ceil(amt*price);const w=wealthOf(wealth,user.id);if(w.gold<cost){setMsg(`You need ${cost}T gold to buy ${amt}M food.`);return;}const nextGame={...g,food:Number(g.food||0)-amt,gold:Number(g.gold||0)+cost,foodMarketStock:stock-amt};const nextWealth={...wealth,[user.id]:{...w,gold:w.gold-cost,food:w.food+amt}};const entry={type:"market",session:sLab(g),text:`${user.latinName} bought ${amt}M food from the Roman state market for ${cost}T gold.`};await db.set("spqr_g",nextGame);await saveWealth(nextWealth);await addWealthLog(entry);setWealthlog(wl=>[...wl,entry]);await addHistory(user.id,"Bought Food From State",entry.text,"wealth");setFoodBuy("");setMsg("Food bought from the state market and recorded publicly.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
+  const sellFood=async()=>{const w=wealthOf(wealth,user.id);const raw=prompt(`How much food do you want to sell to the Roman state? Current rate: 1M food = ${foodSaleRate}T gold.`);const amt=Math.floor(Number(raw));if(!amt||amt<=0)return;if(w.food<amt){setMsg("You do not have enough personal food.");return;}const gold=Math.floor(amt*foodSaleRate);if(gold<=0){setMsg("That amount is too small to receive gold at the current rate.");return;}const g={...DEF_GAME,...(await db.get("spqr_g")||D.game||{})};if(Number(g.gold||0)<gold){setMsg(`The state treasury does not have enough gold to buy that food. Needed: ${gold}T.`);return;}const nextGame={...g,gold:Number(g.gold||0)-gold,food:Number(g.food||0)+amt,foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)+amt})};const nextWealth={...wealth,[user.id]:{...w,gold:w.gold+gold,food:w.food-amt}};const entry={type:"state-food-sale",session:sLab(g),text:`${user.latinName} sold ${amt}M food to the Roman state for ${gold}T gold. State: +${amt}M food, -${gold}T gold.`};await db.set("spqr_g",nextGame);await saveWealth(nextWealth);await addWealthLog(entry);setWealthlog(wl=>[...wl,{id:Date.now().toString(),ts:Date.now(),...entry}]);await addHistory(user.id,"Sold Food to State",entry.text,"wealth");setMsg(`Sold ${amt}M food to the state for ${gold}T gold.`);onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
+  const buyFoodFromState=async()=>{const amt=Math.floor(Number(foodBuy));const g={...DEF_GAME,...(await db.get("spqr_g")||D.game||{})};const price=Number(g.foodMarketPrice??2);const stock=marketFoodAvailable(g);if(!amt||amt<=0){setMsg("Enter how much food to buy.");return;}if(amt>stock||amt>Number(g.food||0)){setMsg("The state market does not have that much food available from the state stockpile.");return;}const cost=Math.ceil(amt*price);const w=wealthOf(wealth,user.id);if(w.gold<cost){setMsg(`You need ${cost}T gold to buy ${amt}M food.`);return;}const nextGame={...g,food:Number(g.food||0)-amt,gold:Number(g.gold||0)+cost,foodMarketStock:Math.max(0,marketFoodAvailable({...g,food:Number(g.food||0)-amt}) )};const nextWealth={...wealth,[user.id]:{...w,gold:w.gold-cost,food:w.food+amt}};const entry={type:"market",session:sLab(g),text:`${user.latinName} bought ${amt}M food from the Roman state market for ${cost}T gold. State: -${amt}M food, +${cost}T gold.`};await db.set("spqr_g",nextGame);await saveWealth(nextWealth);await addWealthLog(entry);setWealthlog(wl=>[...wl,{id:Date.now().toString(),ts:Date.now(),...entry}]);await addHistory(user.id,"Bought Food From State",entry.text,"wealth");setFoodBuy("");setMsg("Food bought from the state stockpile and recorded publicly.");onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3000);};
   const sendWealth=async()=>{const to=transfer.to,kind=transfer.kind,amt=Math.floor(Number(transfer.amount));if(!to||!amt||amt<=0){setMsg("Choose a recipient and amount.");return;}const fromW=wealthOf(wealth,user.id);if(fromW[kind]<amt){setMsg("You do not have enough personal resources.");return;}const toW=wealthOf(wealth,to);const recipient=(D.players||[]).find(p=>p.id===to);const next={...wealth,[user.id]:{...fromW,[kind]:fromW[kind]-amt},[to]:{...toW,[kind]:toW[kind]+amt}};await saveWealth(next);await addHistory(user.id,"Transfer Sent",`${user.latinName} sent ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Transfer Received",`${recipient?.latinName||"A senator"} received ${amt}${kind==="gold"?"T gold":"M food"} from ${user.latinName}.`,`wealth`);const entry={type:"transfer",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${amt}${kind==="gold"?"T gold":"M food"} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setTransfer({to:"",kind:"gold",amount:""});setMsg("Transfer completed and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   const sendProperty=async(asset)=>{const to=propTransfer[asset.id];if(!to){setMsg("Choose a recipient for the property.");return;}const recipient=(D.players||[]).find(p=>p.id===to);const biz=getBiz(businesses,asset.typeId);if(!confirm(`Transfer ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName}?`))return;const nextAssets=assets.map(a=>a.id===asset.id?{...a,ownerId:to,ownerName:recipient?.latinName||"Unknown"}:a);setAssets(nextAssets);await db.set("spqr_assets",nextAssets);await addHistory(user.id,"Property Transferred",`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`,`wealth`);await addHistory(to,"Property Received",`${recipient?.latinName||"A senator"} received ${biz.name} in ${asset.regionName||asset.regionId} from ${user.latinName}.`,`wealth`);const entry={type:"property",session:sLab(D.game||DEF_GAME),text:`${user.latinName} transferred ${biz.name} in ${asset.regionName||asset.regionId} to ${recipient?.latinName||"another senator"}.`};await addWealthLog(entry);setWealthlog(w=>[...w,entry]);setPropTransfer(x=>({...x,[asset.id]:""}));setMsg("Property transferred and recorded publicly.");setTimeout(()=>setMsg(""),3000);};
   return <div>
     
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
-    <Card><STit c="Personal Wealth Balance" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
+    <Card style={{borderLeft:`6px solid ${RES.gold.color}`}}><STit c="Private Wealth" sub="Exact coin and food are private. Only you and the Game Master can see them."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem"}}>
         <Stat label="🪙 Private Gold" value={`${fmt(myW.gold)}T`} color={myW.gold<0?T.rhi:RES.gold.color}/><Stat label="🌾 Private Food" value={`${fmt(myW.food)}M`} color={myW.food<0?T.rhi:RES.food.color}/><Stat label="Gross Estate Income" value={`🪙 +${fmt(bal.gross.gold)}T / 🌾 +${fmt(bal.gross.food)}M`} color={T.gre}/><Stat label="Taxes" value={`-${fmt(bal.taxGold)}T / -${fmt(bal.taxFood)}M`} color={T.rhi}/><Stat label="Household Upkeep" value={`-${fmt(bal.houseGold)}T / -${fmt(bal.houseFood)}M`} color={T.rhi}/><Stat label="Net per Season" value={`${bal.netGold>=0?"+":""}${fmt(bal.netGold)}T / ${bal.netFood>=0?"+":""}${fmt(bal.netFood)}M`} color={(bal.netGold+bal.netFood)>=0?T.gre:T.rhi}/>
       </div>
       <div style={{marginTop:"0.6rem",color:T.mut}}>Current private tax rate: 🪙 {bal.tax.gold}% / 🌾 {bal.tax.food}% of estate income.</div>
     </Card>
-    <Card><STit c="Private Wealth Balance Sheet" sub="Your private economy for the current season. This information is private to you and the Game Master."/>
+    <Card style={{borderLeft:`6px solid ${T.blue}`}}><STit c="Private Wealth Balance Sheet" sub="Your private economy for the current season. This information is private to you and the Game Master."/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:"0.75rem"}}>
         <div style={{border:`1px solid ${RES.gold.color}66`,background:"#FFF8E8",padding:"0.75rem"}}>
           <div style={{fontFamily:"'Cinzel',serif",letterSpacing:"0.12em",color:RES.gold.color,fontWeight:900,marginBottom:"0.45rem"}}>🪙 GOLD ACCOUNT</div>
@@ -1880,11 +2034,11 @@ function PersonalWealthPanel({user,D,onRefresh}){
       <STit c="Property Income Summary"/>
       {myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties generating private income yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.95rem",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Province","Property Type","Assets","Gross Gold","Gross Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{Object.entries(myAssets.reduce((acc,a)=>{const biz=getBiz(businesses,a.typeId);const k=`${a.regionId||"unknown"}__${biz.id}`;if(!acc[k])acc[k]={region:a.regionName||getRegion(regions,a.regionId).name,biz,count:0,gold:0,food:0};acc[k].count+=1;acc[k].gold+=effectiveGoldIncome(biz.incomeGold,D.game||DEF_GAME);acc[k].food+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return acc;},{})).map(([k,row])=><tr key={k}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:800}}>{row.region}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.biz.emoji} {row.biz.name}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{row.count}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>+{row.gold}T</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:RES.food.color}}>+{row.food}M</td></tr>)}</tbody></table></div>}
     </Card>
-    <Card><STit c="Invest in Estates and Businesses" sub="Each province has limited slots. Senators can compete to control profitable assets."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem",alignItems:"end"}}><div><Lbl c="Business Type"/><select value={buy.typeId} onChange={e=>setBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div><div><Lbl c="Province"/><select value={buy.regionId} onChange={e=>setBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div><Btn onClick={buyAsset}>Buy Property</Btn></div><div style={{marginTop:"0.75rem",padding:"0.65rem",background:T.bg,border:`1px solid ${T.border}`}}><b>{b.emoji} {b.name}</b> in <b>{reg.name}</b><br/>Cost: 🪙 {b.costGold}T / 🌾 {b.costFood}M · Gross Income: 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,D.game||DEF_GAME)} · Slots: {used}/{cap}</div></Card>
-    <Card><STit c="Estate Slots by Province" sub="See which businesses are available and which senators already control slots in each province."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.9rem",minWidth:"900px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"'Cinzel',serif"}}><th style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>Province</th>{businesses.map(bz=><th key={bz.id} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{bz.emoji} {bz.name}</th>)}</tr></thead><tbody>{regions.map(r=><tr key={r.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{r.name}</td>{businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,D.players||[]);return <td key={bz.id} style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{max<=0?<span style={{color:T.mut}}>Unavailable</span>:<><b>{owners.length}/{max}</b> occupied<br/>{owners.length?<span>{owners.join(", ")}</span>:<span style={{color:T.gre}}>Available</span>}{owners.length<max&&<div style={{color:T.gre,fontSize:"0.82rem"}}>Open slots: {max-owners.length}</div>}</>}</td>})}</tr>)}</tbody></table></div></Card>
+    <Card style={{borderLeft:`6px solid ${T.gre}`}}><STit c="Properties & Estates" sub="Buy, manage, transfer or send properties to auction. Each province has limited slots and every owner is visible in the estate map."/><STit c="Invest in Estates and Businesses" sub="Each province has limited slots. Senators can compete to control profitable assets."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.6rem",alignItems:"end"}}><div><Lbl c="Business Type"/><select value={buy.typeId} onChange={e=>setBuy(x=>({...x,typeId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{businesses.map(b=><option key={b.id} value={b.id}>{b.emoji} {b.name}</option>)}</select></div><div><Lbl c="Province"/><select value={buy.regionId} onChange={e=>setBuy(x=>({...x,regionId:e.target.value}))} style={{width:"100%",padding:"0.48rem",border:`1px solid ${T.border}`,background:T.card}}>{regions.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></div><Btn onClick={buyAsset}>Buy Property</Btn></div><div style={{marginTop:"0.75rem",padding:"0.65rem",background:T.bg,border:`1px solid ${T.border}`}}><b>{b.emoji} {b.name}</b> in <b>{reg.name}</b><br/>Cost: 🪙 {b.costGold}T / 🌾 {b.costFood}M · Gross Income: 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,D.game||DEF_GAME)} · Slots: {used}/{cap}</div></Card>
+    <EstateSlotsByProvince assets={assets} businesses={businesses} regions={regions} players={D.players||[]} defaultOpen={false}/>
     <Card><STit c="My Properties by Region"/>{myAssets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>You own no properties yet.</div>:Object.entries(byRegion).map(([regionId,list])=>{const r=getRegion(regions,regionId);const sum=list.reduce((a,x)=>{const biz=getBiz(businesses,x.typeId);a.g+=effectiveGoldIncome(biz.incomeGold,D.game||DEF_GAME);a.f+=effectiveFoodIncome(biz.incomeFood,D.game||DEF_GAME);return a;},{g:0,f:0});return <Card key={regionId} style={{borderLeft:`4px solid ${T.gold}`}}><STit c={r.name} sub={`Capital: ${r.capital||"Unknown"} · Gross income: 🪙 +${sum.g}T / 🌾 +${sum.f}M`}/>{list.map(a=>{const biz=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"grid",gridTemplateColumns:"minmax(220px,1fr) auto",gap:"0.5rem",alignItems:"center",padding:"0.55rem",border:`1px solid ${T.border}`,marginBottom:"0.45rem",background:T.bg}}><div><b>{biz.emoji} {biz.name}</b><div style={{color:T.mut}}>Income: 🪙 +{biz.incomeGold}T / 🌾 +{displayedFoodIncome(biz.incomeFood,D.game||DEF_GAME)}M{winterFoodMark(biz.incomeFood,D.game||DEF_GAME)}</div><Row gap="0.35rem" wrap><select value={propTransfer[a.id]||""} onChange={e=>setPropTransfer(x=>({...x,[a.id]:e.target.value}))} style={{padding:"0.32rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Transfer property to...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select><Btn v="dark" sm onClick={()=>sendProperty(a)}>Transfer</Btn></Row></div><Btn v="red" sm onClick={()=>sellAsset(a)}>Sell</Btn></div>})}</Card>})}</Card>
     {upgrade&&<Card><STit c="Class Advancement" sub="A senator may rise socially by paying the required private wealth. This is recorded in personal history."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="Current Class" value={`${getClassInfo(user.charClass).emoji} ${getClassInfo(user.charClass).label}`}/><Stat label="Next Class" value={`${getClassInfo(upgrade.to).emoji} ${getClassInfo(upgrade.to).label}`} color={getClassInfo(upgrade.to).color}/><Stat label="Cost" value={`🪙 ${upgrade.gold}T / 🌾 ${upgrade.food}M`} color={T.rhi}/><Btn onClick={changeClassByPayment}>Pay & Rise</Btn></div></Card>}
-    <Card><STit c="Buy Food From the Roman Market" sub="The market is controlled by the Roman state. The Quaestors/GM can limit market stock and price. All purchases are publicly recorded."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="🌾 Market Food Available" value={`${fmt((D.game||{}).foodMarketStock??0)}M`} color={RES.food.color}/><Stat label="🪙 Price" value={`${fmt((D.game||{}).foodMarketPrice??2)}T / 1M`} color={RES.gold.color}/><Inp label="Food to Buy" type="number" value={foodBuy} onChange={setFoodBuy}/><Btn onClick={buyFoodFromState}>Buy Food</Btn></div></Card>
+    <Card><STit c="Buy Food From the Roman Market" sub="The market is controlled by the Roman state. Available food is a percentage of the state stockpile, not extra food. All purchases are publicly recorded."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.55rem",alignItems:"end"}}><Stat label="🌾 Market Food Available" value={`${fmt(marketFoodAvailable(D.game||{}))}M`} color={RES.food.color}/><Stat label="🪙 Price" value={`${fmt((D.game||{}).foodMarketPrice??2)}T / 1M`} color={RES.gold.color}/><Inp label="Food to Buy" type="number" value={foodBuy} onChange={setFoodBuy}/><Btn onClick={buyFoodFromState}>Buy Food</Btn></div></Card>
     <Card><STit c="Transfers, Donations and Food Sales"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem",alignItems:"end"}}><div><Lbl c="Recipient"/><select value={transfer.to} onChange={e=>setTransfer({...transfer,to:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="">Choose senator...</option>{otherPlayers.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div><div><Lbl c="Resource"/><select value={transfer.kind} onChange={e=>setTransfer({...transfer,kind:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`}}><option value="gold">🪙 Gold</option><option value="food">🌾 Food</option></select></div><Inp label="Amount" type="number" value={transfer.amount} onChange={v=>setTransfer({...transfer,amount:v})}/><Btn onClick={sendWealth}>Send</Btn></div><Row gap="0.5rem" wrap><Btn onClick={()=>donate("gold")}>Donate 🪙 Gold to State</Btn><Btn onClick={()=>donate("food")}>Donate 🌾 Food to State</Btn><Btn v="dark" onClick={sellFood}>Sell Personal Food</Btn></Row></Card>
     <Card><STit c="Public Wealth Ledger" sub="Transfers, property transfers and state market purchases are public record."/>{wealthlog.slice(-20).reverse().map(e=><div key={e.id||e.ts} style={{padding:"0.35rem 0",borderBottom:`1px solid ${T.border}`}}>{e.session&&<b>{e.session}: </b>}{e.text}</div>)}{wealthlog.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No wealth transactions recorded yet.</div>}</Card>
   </div>;
@@ -1918,9 +2072,9 @@ function ABusinesses({D,onRefresh}){
     
     {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
     <Card><STit c="Private Economy Control" sub="Personal wealth is private from other players. This is the GM balance sheet for all senators."/><div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:"0.5rem"}}><Stat label="Business Types" value={businesses.length}/><Stat label="Properties Owned" value={assets.length}/><Stat label="Gold Donated" value={`🪙 ${fmt(donationTotal("gold"))}T`} color={RES.gold.color}/><Stat label="Food Donated" value={`🌾 ${fmt(donationTotal("food"))}M`} color={RES.food.color}/></div><Row gap="0.5rem" wrap><Btn v="green" onClick={addBiz}>＋ Add Business Type</Btn><Btn v="dark" onClick={applyBalancedPreset}>⚖️ Load Balanced Preset</Btn><Btn onClick={save}>💾 Save Private Economy Rules</Btn></Row></Card>
-    <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the amount of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 State Food Market Stock" type="number" value={game.foodMarketStock??0} onChange={v=>setGame({...game,foodMarketStock:Number(v)||0})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame(game)}>Save Market & Tax Rules</Btn></Row></Card>
+    <Card><STit c="Taxes and State Food Market" sub="Quaestor actions can justify changing private estate taxes and the percentage of state food available for sale."/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:"0.6rem"}}><Inp label="🪙 Estate Gold Tax %" type="number" value={game.privateTaxGoldPct??10} onChange={v=>setGame({...game,privateTaxGoldPct:Number(v)||0})}/><Inp label="🌾 Estate Food Tax %" type="number" value={game.privateTaxFoodPct??5} onChange={v=>setGame({...game,privateTaxFoodPct:Number(v)||0})}/><Inp label="🌾 % of State Food Available" type="number" value={game.foodMarketPct??marketFoodPct(game)} onChange={v=>setGame({...game,foodMarketPct:clampPct(v),foodMarketStock:marketFoodAvailable({...game,foodMarketPct:clampPct(v)})})}/><Inp label="🪙 Food Price (Gold per 1M)" type="number" value={game.foodMarketPrice??2} onChange={v=>setGame({...game,foodMarketPrice:Number(v)||0})}/></div><Row gap="0.5rem" wrap><Btn onClick={()=>saveGame({...game,foodMarketPct:marketFoodPct(game),foodMarketStock:marketFoodAvailable(game)})}>Save Market & Tax Rules</Btn></Row></Card>
     <Card><STit c="Senator Balance Sheet" sub="GM-only overview. Exact private wealth is hidden from other players. Edit wealth and household upkeep here."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.92rem",minWidth:"980px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"'Cinzel',serif"}}>{["Senator","🪙 Gold","🌾 Food","Gross Estate","Tax","Household","Net / Season","Properties"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{players.map(p=>{const w=wealthOf(wealth,p.id);const bal=personalBalanceFor(p.id,p.role,assets,businesses,wealth,game);return <tr key={p.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{p.latinName}</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={w.gold} onChange={e=>setPlayerWealth(p.id,"gold",e.target.value)} style={{width:"110px",padding:"0.28rem",color:RES.gold.color}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={w.food} onChange={e=>setPlayerWealth(p.id,"food",e.target.value)} style={{width:"110px",padding:"0.28rem",color:RES.food.color}}/></td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:T.gre}}>+{bal.gross.gold}T / +{bal.gross.food}M</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:T.rhi}}>-{bal.taxGold}T / -{bal.taxFood}M</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input title="Household Gold" type="number" value={w.householdGold} onChange={e=>setPlayerWealth(p.id,"householdGold",e.target.value)} style={{width:"72px",padding:"0.25rem"}}/> / <input title="Household Food" type="number" value={w.householdFood} onChange={e=>setPlayerWealth(p.id,"householdFood",e.target.value)} style={{width:"72px",padding:"0.25rem"}}/></td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:(bal.netGold+bal.netFood)>=0?T.gre:T.rhi}}>{bal.netGold>=0?"+":""}{bal.netGold}T / {bal.netFood>=0?"+":""}{bal.netFood}M</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,textAlign:"center"}}>{assets.filter(a=>a.ownerId===p.id).length}</td></tr>})}</tbody></table></div></Card>
-    <Card><STit c="Estate Slots Overview" sub="GM view of who owns each estate slot and what is still available for purchase."/><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:"0.9rem",minWidth:"980px"}}><thead><tr style={{background:T.bg,color:T.mut,fontFamily:"\'Cinzel\',serif"}}><th style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>Province</th>{businesses.map(bz=><th key={bz.id} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{bz.emoji} {bz.name}</th>)}</tr></thead><tbody>{regions.map(r=><tr key={r.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{r.name}</td>{businesses.map(bz=>{const max=Number((bz.regionCaps||{})[r.id]||0);const owners=estateSlotDetails(assets,bz.id,r.id,players);return <td key={bz.id} style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{max<=0?<span style={{color:T.mut}}>—</span>:<><b>{owners.length}/{max}</b><br/>{owners.length?owners.join(", "):<span style={{color:T.gre}}>Available</span>}{owners.length<max&&<div style={{color:T.gre,fontSize:"0.82rem"}}>Open: {max-owners.length}</div>}</>}</td>})}</tr>)}</tbody></table></div></Card>
+    <EstateSlotsByProvince title="Estate Slots Overview" sub="GM view of who owns each estate slot and what is still available for purchase." assets={assets} businesses={businesses} regions={regions} players={players} defaultOpen={false}/>
     <Card><STit c="Business Types and Regional Limits"/>{businesses.map((b,i)=><Card key={b.id} style={{borderLeft:`4px solid ${T.gold}`}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.5rem"}}><Inp label="Emoji" value={b.emoji} onChange={v=>updBiz(i,"emoji",v)}/><Inp label="Name" value={b.name} onChange={v=>updBiz(i,"name",v)}/><Inp label="ID" value={b.id} onChange={v=>updBiz(i,"id",v)}/><Inp label="Cost Gold" type="number" value={b.costGold} onChange={v=>updBiz(i,"costGold",v)}/><Inp label="Cost Food" type="number" value={b.costFood} onChange={v=>updBiz(i,"costFood",v)}/><Inp label="Income Gold" type="number" value={b.incomeGold} onChange={v=>updBiz(i,"incomeGold",v)}/><Inp label="Income Food" type="number" value={b.incomeFood} onChange={v=>updBiz(i,"incomeFood",v)}/></div><STit c="Slots by Province"/><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.4rem"}}>{regions.map(r=><div key={r.id}><Lbl c={r.name}/><input type="number" value={(b.regionCaps||{})[r.id]||0} onChange={e=>updCap(i,r.id,e.target.value)} style={{width:"100%",padding:"0.35rem",border:`1px solid ${T.border}`}}/></div>)}</div></Card>)}</Card>
     <Card><STit c="All Properties"/>{assets.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No properties purchased yet.</div>:assets.map(a=>{const b=getBiz(businesses,a.typeId);return <div key={a.id} style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",padding:"0.45rem",borderBottom:`1px solid ${T.border}`,flexWrap:"wrap"}}><span><b>{b.emoji} {b.name}</b> — {a.ownerName} — {a.regionName} · 🪙 +{b.incomeGold}T / 🌾 +{displayedFoodIncome(b.incomeFood,game||D.game||DEF_GAME)}M{winterFoodMark(b.incomeFood,game||D.game||DEF_GAME)}</span><Row gap="0.35rem" wrap><Btn v="red" sm onClick={()=>destroyAsset(a)}>Destroy / War Loss</Btn><Btn v="ghost" sm onClick={()=>removeAsset(a.id)}>Remove</Btn></Row></div>})}</Card>
     <Card><STit c="Donation Ledger"/>{donations.slice(-30).reverse().map(d=><div key={d.id} style={{padding:"0.35rem 0",borderBottom:`1px solid ${T.border}`}}>{d.kind==="gold"?"🪙":"🌾"} <b>{d.playerName}</b> donated {fmt(d.amount)} {d.kind} · {d.session}</div>)}{donations.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No donations yet.</div>}</Card>
@@ -2198,47 +2352,95 @@ function AReputation({D,onRefresh}){
 }
 
 
-function ForumPanel({D}){
-  const [kind,setKind]=useState("all");
+function ForumPanel({D,user,onRefresh}){
   const [q,setQ]=useState("");
-  const repEvents=(D.replog||[]).map(e=>({
-    id:e.id||e.ts||Math.random(),ts:e.ts||Date.now(),kind:e.type||"reputation",
-    title:e.type==="slander"?"Rumour / Slander Campaign":e.type==="boost"?"Reputation Action":e.type==="counter"?"Counter-Campaign":"Reputation Event",
-    text:e.text||"",session:e.session||"",color:e.type==="slander"?T.rhi:e.type==="boost"?T.gre:T.blue
-  }));
-  const wealthEvents=(D.wealthlog||[]).map(e=>({
-    id:e.id||e.ts||Math.random(),ts:e.ts||Date.now(),kind:e.type||"wealth",
-    title:e.type==="donation"?"Donation to the Republic":e.type==="market"?"State Food Market":e.type==="transfer"?"Private Transfer":e.type==="property"?"Property Transfer":"Economic Event",
-    text:e.text||"",session:e.session||"",color:T.gold
-  }));
+  const [kind,setKind]=useState("all");
+  const [auctionAsset,setAuctionAsset]=useState("");
+  const [startingBid,setStartingBid]=useState("");
+  const [bidByAuction,setBidByAuction]=useState({});
+  const players=D.players||[];
+  const businesses=(D.businesses&&D.businesses.length)?D.businesses:DEF_BUSINESSES;
+  const assets=normalizeAssetsList(D.assets||[]);
+  const auctions=D.auctions||[];
+  const myAuctionable=assets.filter(a=>user&&(a.ownerId===user.id||((user.role||"").startsWith("quaestor")&&isStateOwner(a.ownerId)))&&!assetInActiveAuction(auctions,a.id));
+  useEffect(()=>{if(!auctionAsset&&myAuctionable.length)setAuctionAsset(myAuctionable[0].id);},[auctionAsset,myAuctionable.length]);
+  const openAuction=async()=>{
+    if(!user)return;
+    const asset=assets.find(a=>a.id===auctionAsset);if(!asset)return alert("Choose a property to auction.");
+    if(assetInActiveAuction(auctions,asset.id))return alert("This property is already in an active auction.");
+    if(asset.ownerId!==user.id&&!((user.role||"").startsWith("quaestor")&&isStateOwner(asset.ownerId)))return alert("You can only auction your own property. Quaestors may auction state property.");
+    const min=Math.max(0,Math.floor(Number(startingBid)||0));
+    const biz=getBiz(businesses,asset.typeId);
+    const auc={id:`auc_${Date.now()}_${Math.random().toString(36).slice(2)}`,assetId:asset.id,assetName:`${biz.emoji} ${biz.name}`,regionId:asset.regionId,regionName:asset.regionName||asset.regionId,sellerId:asset.ownerId,sellerName:ownerNameFor(players,asset.ownerId,asset.ownerName),openedById:user.id,openedByName:user.latinName,startingBid:min,bids:[],status:"active",createdAt:Date.now(),endsAt:Date.now()+48*60*60*1000,session:sLab(D.game||DEF_GAME)};
+    const next=[auc,...auctions];await db.set("spqr_auctions",next);
+    await addWealthLog({type:"property-auction",playerId:user.id,session:auc.session,text:`${user.latinName} opened a 48h auction for ${auc.assetName} in ${auc.regionName}. Seller: ${auc.sellerName}. Starting bid: ${min}T gold.`});
+    await pushN("Property Auction Opened",`${user.latinName} opened a 48h auction for ${auc.assetName} in ${auc.regionName}.`);
+    setStartingBid("");onRefresh&&onRefresh();
+  };
+  const placeBid=async(auc)=>{
+    if(!user)return;
+    const amt=Math.floor(Number(bidByAuction[auc.id])); if(!amt||amt<=0)return alert("Enter a valid bid in gold.");
+    if(user.id===auc.sellerId)return alert("You cannot bid on your own auction.");
+    if(isStateOwner(auc.sellerId)&&(user.role||"").startsWith("quaestor"))return alert("Quaestors cannot bid on auctions they control for the state.");
+    const min=Math.max(Number(auc.startingBid||0),...((auc.bids||[]).map(b=>Number(b.amount||0))))+(((auc.bids||[]).length||Number(auc.startingBid||0)>0)?1:0);
+    if(amt<min)return alert(`Bid must be at least ${min}T gold.`);
+    const wealth=await db.get("spqr_wealth")||{};const w=wealthOf(wealth,user.id);if(Number(w.gold||0)<amt)return alert("You do not have enough private gold for this bid.");
+    const all=await db.get("spqr_auctions")||[];
+    const next=all.map(a=>a.id===auc.id?{...a,bids:[...(a.bids||[]),{bidderId:user.id,bidderName:user.latinName,amount:amt,ts:Date.now()}]}:a);
+    await db.set("spqr_auctions",next);
+    await addWealthLog({type:"property-auction-bid",playerId:user.id,session:auc.session||sLab(D.game||DEF_GAME),text:`${user.latinName} bid ${amt}T gold for ${auc.assetName} in ${auc.regionName}.`});
+    setBidByAuction({...bidByAuction,[auc.id]:""});onRefresh&&onRefresh();
+  };
+  const closeExpiredNow=async()=>{await resolveExpiredAuctions(players,businesses,D.game||DEF_GAME);onRefresh&&onRefresh();};
+  const repEvents=(D.replog||[]).map(e=>({id:e.id,ts:e.ts||0,kind:e.type||"reputation",title:e.type==="boost"?"Reputation Boost":e.type==="counter"?"Counter-Campaign":e.type==="slander"?"Slander Campaign":"Reputation Event",text:e.text||"",session:e.session||"",color:e.type==="slander"?T.rhi:e.type==="boost"?T.gre:T.blue}));
+  const wealthEvents=(D.wealthlog||[]).map(e=>({id:e.id||e.ts,ts:e.ts||0,kind:e.type||"wealth",title:e.type==="property-auction"?"Property Auction":e.type==="state-property-buy"?"State Property Purchase":"Public Wealth Ledger",text:e.text||"",session:e.session||"",color:e.type?.includes("auction")?T.blue:e.type==="state-property-buy"?T.gre:T.gold}));
   const electionEvents=(D.elections||[]).flatMap(el=>{
-    const arr=[];
-    if(el.status)arr.push({id:(el.id||Math.random())+"_status",ts:el.updatedAt||el.ts||0,kind:"election",title:`Election: ${POS[el.office]?.title||el.office||"Magistracy"}`,text:`Status: ${el.status}${el.winnerName?` · Winner: ${el.winnerName}`:""}`,session:el.session||"",color:T.blue});
-    (el.candidates||[]).forEach(c=>arr.push({id:(el.id||"")+"_cand_"+(c.id||c.playerId||Math.random()),ts:c.ts||el.ts||0,kind:"election",title:"Election Candidacy",text:`${c.name||c.playerName||"A senator"} stood for ${POS[el.office]?.title||el.office||"office"}${c.speech?`: ${c.speech}`:""}`,session:el.session||"",color:T.blue}));
+    const arr=[]; if(el.status==="closed")arr.push({id:`el-${el.id}`,ts:el.closedAt||0,kind:"election",title:`Election Closed: ${POS[el.office]?.title||el.office||"Office"}`,text:`Winner recorded for ${POS[el.office]?.title||el.office||"office"}.`,session:el.session||"",color:T.gre});
+    (el.candidates||[]).forEach(c=>arr.push({id:`cand-${el.id}-${c.playerId}`,ts:c.ts||0,kind:"election",title:`Candidacy: ${c.name}`,text:`Standing for ${POS[el.office]?.title||el.office||"office"}${c.speech?`: ${c.speech}`:""}`,session:el.session||"",color:T.blue}));
     return arr;
   });
-  const motionEvents=(D.motions||[]).filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).map(m=>({
-    id:m.id,ts:m.closedAt||m.ts||0,kind:"motion",title:`Motion ${String(m.status||"").toUpperCase()}`,text:`${m.title||"Untitled motion"} — proposed by ${m.proposerName||"Unknown"}`,session:m.session||"",color:m.status==="passed"?T.gre:m.status==="vetoed"?T.blue:T.rhi
-  }));
+  const motionEvents=(D.motions||[]).filter(m=>["passed","failed","rejected","vetoed"].includes(m.status)).map(m=>({id:m.id,ts:m.closedAt||m.ts||0,kind:"motion",title:`Motion ${String(m.status||"").toUpperCase()}`,text:`${m.title||"Untitled motion"} — proposed by ${m.proposerName||"Unknown"}`,session:m.session||"",color:m.status==="passed"?T.gre:m.status==="vetoed"?T.blue:T.rhi}));
   const events=[...repEvents,...wealthEvents,...electionEvents,...motionEvents].sort((a,b)=>(b.ts||0)-(a.ts||0));
-  const kinds=["all","slander","boost","counter","wealth","election","motion"];
+  const kinds=["all","auction","slander","boost","counter","wealth","election","motion"];
   const filtered=events.filter(e=>{
-    const okKind=kind==="all"||e.kind===kind||(kind==="slander"&&e.title.toLowerCase().includes("slander"));
+    const okKind=kind==="all"||(kind==="auction"&&String(e.kind).includes("auction"))||e.kind===kind||(kind==="slander"&&e.title.toLowerCase().includes("slander"));
     const hay=`${e.title} ${e.text} ${e.session}`.toLowerCase();
     return okKind && (!q.trim()||hay.includes(q.trim().toLowerCase()));
   });
-  return <Card><STit c="Forum Registry" sub="Public record of major political, economic and reputation events."/>
-    <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",alignItems:"end",marginBottom:"0.75rem"}}>
-      <div><Lbl c="Filter"/><select value={kind} onChange={e=>setKind(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{kinds.map(k=><option key={k} value={k}>{k==="all"?"All Events":k.charAt(0).toUpperCase()+k.slice(1)}</option>)}</select></div>
-      <div style={{minWidth:260,flex:1}}><Lbl c="Search"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search senator, motion, rumour, donation..." style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}/></div>
-      <Badge c={`${filtered.length} shown`} color={T.gold}/>
-    </div>
-    {filtered.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No public forum events match this filter.</div>:filtered.slice(0,200).map(e=><div key={e.id} style={{borderLeft:`5px solid ${e.color}`,background:T.surf,border:`1px solid ${T.border}`,padding:"0.65rem",marginBottom:"0.55rem"}}>
-      <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:e.color,letterSpacing:"0.05em"}}>{e.title}</div><Badge c={e.kind} color={e.color}/></div>
-      <div style={{lineHeight:1.45}}>{e.text}</div>
-      <div style={{fontSize:"0.78rem",color:T.mut,marginTop:"0.25rem"}}>{e.session||""}{e.ts?` · ${new Date(e.ts).toLocaleString()}`:""}</div>
-    </div>)}
-  </Card>;
+  const activeAuctions=auctions.filter(a=>a.status==="active").sort((a,b)=>Number(a.endsAt||0)-Number(b.endsAt||0));
+  const closedAuctions=auctions.filter(a=>a.status!=="active").slice(0,25);
+  const auctionCard=a=>{const high=(a.bids||[]).slice().sort((x,y)=>Number(y.amount||0)-Number(x.amount||0))[0];const min=Math.max(Number(a.startingBid||0),Number(high?.amount||0))+((a.bids||[]).length||Number(a.startingBid||0)>0?1:0);const remaining=Math.max(0,Number(a.endsAt||0)-Date.now());return <div key={a.id} style={{border:`1px solid ${T.border}`,borderLeft:`5px solid ${T.blue}`,background:T.surf,padding:"0.65rem",marginBottom:"0.55rem"}}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.blue}}>{a.assetName} — {a.regionName}</div><Badge c={a.status==="active"?`ACTIVE · ends ${new Date(a.endsAt).toLocaleString()}`:String(a.status).toUpperCase()} color={a.status==="active"?T.blue:T.mut}/></div>
+    <div style={{color:T.mut}}>Seller: <b>{a.sellerName}</b> · Starting bid: {fmt(a.startingBid)}T · Highest: <b>{high?`${fmt(high.amount)}T by ${high.bidderName}`:"No bids"}</b></div>
+    {a.status==="active"&&<Row gap="0.4rem" wrap><Inp label={`Bid Gold (min ${min}T)`} type="number" value={bidByAuction[a.id]||""} onChange={v=>setBidByAuction(x=>({...x,[a.id]:v}))}/><Btn v="blue" onClick={()=>placeBid(a)}>Place Bid</Btn><span style={{color:T.mut,fontSize:"0.85rem"}}>Time left: {Math.ceil(remaining/3600000)}h</span></Row>}
+    {(a.bids||[]).length>0&&<div style={{marginTop:"0.45rem",fontSize:"0.9rem",color:T.text}}>Bids: {(a.bids||[]).slice().sort((x,y)=>Number(y.amount||0)-Number(x.amount||0)).map(b=>`${b.bidderName} ${b.amount}T`).join(" · ")}</div>}
+    {a.resolution&&<div style={{marginTop:"0.35rem",color:T.gre}}>{a.resolution}</div>}
+  </div>};
+  return <div>
+    <Card><STit c="Forum Property Auctions" sub="Players and the government can auction properties. Auctions last 48 hours; when they expire, the property is assigned to the highest bidder and gold is transferred."/>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+        <div><Lbl c="Property to Auction"/><select value={auctionAsset} onChange={e=>setAuctionAsset(e.target.value)} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Choose property...</option>{myAuctionable.map(a=>{const b=getBiz(businesses,a.typeId);return <option key={a.id} value={a.id}>{b.emoji} {b.name} · {a.regionName||a.regionId} · {ownerNameFor(players,a.ownerId,a.ownerName)}</option>})}</select></div>
+        <Inp label="Starting Bid Gold" type="number" value={startingBid} onChange={setStartingBid}/>
+        <Btn v="green" disabled={!auctionAsset} onClick={openAuction}>Open 48h Auction</Btn>
+        <Btn v="dark" onClick={closeExpiredNow}>Resolve Expired Auctions</Btn>
+      </div>
+      {myAuctionable.length===0&&<div style={{color:T.mut,fontStyle:"italic",marginTop:"0.45rem"}}>You have no available properties to auction. Quaestors can auction Roman State properties.</div>}
+    </Card>
+    <Card><STit c="Active Auctions" sub="Highest bid at the end of 48 hours wins automatically when the app refreshes or this section resolves expired auctions."/>{activeAuctions.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No active property auctions.</div>:activeAuctions.map(auctionCard)}</Card>
+    <Card><STit c="Auction History"/>{closedAuctions.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No closed auctions yet.</div>:closedAuctions.map(auctionCard)}</Card>
+    <Card><STit c="Forum Registry" sub="Public record of major political, economic and reputation events."/>
+      <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",alignItems:"end",marginBottom:"0.75rem"}}>
+        <div><Lbl c="Filter"/><select value={kind} onChange={e=>setKind(e.target.value)} style={{padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}>{kinds.map(k=><option key={k} value={k}>{k==="all"?"All Events":k.charAt(0).toUpperCase()+k.slice(1)}</option>)}</select></div>
+        <div style={{minWidth:260,flex:1}}><Lbl c="Search"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search senator, motion, auction, rumour, donation..." style={{width:"100%",padding:"0.45rem",background:T.card,border:`1px solid ${T.border}`}}/></div>
+        <Badge c={`${filtered.length} shown`} color={T.gold}/>
+      </div>
+      {filtered.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No public forum events match this filter.</div>:filtered.slice(0,200).map(e=><div key={e.id} style={{borderLeft:`5px solid ${e.color}`,background:T.surf,border:`1px solid ${T.border}`,padding:"0.65rem",marginBottom:"0.55rem"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:e.color,letterSpacing:"0.05em"}}>{e.title}</div><Badge c={e.kind} color={e.color}/></div>
+        <div style={{lineHeight:1.45}}>{e.text}</div>
+        <div style={{fontSize:"0.78rem",color:T.mut,marginTop:"0.25rem"}}>{e.session||""}{e.ts?` · ${new Date(e.ts).toLocaleString()}`:""}</div>
+      </div>)}
+    </Card>
+  </div>;
 }
 
 /* ══ PLAYER APP ═══════════════════════════════════════════════════════════ */
@@ -2247,16 +2449,17 @@ function PlayerApp({user:initUser,onLogout}){
   const [group,setGroup]=useState("gov");
   const [user,setUser]=useState(initUser);
   const [inactivePrompt,setInactivePrompt]=useState(()=>isInactiveSenator(initUser));
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES,treasuryActions:[]});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES,treasuryActions:[],auctions:[]});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules,treasuryActions]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules,treasuryActions,auctions]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules"),db.get("spqr_treasury_actions")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules"),db.get("spqr_treasury_actions"),db.get("spqr_auctions")
     ]);
     const allElections=normalizeElections(elections,election);
+    const settledAuctions=await resolveExpiredAuctions(players||[],(businesses&&businesses.length)?businesses:DEF_BUSINESSES,game||DEF_GAME);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[]});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
     if(players){const me=players.find(p=>p.id===user.id);if(me){setUser(me); if(isInactiveSenator(me))setInactivePrompt(true);}}
   },[user.id]);
 
@@ -2287,7 +2490,7 @@ function PlayerApp({user:initUser,onLogout}){
       {k:"senate",l:"Senate"},{k:"voting",l:`Motions${votingCount>0?` (${votingCount})`:""}`},{k:"orders",l:"Orders"},{k:"resources",l:"Economy"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:"Elections"},...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
     ]},
     {key:"personal",label:"👤 Personal",tone:"personal",tabs:[
-      {k:"wealth",l:"Personal Wealth"},{k:"reputation",l:"Reputation"},{k:"forum",l:"Forum"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
+      {k:"wealth",l:"Private Wealth"},{k:"reputation",l:"Reputation"},{k:"forum",l:"Forum"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
     ]},
     {key:"records",label:"📜 Records",tone:"records",tabs:[
       {k:"cemetery",l:"Cemetery"},{k:"laws",l:"Laws"},{k:"map",l:"Map"}
@@ -2345,7 +2548,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} treasuryActions={D.treasuryActions||[]} motions={D.motions||[]} onRefresh={refresh}/>}
         {tab==="wealth"    &&<PersonalWealthPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="reputation"&&<ReputationPanel user={user} D={D} onRefresh={refresh}/>}
-        {tab==="forum"&&<ForumPanel D={D}/>}
+        {tab==="forum"&&<ForumPanel D={D} user={user} onRefresh={refresh}/>}
         {tab==="parties"   &&<PartiesPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="cemetery" &&<CemeteryPanel cemetery={D.cemetery||[]} players={D.players||[]}/>}
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
@@ -2439,8 +2642,9 @@ function ASenators({D,onRefresh}){
     const cemetery=await db.get("spqr_cemetery")||[];
     const grave={...target,role:null,dead:true,cause:cause||"Unknown",deathSession:sLab(D.game||DEF_GAME),deathTs:Date.now()};
     await db.set("spqr_cemetery",[...cemetery,grave]);
+    await transferDeadPlayerEstateToState(target,D.game||DEF_GAME);
     await db.set("spqr_p",players.filter(p=>p.id!==playerId));
-    await addHistory(playerId,"Death",`${target.latinName} died. Cause: ${cause||"Unknown"}.`,"death");
+    await addHistory(playerId,"Death",`${target.latinName} died. Cause: ${cause||"Unknown"}. Private wealth and properties passed to the Roman State.`,"death");
     await pushN("Death Notice",`${target.latinName} has died and has been entered into the cemetery of the Republic.`);
     onRefresh();
   };
@@ -2657,7 +2861,7 @@ function ALegions({D,onRefresh}){
 function ABackupRestore({onRefresh}){
   const [msg,setMsg]=useState("");
   const fileRef=useRef();
-  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types"];
+  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types","spqr_auctions","spqr_quaestor_property_buys"];
   const exportData=async()=>{
     const data={version:1,exportedAt:new Date().toISOString(),keys:{}};
     for(const k of keys){data.keys[k]=await db.get(k);}
@@ -2760,6 +2964,11 @@ function AResources({D,onRefresh}){
     const assets=(await db.get("spqr_assets"))||[];
     const wealth=(await db.get("spqr_wealth"))||{};
     const players=(await db.get("spqr_p"))||[];
+    const stateEstateIncome=(assets||[]).filter(a=>isStateOwner(a.ownerId)).reduce((acc,a)=>{const bz=getBiz(businesses,a.typeId);acc.gold+=effectiveGoldIncome(bz.incomeGold,g);acc.food+=effectiveFoodIncome(bz.incomeFood,g);return acc;},{gold:0,food:0});
+    if(stateEstateIncome.gold||stateEstateIncome.food){
+      ng={...ng,gold:Number(ng.gold||0)+stateEstateIncome.gold,food:Number(ng.food||0)+stateEstateIncome.food};
+      await addWealthLog({type:"state-estate-income",session:sLab(ng),text:`State-owned estates produced ${stateEstateIncome.gold}T gold and ${stateEstateIncome.food}M food for the Roman treasury.`});
+    }
     const nextWealth={...wealth};
     let nextPlayers=[...players];
     const deadSenators=[];
@@ -2770,10 +2979,12 @@ function AResources({D,onRefresh}){
         const cemetery=await db.get("spqr_cemetery")||[];
         const grave={...pl,role:null,dead:true,cause:"Starvation after failing to resolve a private food deficit.",deathSession:sLab(ng),deathTs:Date.now()};
         await db.set("spqr_cemetery",[...cemetery,grave]);
+        await transferDeadPlayerEstateToState(pl,ng);
+        ng={...ng,gold:Number(ng.gold||0)+Math.max(0,Number(w.gold||0)),food:Number(ng.food||0)+Math.max(0,Number(w.food||0))};
         nextPlayers=nextPlayers.filter(x=>x.id!==pl.id);
-        delete nextWealth[pl.id];
+        nextWealth[pl.id]={...w,gold:0,food:0};
         deadSenators.push(pl.latinName);
-        await addHistory(pl.id,"Death by Starvation",`${pl.latinName} died after failing to resolve a private food deficit.`,"death");
+        await addHistory(pl.id,"Death by Starvation",`${pl.latinName} died after failing to resolve a private food deficit. Private wealth and properties passed to the Roman State.`,"death");
         continue;
       }
       if(Number(w.gold||0)<0 && debtSessionExpired(w.debtGoldSince,g.session)){
@@ -2824,7 +3035,7 @@ function AResources({D,onRefresh}){
   };
   const restartGame=async()=>{
     if(!confirm("Restart the campaign? This will reset resources, legions, regions, motions, orders, deadlines, elections and notifications. Senators and setup images/links are kept."))return;
-    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_CAVALRY,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);await db.set("spqr_biz",DEF_BUSINESSES);await db.set("spqr_assets",[]);await db.set("spqr_wealth",{});await db.set("spqr_donations",[]);await db.set("spqr_wealthlog",[]);await db.set("spqr_history",[]);await db.set("spqr_parties",[]);
+    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_CAVALRY,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);await db.set("spqr_biz",DEF_BUSINESSES);await db.set("spqr_assets",[]);await db.set("spqr_wealth",{});await db.set("spqr_donations",[]);await db.set("spqr_wealthlog",[]);await db.set("spqr_history",[]);await db.set("spqr_parties",[]);await db.set("spqr_auctions",[]);await db.set("spqr_quaestor_property_buys",{});
     setG(DEF_GAME);setRegs(DEF_REGIONS.map(r=>({...r})));setMsg("Game restarted.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   return <div>
@@ -3315,16 +3526,17 @@ function ARegistry({D}){
 function AdminApp({onLogout}){
   const [tab,setTab]=useState("overview");
   const [group,setGroup]=useState("gov");
-  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES,treasuryActions:[]});
+  const [D,setD]=useState({players:[],game:DEF_GAME,legions:DEF_LEGIONS,regions:DEF_REGIONS,motions:[],orders:[],deadline:null,cfg:{},laws:LAWS,econ:[],election:null,elections:[],cavalry:DEF_CAVALRY,fleets:DEF_FLEETS,businesses:DEF_BUSINESSES,assets:[],wealth:{},donations:[],history:[],parties:[],wealthlog:[],cemetery:[],forceTypes:FORCE_TYPES,courts:[],reputation:{},replog:[],repRules:DEF_REP_RULES,treasuryActions:[],auctions:[]});
 
   const refresh=useCallback(async()=>{
-    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules,treasuryActions]=await Promise.all([
+    const [players,game,legions,regions,motions,orders,deadline,cfg,laws,econ,election,elections,cavalry,fleets,businesses,assets,wealth,donations,history,parties,wealthlog,cemetery,forceTypes,courts,reputation,replog,repRules,treasuryActions,auctions]=await Promise.all([
       db.get("spqr_p"),db.get("spqr_g"),db.get("spqr_l"),db.get("spqr_r"),
-      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules"),db.get("spqr_treasury_actions")
+      db.get("spqr_m"),db.get("spqr_o"),db.get("spqr_deadline"),db.get("spqr_cfg"),db.get("spqr_laws"),db.get("spqr_econ"),db.get("spqr_election"),db.get("spqr_elections"),db.get("spqr_cav"),db.get("spqr_f"),db.get("spqr_biz"),db.get("spqr_assets"),db.get("spqr_wealth"),db.get("spqr_donations"),db.get("spqr_history"),db.get("spqr_parties"),db.get("spqr_wealthlog"),db.get("spqr_cemetery"),db.get("spqr_force_types"),db.get("spqr_courts"),db.get("spqr_reputation"),db.get("spqr_replog"),db.get("spqr_rep_rules"),db.get("spqr_treasury_actions"),db.get("spqr_auctions")
     ]);
     const allElections=normalizeElections(elections,election);
+    const settledAuctions=await resolveExpiredAuctions(players||[],(businesses&&businesses.length)?businesses:DEF_BUSINESSES,game||DEF_GAME);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[]});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
