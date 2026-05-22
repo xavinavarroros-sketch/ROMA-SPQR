@@ -292,16 +292,28 @@ const transferDeadPlayerEstateToState=async(player,gameFallback=DEF_GAME)=>{
   const w=wealthOf(wealth,player.id);
   const deadGold=Math.max(0,Number(w.gold||0));
   const deadFood=Math.max(0,Number(w.food||0));
-  const assets=normalizeAssetsList(assets0||[]);
-  const inherited=assets.filter(a=>a.ownerId===player.id).length;
-  const nextAssets=assets.map(a=>a.ownerId===player.id?{...a,ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,inheritedFrom:player.latinName,inheritedAt:sLab(g),inheritedTs:Date.now()}:a);
+  const assets=normalizeAssetsList(Array.isArray(assets0)?assets0:[]);
+
+  // SAFETY: killing one senator must never shrink or wipe the global property list.
+  // We save a pre-death snapshot and only rewrite assets whose ownerId exactly matches the dead senator.
+  const snapshot={ts:Date.now(),session:sLab(g),deadPlayerId:player.id,deadPlayerName:player.latinName,assets,wealth,game:g};
+  await db.set("spqr_assets_last_safe",assets);
+  await db.set(`spqr_assets_backup_pre_death_${snapshot.ts}`,snapshot);
+
+  const isDeadOwner=a=>String(a?.ownerId||"")===String(player.id);
+  const inherited=assets.filter(isDeadOwner).length;
+  const nextAssets=assets.map(a=>isDeadOwner(a)?{...a,ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,inheritedFrom:player.latinName,inheritedFromId:player.id,inheritedAt:sLab(g),inheritedTs:Date.now()}:a);
+  if(nextAssets.length!==assets.length){
+    await addWealthLog({type:"inheritance-safety-abort",playerId:player.id,session:sLab(g),text:`Safety abort: death transfer for ${player.latinName} would have changed property count from ${assets.length} to ${nextAssets.length}. No property transfer was saved.`});
+    return;
+  }
   const nextWealth={...wealth,[player.id]:{...w,gold:0,food:0}};
   const nextGame={...g,gold:Number(g.gold||0)+deadGold,food:Number(g.food||0)+deadFood,foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)+deadFood})};
   await db.set("spqr_assets",nextAssets);
   await db.set("spqr_wealth",nextWealth);
   await db.set("spqr_g",nextGame);
   if(deadGold||deadFood||inherited){
-    await addWealthLog({type:"inheritance-to-state",playerId:player.id,session:sLab(g),text:`${player.latinName} died. The Roman State inherited ${deadGold}T gold, ${deadFood}M food and ${inherited} properties/estates.`});
+    await addWealthLog({type:"inheritance-to-state",playerId:player.id,session:sLab(g),text:`${player.latinName} died. The Roman State inherited ${deadGold}T gold, ${deadFood}M food and ${inherited} properties/estates. Global property count preserved: ${assets.length}.`});
   }
 };
 const resolveExpiredAuctions=async(players=[],businesses=DEF_BUSINESSES,gameFallback=DEF_GAME)=>{
@@ -2513,7 +2525,7 @@ function PlayerApp({user:initUser,onLogout}){
         </div>
         <div style={{justifySelf:"center",textAlign:"center",minWidth:0}}>{currentParty?<PartyBadge party={currentParty}/>:<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:T.mut,letterSpacing:"0.08em"}}>No Political Party</span>}</div>
         <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end",gap:"0.6rem",flexWrap:"wrap"}}>
-          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {D.game.year} BC · Turn {D.game.session}</span>
+          <span style={{color:T.mut,fontSize:"0.75rem",fontFamily:"'Cinzel',serif"}}>{seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {D.game.year} BC · Turn {D.game.session}</span>
           {pos&&<Badge c={pos.abbr} color={pos.color}/>} 
           <span style={{color:T.text,fontSize:"0.85rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
           <NotifBell userId={user.id}/>
