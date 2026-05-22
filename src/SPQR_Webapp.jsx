@@ -2950,22 +2950,38 @@ function ALegions({D,onRefresh}){
 function ABackupRestore({onRefresh}){
   const [msg,setMsg]=useState("");
   const fileRef=useRef();
-  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types","spqr_auctions","spqr_quaestor_property_buys"];
-  const exportData=async()=>{
-    const data={version:1,exportedAt:new Date().toISOString(),keys:{}};
-    for(const k of keys){data.keys[k]=await db.get(k);}
-    const label=data.keys.spqr_g?sLab({...DEF_GAME,...data.keys.spqr_g}).replace(/[^a-zA-Z0-9]+/g,"-"):"game";
+  const privateFileRef=useRef();
+  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types","spqr_auctions","spqr_treasury_actions","spqr_quaestor_property_buys"];
+  const privateKeys=["spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_treasury_actions","spqr_auctions","spqr_quaestor_property_buys"];
+  const downloadJson=(data,filename)=>{
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=url;
-    a.download=`rome-yes-backup-${label}-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setMsg("Backup exported. Keep the JSON file safe before updating GitHub/Railway.");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  };
+  const exportData=async()=>{
+    const data={type:"rome-yes-full-backup",version:2,exportedAt:new Date().toISOString(),keys:{}};
+    for(const k of keys){data.keys[k]=await db.get(k);}
+    const label=data.keys.spqr_g?sLab({...DEF_GAME,...data.keys.spqr_g}).replace(/[^a-zA-Z0-9]+/g,"-"):"game";
+    downloadJson(data,`rome-yes-full-backup-${label}-${new Date().toISOString().slice(0,10)}.json`);
+    setMsg("Full backup exported. Keep the JSON file safe before updating GitHub/Railway.");
     setTimeout(()=>setMsg(""),5000);
+  };
+  const exportPrivateData=async()=>{
+    const data={type:"rome-yes-private-wealth-reputation-assets-backup",version:2,exportedAt:new Date().toISOString(),session:sLab((await db.get("spqr_g"))||DEF_GAME),keys:{},counts:{}};
+    for(const k of privateKeys){data.keys[k]=await db.get(k);}
+    data.counts.assets=Array.isArray(data.keys.spqr_assets)?data.keys.spqr_assets.length:0;
+    data.counts.wealthPlayers=data.keys.spqr_wealth?Object.keys(data.keys.spqr_wealth).length:0;
+    data.counts.reputationPlayers=data.keys.spqr_reputation?Object.keys(data.keys.spqr_reputation).length:0;
+    data.counts.wealthLog=Array.isArray(data.keys.spqr_wealthlog)?data.keys.spqr_wealthlog.length:0;
+    downloadJson(data,`rome-yes-private-wealth-reputation-assets-${new Date().toISOString().replace(/[:.]/g,"-")}.json`);
+    setMsg(`Private backup exported: ${data.counts.assets} properties, ${data.counts.wealthPlayers} wealth records, ${data.counts.reputationPlayers} reputation records.`);
+    setTimeout(()=>setMsg(""),6000);
+  };
+  const savePreImportSnapshot=async(label,keysToSave)=>{
+    const snapshot={type:"rome-yes-pre-import-snapshot",label,ts:Date.now(),exportedAt:new Date().toISOString(),keys:{}};
+    for(const k of keysToSave){snapshot.keys[k]=await db.get(k);}
+    await db.set(`spqr_manual_pre_import_snapshot_${Date.now()}`,snapshot);
   };
   const importData=async(e)=>{
     const f=e.target.files?.[0];
@@ -2975,11 +2991,16 @@ function ABackupRestore({onRefresh}){
       const data=JSON.parse(text);
       const payload=data.keys||data;
       if(!payload.spqr_g&&!payload.spqr_p&&!payload.spqr_m)throw new Error("This does not look like a ROME-YES backup file.");
-      if(!confirm("Import this backup? This will replace the current shared game data for all players."))return;
+      if(!confirm("Import this FULL backup? This will replace the current shared game data for all players."))return;
+      await savePreImportSnapshot("before-full-import",keys);
       for(const k of keys){
-        if(Object.prototype.hasOwnProperty.call(payload,k))await db.set(k,payload[k]);
+        if(!Object.prototype.hasOwnProperty.call(payload,k))continue;
+        if(k==="spqr_assets")await safeSetAssets(payload[k],"manual full backup import",{allowWipe:true});
+        else if(k==="spqr_wealth")await safeSetWealth(payload[k],"manual full backup import",{allowWipe:true,mergeMissing:false});
+        else if(k==="spqr_reputation")await safeSetReputation(payload[k],"manual full backup import",{allowWipe:true,mergeMissing:false});
+        else await db.set(k,payload[k]);
       }
-      setMsg("Backup imported successfully. Refreshing game data...");
+      setMsg("Full backup imported successfully. Refreshing game data...");
       onRefresh&&onRefresh();
       setTimeout(()=>setMsg(""),5000);
     }catch(err){
@@ -2989,19 +3010,63 @@ function ABackupRestore({onRefresh}){
       if(fileRef.current)fileRef.current.value="";
     }
   };
+  const importPrivateData=async(e)=>{
+    const f=e.target.files?.[0];
+    if(!f)return;
+    try{
+      const text=await f.text();
+      const data=JSON.parse(text);
+      const payload=data.keys||data;
+      if(!payload.spqr_assets&&!payload.spqr_wealth&&!payload.spqr_reputation)throw new Error("This does not look like a private wealth/reputation/assets backup.");
+      const assetCount=Array.isArray(payload.spqr_assets)?payload.spqr_assets.length:0;
+      const wealthCount=payload.spqr_wealth?Object.keys(payload.spqr_wealth).length:0;
+      const repCount=payload.spqr_reputation?Object.keys(payload.spqr_reputation).length:0;
+      if(!confirm(`Restore PRIVATE ECONOMY backup?\n\nProperties: ${assetCount}\nWealth records: ${wealthCount}\nReputation records: ${repCount}\n\nThis will replace the current private wealth, reputation and property data, but it will not replace players, motions, offices or armies.`))return;
+      await savePreImportSnapshot("before-private-economy-import",privateKeys);
+      if(Object.prototype.hasOwnProperty.call(payload,"spqr_assets"))await safeSetAssets(payload.spqr_assets||[],"manual private economy restore",{allowWipe:true});
+      if(Object.prototype.hasOwnProperty.call(payload,"spqr_wealth"))await safeSetWealth(payload.spqr_wealth||{},"manual private economy restore",{allowWipe:true,mergeMissing:false});
+      if(Object.prototype.hasOwnProperty.call(payload,"spqr_reputation"))await safeSetReputation(payload.spqr_reputation||{},"manual private economy restore",{allowWipe:true,mergeMissing:false});
+      for(const k of privateKeys){
+        if(["spqr_assets","spqr_wealth","spqr_reputation"].includes(k))continue;
+        if(Object.prototype.hasOwnProperty.call(payload,k))await db.set(k,payload[k]);
+      }
+      await addWealthLog({type:"private-backup-restore",session:sLab((await db.get("spqr_g"))||DEF_GAME),text:`GM restored private economy backup: ${assetCount} properties, ${wealthCount} wealth records, ${repCount} reputation records.`});
+      setMsg(`Private economy restored: ${assetCount} properties, ${wealthCount} wealth records, ${repCount} reputation records.`);
+      onRefresh&&onRefresh();
+      setTimeout(()=>setMsg(""),7000);
+    }catch(err){
+      setMsg(`Private restore failed: ${err.message||err}`);
+      setTimeout(()=>setMsg(""),7000);
+    }finally{
+      if(privateFileRef.current)privateFileRef.current.value="";
+    }
+  };
   return(
-    <Card style={{borderLeft:`3px solid ${T.blue}`}}>
-      <STit c="Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects senators, motions, orders, laws, legions, resources, map and settings."/>
-      {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"1.05rem"}}>{msg}</div>}
-      <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
-        Export a backup before every major update. If anything disappears after a redeploy, import the JSON file here to restore the shared game.
-      </div>
-      <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
-      <Row gap="0.5rem" wrap>
-        <Btn v="blue" onClick={exportData}>⬇ Export Backup</Btn>
-        <Btn v="dark" onClick={()=>fileRef.current.click()}>⬆ Import Backup</Btn>
-      </Row>
-    </Card>
+    <div>
+      <Card style={{borderLeft:`4px solid ${T.rhi}`,background:"#FFF7F7"}}>
+        <STit c="Private Economy Safety Backup" sub="Fast backup/restore for the fragile data: senator properties, private wealth, reputation, auctions and wealth ledger."/>
+        {msg&&<div style={{padding:"0.45rem 0.7rem",background:"#0a1a0a",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.65rem",fontSize:"1.05rem"}}>{msg}</div>}
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
+          Use this button before killing characters, advancing seasons, restoring logs, or deploying updates. If properties, coin, food or reputation are lost, upload the JSON here to restore only private economy data without touching players or offices.
+        </div>
+        <input type="file" ref={privateFileRef} onChange={importPrivateData} accept="application/json,.json" style={{display:"none"}}/>
+        <Row gap="0.5rem" wrap>
+          <Btn v="blue" onClick={exportPrivateData}>⬇ Save Private Wealth / Reputation / Properties</Btn>
+          <Btn v="dark" onClick={()=>privateFileRef.current.click()}>⬆ Restore Private Economy Backup</Btn>
+        </Row>
+      </Card>
+      <Card style={{borderLeft:`3px solid ${T.blue}`}}>
+        <STit c="Full Backup / Restore Game Data" sub="Use this before uploading new GitHub changes. It protects the whole shared game state."/>
+        <div style={{fontSize:"1.05rem",color:T.mut,lineHeight:1.5,marginBottom:"0.75rem"}}>
+          Full export includes players, motions, orders, laws, legions, resources, map, settings, properties, wealth and reputation. Importing a full backup replaces the whole shared game state.
+        </div>
+        <input type="file" ref={fileRef} onChange={importData} accept="application/json,.json" style={{display:"none"}}/>
+        <Row gap="0.5rem" wrap>
+          <Btn v="blue" onClick={exportData}>⬇ Export Full Backup</Btn>
+          <Btn v="dark" onClick={()=>fileRef.current.click()}>⬆ Import Full Backup</Btn>
+        </Row>
+      </Card>
+    </div>
   );
 }
 
