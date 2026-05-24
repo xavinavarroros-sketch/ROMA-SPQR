@@ -2091,6 +2091,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
   const totalFoodIncome=inc.food+privateTaxes.food;
   const netGold=totalGoldIncome-mb.totalGold;
   const netFood=totalFoodIncome-mb.totalFood;
+  const snap=economySnapshot(g,regs,legs,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS,D.players||[],D.assets||[],D.businesses||DEF_BUSINESSES,D.wealth||{});
   const goldStyle={color:RES.gold.color,fontFamily:"'Cinzel',serif",fontWeight:900};
   const foodStyle={color:RES.food.color,fontFamily:"'Cinzel',serif",fontWeight:900};
   const BalanceRow=({label,value,color=T.text,bold,emoji})=><div style={{display:"flex",justifyContent:"space-between",gap:"0.75rem",borderBottom:`1px solid ${T.border}`,padding:"0.42rem 0",fontSize:"1.08rem",alignItems:"center"}}><span style={{color:T.mut}}>{emoji&&<span style={{marginRight:"0.35rem"}}>{emoji}</span>}{label}</span><span style={{color,fontFamily:"'Cinzel',serif",fontWeight:bold?900:700}}>{value}</span></div>;
