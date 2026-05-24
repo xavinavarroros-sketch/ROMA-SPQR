@@ -19,6 +19,14 @@ const T={bg:"#F6EFE4",surf:"#FFF9EE",card:"#FFFFFF",border:"#D6BFA3",bhi:"#A3202
   green:"#2F7D32",gre:"#46A04A",blue:"#284B7A",
   text:"#26160F",mut:"#4A382B",fnt:"#BFAE99"};
 const RES={gold:{emoji:"🪙",name:"Gold",unit:"T",color:T.ghi},food:{emoji:"🌾",name:"Food",unit:"M",color:T.green},men:{emoji:"👥",name:"Manpower",unit:"men",color:T.blue}};
+const legionDisplayName=l=>{
+  const pub=String(l?.publicId||"").trim();
+  const name=String(l?.name||"").trim();
+  if(pub&&name&&!name.toLowerCase().startsWith(pub.toLowerCase()))return `${pub} — ${name}`;
+  if(name)return name;
+  if(pub)return `Legio ${pub}`;
+  return `Legio ${l?.id||""}`;
+};
 class ErrorBoundary extends React.Component{
   constructor(props){super(props);this.state={hasError:false,error:null};}
   static getDerivedStateFromError(error){return {hasError:true,error};}
@@ -1038,7 +1046,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
       <STit c="Pending / Queued Motions" sub="Motions awaiting GM approval, rejected by GM, or queued behind the active motion."/>
       {[...pendingLike].reverse().map(m=>{
         const isSel=selMotion===m.id;
-        const eligible=votingEligiblePlayers(D.players||[]);
+        const eligible=votingEligiblePlayers(players||[]);
         const eligibleVotes=voteCountFromEligible(m.votes||{},eligible).map(([,v])=>v);
         const yeas=eligibleVotes.filter(v=>v==="yea").length;
         const nays=eligibleVotes.filter(v=>v==="nay").length;
@@ -1210,9 +1218,15 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   const [praetorAssign,setPraetorAssign]=useState({playerId:"",title:"Praetor Militare",command:"",legionId:""});
   const [fieldPraetors,setFieldPraetors]=useState([]);
   const [legateAssign,setLegateAssign]=useState({legionId:"",playerId:""});
+  const [legionIdentity,setLegionIdentity]=useState({legionId:"",publicId:"",name:""});
   const myCommandedLegions=(legions||[]).filter(l=>String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName));
   const manageableLegions=(legions||[]).filter(l=>isConsul||String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName));
   useEffect(()=>{ if(canCommandLegions){setLegateAssign(x=>({legionId:x.legionId||((manageableLegions||[])[0]?.id||((legions||[])[0]?.id||"")),playerId:x.playerId||((players||[])[0]?.id||"")}));}},[canCommandLegions,legions,players]);
+  useEffect(()=>{
+    if(!canCommandLegions)return;
+    const first=(manageableLegions&&manageableLegions.length?manageableLegions:(legions||[]))[0];
+    if(first&&!legionIdentity.legionId)setLegionIdentity({legionId:first.id,publicId:first.publicId||first.id||"",name:first.name||""});
+  },[canCommandLegions,legions,manageableLegions.length]);
   useEffect(()=>{ if(canCommandLegions && !praetorAssign.playerId && players?.length) setPraetorAssign(x=>({...x,playerId:players[0].id,legionId:x.legionId||((manageableLegions||[])[0]?.id||"")})); },[canCommandLegions,players,praetorAssign.playerId,legions]);
   useEffect(()=>{let alive=true;(async()=>{if(!canCommandLegions)return;const cfg=await db.get("spqr_cfg")||{};if(alive)setFieldPraetors(cfg.fieldPraetors||[]);})();return()=>{alive=false};},[canCommandLegions,players?.length]);
   const takeCommandOfLegion=async(legion)=>{
@@ -1220,12 +1234,27 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
     const nextLegions=allLegions.map(l=>String(l.id)===String(legion.id)?{...l,commanderId:user.id,commander:user.latinName,commanderRole:pos.title,commanderAssignedAt:new Date().toISOString()}:l);
     const allPlayers=await db.get("spqr_p")||players||[];
-    const nextPlayers=allPlayers.map(p=>p.id===user.id?{...p,awayCampaign:true,campaignReason:`Commander of ${legion.name||`Legio ${legion.id}`}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
+    const nextPlayers=allPlayers.map(p=>p.id===user.id?{...p,awayCampaign:true,campaignReason:`Commander of ${legionDisplayName(legion)}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
     await db.set("spqr_l",nextLegions);
     await db.set("spqr_p",nextPlayers);
-    await addHistory(user.id,"Legion Command Taken",`${user.latinName} took command of ${legion.name||`Legio ${legion.id}`}. Marked away from Rome.`,"office");
-    await pushN("Legion Command Assigned",`${user.latinName} has taken command of ${legion.name||`Legio ${legion.id}`}.`);
-    await pushN("Away from Rome",`You are now away from Rome as commander of ${legion.name||`Legio ${legion.id}`}. Senate motions, elections and Forum access are restricted until recalled.`,user.id);
+    await addHistory(user.id,"Legion Command Taken",`${user.latinName} took command of ${legionDisplayName(legion)}. Marked away from Rome.`,"office");
+    await pushN("Legion Command Assigned",`${user.latinName} has taken command of ${legionDisplayName(legion)}.`);
+    await pushN("Away from Rome",`You are now away from Rome as commander of ${legionDisplayName(legion)}. Senate motions, elections and Forum access are restricted until recalled.`,user.id);
+    onRefresh&&onRefresh();
+  };
+  const saveLegionIdentity=async()=>{
+    if(!isConsul)return alert("Only Consuls can change legion names and public IDs from this panel.");
+    const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
+    const target=allLegions.find(l=>String(l.id)===String(legionIdentity.legionId));
+    if(!target)return alert("Choose a legion.");
+    if(!(String(target.commanderId||"")===String(user.id)||String(target.commander||"")===String(user.latinName)))return alert("You can only rename legions under your command.");
+    const publicId=String(legionIdentity.publicId||"").trim();
+    const name=String(legionIdentity.name||"").trim();
+    if(!publicId&&!name)return alert("Add a public legion ID or a name.");
+    const nextLegions=allLegions.map(l=>String(l.id)===String(target.id)?{...l,publicId:publicId||l.publicId||l.id,name:name||l.name,renamedBy:user.latinName,renamedById:user.id,renamedAt:new Date().toISOString()}:l);
+    await db.set("spqr_l",nextLegions);
+    await addHistory(user.id,"Legion Identity Changed",`${user.latinName} renamed ${legionDisplayName(target)} to ${publicId?publicId+" — ":""}${name||target.name||"Unnamed Legion"}.`,"office");
+    await pushN("Legion Identity Updated",`${user.latinName} updated the name/public ID of ${publicId?publicId+" — ":""}${name||target.name||"a legion"}.`);
     onRefresh&&onRefresh();
   };
   const assignFieldPraetor=async()=>{
@@ -1235,7 +1264,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     if(!selectedLegion)return alert("Take command of a legion first, or ask the GM to assign you one.");
     if(!isConsul && !(String(selectedLegion.commanderId||"")===String(user.id)||String(selectedLegion.commander||"")===String(user.latinName)))return alert("You can only assign staff under legions you command.");
     const cfg=await db.get("spqr_cfg")||{};
-    const entry={id:`fp_${Date.now()}_${Math.random().toString(36).slice(2)}`,playerId:target.id,playerName:target.latinName,title:praetorAssign.title||"Praetor Militare",command:praetorAssign.command||`Assigned to assist ${selectedLegion.name||`Legio ${selectedLegion.id}`}.`,legionId:selectedLegion.id,legionName:selectedLegion.name||`Legio ${selectedLegion.id}`,assignedBy:user.latinName,assignedById:user.id,session:sLab(game||DEF_GAME),ts:Date.now(),active:true};
+    const entry={id:`fp_${Date.now()}_${Math.random().toString(36).slice(2)}`,playerId:target.id,playerName:target.latinName,title:praetorAssign.title||"Praetor Militare",command:praetorAssign.command||`Assigned to assist ${legionDisplayName(selectedLegion)}.`,legionId:selectedLegion.id,legionName:legionDisplayName(selectedLegion),assignedBy:user.latinName,assignedById:user.id,session:sLab(game||DEF_GAME),ts:Date.now(),active:true};
     const next=[entry,...(cfg.fieldPraetors||[]).map(x=>x.playerId===target.id&&x.legionId===selectedLegion.id?{...x,active:false,removedAt:Date.now(),removedBy:user.latinName}:x)].slice(0,80);
     const allPlayers=await db.get("spqr_p")||players||[];
     await db.set("spqr_cfg",{...cfg,fieldPraetors:next});
@@ -1263,18 +1292,19 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   };
   const assignLegateToLegion=async()=>{
     if(!canCommandLegions)return alert("Your office cannot assign legates from this panel.");
-    const target=players.find(p=>p.id===legateAssign.playerId); if(!target)return alert("Choose a senator to serve as legate.");
+    const target=players.find(p=>p.id===legateAssign.playerId); if(!target)return alert("Choose a senator to serve as legatus.");
     const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
     const chosen=allLegions.find(l=>String(l.id)===String(legateAssign.legionId)); if(!chosen)return alert("Choose a legion.");
+    if(String(target.id)===String(chosen.commanderId||""))return alert("The commander/Consul cannot also be listed as his own Legatus. Choose another senator as Legatus.");
     if(!isConsul && !(String(chosen.commanderId||"")===String(user.id)||String(chosen.commander||"")===String(user.latinName)))return alert("You can only assign legates under legions you command.");
     const nextLegions=allLegions.map(l=>String(l.id)===String(chosen.id)?{...l,legateId:target.id,legateName:target.latinName,legateAssignedBy:user.latinName,legateAssignedById:user.id,legateAssignedAt:new Date().toISOString()}:l);
     const allPlayers=await db.get("spqr_p")||players||[];
-    const nextPlayers=allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`Legate under ${chosen.commander||user.latinName} in ${chosen.name||`Legio ${chosen.id}`}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
+    const nextPlayers=allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`Legate under ${chosen.commander||user.latinName} in ${legionDisplayName(chosen)}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
     await db.set("spqr_l",nextLegions);
     await db.set("spqr_p",nextPlayers);
-    await addHistory(target.id,"Legate Assigned",`${target.latinName} was appointed legate of ${chosen.name||`Legio ${chosen.id}`} under commander ${chosen.commander||user.latinName} by ${user.latinName}. Marked away from Rome.`,"office");
-    await pushN("Legate Assigned",`${target.latinName} has been appointed legate of ${chosen.name||`Legio ${chosen.id}`} under ${chosen.commander||user.latinName}.`);
-    await pushN("Away from Rome",`You have been marked away from Rome as legate of ${chosen.name||`Legio ${chosen.id}`}. Senate motions, elections and Forum access are restricted until recalled.`,target.id);
+    await addHistory(target.id,"Legate Assigned",`${target.latinName} was appointed legate of ${legionDisplayName(chosen)} under commander ${chosen.commander||user.latinName} by ${user.latinName}. Marked away from Rome.`,"office");
+    await pushN("Legate Assigned",`${target.latinName} has been appointed legate of ${legionDisplayName(chosen)} under ${chosen.commander||user.latinName}.`);
+    await pushN("Away from Rome",`You have been marked away from Rome as legate of ${legionDisplayName(chosen)}. Senate motions, elections and Forum access are restricted until recalled.`,target.id);
     onRefresh&&onRefresh();
   };
   const recallLegateFromLegion=async(legion)=>{
@@ -1287,7 +1317,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
       const cfg=await db.get("spqr_cfg")||{};
       const stillFieldPraetor=(cfg.fieldPraetors||[]).some(x=>x.active!==false&&String(x.playerId||"")===String(targetId));
       if(!stillFieldPraetor){const allPlayers=await db.get("spqr_p")||players||[];await db.set("spqr_p",allPlayers.map(p=>p.id===targetId?{...p,awayCampaign:false,campaignReason:"",campaignRecalledBy:user.latinName,campaignRecalledAt:new Date().toISOString()}:p));}
-      await pushN("Recalled to Rome",`You have been recalled from ${legion.name||`Legio ${legion.id}`}. Senate motions and elections are available again.`,targetId);
+      await pushN("Recalled to Rome",`You have been recalled from ${legionDisplayName(legion)}. Senate motions and elections are available again.`,targetId);
     }
     onRefresh&&onRefresh();
   };
@@ -1520,7 +1550,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
             {legions.map(l=>{
               const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt};
               return<div key={l.id} style={{display:"flex",justifyContent:"space-between",padding:"0.3rem 0.5rem",background:T.bg,border:`1px solid ${T.border}`,fontSize:"0.82rem"}}>
-                <span>{l.name||`Legio ${l.id}`}<br/><small style={{color:T.mut}}>📍 {l.location||"Unknown"} · 🎖️ {l.commander||"Unassigned"}</small></span><span style={{color:sc[l.status]||T.mut}}>{l.status==="active"?`${fmt(l.str)} men`:l.status==="raising"?`Raising ${l.prog}/${game.lturns}t`:l.status.toUpperCase()}</span>
+                <span>{legionDisplayName(l)}<br/><small style={{color:T.mut}}>📍 {l.location||"Unknown"} · 🎖️ {l.commander||"Unassigned"}</small></span><span style={{color:sc[l.status]||T.mut}}>{l.status==="active"?`${fmt(l.str)} men`:l.status==="raising"?`Raising ${l.prog}/${game.lturns}t`:l.status.toUpperCase()}</span>
               </div>;
             })}
           </div>
@@ -1560,29 +1590,42 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           <STit c="Legion Command" sub="Take direct command of a legion. Once you command it, you may appoint legates and field Praetors under you. Commanders away on campaign cannot vote in Rome."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.5rem"}}>
             {(legions||[]).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName)?T.green:T.fnt}`,padding:"0.6rem"}}>
-              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {l.name||`Legio ${l.id}`}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {legionDisplayName(l)}</div>
               <div style={{color:T.mut,fontSize:"0.9rem"}}>Commander: <b>{l.commander||"Unassigned"}</b></div>
-              <div style={{color:T.mut,fontSize:"0.9rem"}}>Legate: <b>{l.legateName||"None"}</b></div>
+              <div style={{color:T.mut,fontSize:"0.9rem"}}>Legatus: <b>{l.legateName||"None"}</b></div>
               {(String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName))?<Badge c="YOU COMMAND THIS" color={T.green} sm/>:<Btn v="green" sm onClick={()=>takeCommandOfLegion(l)}>Take Command</Btn>}
             </div>)}
           </div>
         </Card>
       )}
+      {isConsul&&(
+        <Card>
+          <STit c="Consular Legion Identity" sub="Consuls may change the public legion ID and name of legions under their command. This does not change the stable internal database ID."/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+            <div><Lbl c="Your Legion"/><select value={legionIdentity.legionId} onChange={e=>{const l=(manageableLegions||[]).find(x=>String(x.id)===String(e.target.value));setLegionIdentity({legionId:e.target.value,publicId:l?.publicId||l?.id||"",name:l?.name||""});}} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{myCommandedLegions.map(l=><option key={l.id} value={l.id}>{legionDisplayName(l)}</option>)}</select></div>
+            <Inp label="Public Legion ID" value={legionIdentity.publicId} onChange={v=>setLegionIdentity(x=>({...x,publicId:v}))} placeholder="Legio I / I / V"/>
+            <Inp label="Legion Name" value={legionIdentity.name} onChange={v=>setLegionIdentity(x=>({...x,name:v}))} placeholder="Legio I / Ferrata / Scipio's Legion"/>
+            <Btn v="gold" onClick={saveLegionIdentity}>💾 Save Legion Name / ID</Btn>
+          </div>
+          {!myCommandedLegions.length&&<div style={{marginTop:"0.5rem",color:T.fnt,fontStyle:"italic"}}>You must take command of a legion before renaming it.</div>}
+        </Card>
+      )}
+
       {canCommandLegions&&(
         <Card>
-          <STit c="Campaign Staff — Legates" sub="Assign senators as legates under the legion commander. This does not replace the legion commander name; the Consul or commander remains listed as Commander, and the legate appears separately below him."/>
+          <STit c="Campaign Staff — Legati" sub="Assign senators as legates under the legion commander. This does not replace the legion commander name; the Consul or commander remains listed as Commander, and the legate appears separately below him."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
-            <div><Lbl c="Legion"/><select value={legateAssign.legionId} onChange={e=>setLegateAssign(x=>({...x,legionId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · Commander: {l.commander||"Unassigned"}</option>)}</select></div>
-            <div><Lbl c="Senator / Legate"/><select value={legateAssign.playerId} onChange={e=>setLegateAssign(x=>({...x,playerId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(players||[]).map(p=><option key={p.id} value={p.id}>{p.latinName}{isAwayOnCampaign(p)?" — already away":""}</option>)}</select></div>
-            <Btn v="green" onClick={assignLegateToLegion}>⚔️ Assign Legate</Btn>
+            <div><Lbl c="Legion"/><select value={legateAssign.legionId} onChange={e=>setLegateAssign(x=>({...x,legionId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{legionDisplayName(l)} · Commander: {l.commander||"Unassigned"}</option>)}</select></div>
+            <div><Lbl c="Senator / Legatus"/><select value={legateAssign.playerId} onChange={e=>setLegateAssign(x=>({...x,playerId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(players||[]).map(p=><option key={p.id} value={p.id}>{p.latinName}{isAwayOnCampaign(p)?" — already away":""}</option>)}</select></div>
+            <Btn v="green" onClick={assignLegateToLegion}>⚔️ Assign Legatus</Btn>
           </div>
           <div style={{marginTop:"0.75rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.5rem"}}>
             {(manageableLegions.length?manageableLegions:(legions||[])).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${l.legateId?T.gold:T.fnt}`,padding:"0.6rem"}}>
-              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {l.name||`Legio ${l.id}`}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {legionDisplayName(l)}</div>
               <div style={{color:T.mut,fontSize:"0.9rem"}}>Location: {l.location||"Unknown"}</div>
               <div style={{color:T.mut,fontSize:"0.9rem"}}>Commander: <b>{l.commander||"Unassigned"}</b></div>
-              <div style={{marginTop:"0.25rem"}}>Legate: <b>{l.legateName||"None"}</b></div>
-              {l.legateId&&<Btn v="ghost" sm onClick={()=>recallLegateFromLegion(l)}>Recall Legate</Btn>}
+              <div style={{marginTop:"0.25rem"}}>Legatus: <b>{l.legateName||"None"}</b></div>
+              {l.legateId&&<Btn v="ghost" sm onClick={()=>recallLegateFromLegion(l)}>Recall Legatus</Btn>}
             </div>)}
           </div>
         </Card>
@@ -1592,7 +1635,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
         <Card>
           <STit c="Field Praetors — Army Command Assistants" sub="Commanders may appoint senators as temporary Praetors under a specific legion. This does not wipe existing offices; it creates a visible military assignment."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:"0.55rem",alignItems:"end"}}>
-            <div><Lbl c="Legion / Command"/><select value={praetorAssign.legionId} onChange={e=>setPraetorAssign({...praetorAssign,legionId:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · {l.commander||"Unassigned"}</option>)}</select></div>
+            <div><Lbl c="Legion / Command"/><select value={praetorAssign.legionId} onChange={e=>setPraetorAssign({...praetorAssign,legionId:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{legionDisplayName(l)} · {l.commander||"Unassigned"}</option>)}</select></div>
             <div><Lbl c="Senator"/><select value={praetorAssign.playerId} onChange={e=>setPraetorAssign({...praetorAssign,playerId:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{players.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div>
             <Inp label="Title" value={praetorAssign.title} onChange={v=>setPraetorAssign({...praetorAssign,title:v})} placeholder="Praetor Militare"/>
             <Inp label="Command / Assignment" value={praetorAssign.command} onChange={v=>setPraetorAssign({...praetorAssign,command:v})} placeholder="Assist Legio II in Campania..."/>
@@ -2090,11 +2133,11 @@ function LegionsPublicPanel({D}){
     <Card><STit c="Legions" sub="Each legion shows strength, stationed location and commander."/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"0.6rem"}}>
         {legions.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
-          <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.4rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>🛡️ {l.name||`Legio ${l.id}`}</div><Badge c={(l.status||"active").toUpperCase()} color={sc[l.status]||T.mut} sm/></div>
+          <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.4rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>🛡️ {legionDisplayName(l)}</div><Badge c={(l.status||"active").toUpperCase()} color={sc[l.status]||T.mut} sm/></div>
           <UnitLine label="Strength" value={`${fmt(l.str||0)} / ${fmt(l.max||5000)}`}/>
           <UnitLine label="📍 Location" value={l.location||"Unknown"}/>
           <UnitLine label="🎖️ Commander" value={l.commander||"Unassigned"}/>
-          <UnitLine label="⚔️ Legate" value={l.legateName||"No legate assigned"}/>
+          <UnitLine label="⚔️ Legatus" value={l.legateName||"No legatus assigned"}/>
           {l.status==="raising"&&<div style={{marginTop:"0.35rem",color:T.gold}}>Raising progress: {l.prog||0}/{game?.lturns||DEF_GAME.lturns}</div>}
         </div>)}
       </div>
@@ -3169,9 +3212,16 @@ function ALegions({D,onRefresh}){
   const [msg,setMsg]=useState("");
   const players=D.players||[];
   const legateOptions=[{id:"",latinName:"— No Legate —"},...players];
-  const setLegateForLegion=(i,playerId)=>{const p=players.find(x=>x.id===playerId);setLegs(ls=>ls.map((l,j)=>j===i?{...l,legateId:p?.id||null,legateName:p?.latinName||""}:l));};
+  const setLegateForLegion=(i,playerId)=>{
+    const p=players.find(x=>x.id===playerId);
+    setLegs(ls=>ls.map((l,j)=>{
+      if(j!==i)return l;
+      if(p&&(String(p.id)===String(l.commanderId||"")||String(p.latinName||"")===String(l.commander||""))){alert("The commander/Consul cannot also be listed as his own Legatus. Choose another senator as Legatus.");return l;}
+      return {...l,legateId:p?.id||null,legateName:p?.latinName||""};
+    }));
+  };
   useEffect(()=>{
-    setLegs((D.legions||DEF_LEGIONS).map(l=>({name:l.name||`Legio ${l.id}`,max:l.max||5000,str:l.str??5000,commander:l.commander||"Unassigned",armyCommand:l.armyCommand||"Independent",...l})));
+    setLegs((D.legions||DEF_LEGIONS).map(l=>({name:legionDisplayName(l),max:l.max||5000,str:l.str??5000,commander:l.commander||"Unassigned",armyCommand:l.armyCommand||"Independent",...l})));
     setCav((D.cavalry||DEF_CAVALRY).map(c=>({commander:"Unassigned",...c})));
     setFleets((D.fleets||DEF_FLEETS).map(f=>({commander:"Unassigned",...f,triremes:Number(f.triremes??f.ships??0)})));
     setForceTypes((D.forceTypes&&D.forceTypes.length?D.forceTypes:FORCE_TYPES).map(t=>({...t})));
@@ -3202,7 +3252,7 @@ function ALegions({D,onRefresh}){
     if(g.gold<g.lgold||g.food<g.lfood||g.pop<g.lpop){setMsg("Insufficient resources to recruit a new legion.");return;}
     await db.set("spqr_g",{...g,gold:g.gold-g.lgold,food:g.food-g.lfood,pop:g.pop-g.lpop});
     const n=legs.length+1;
-    setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:0,max:5000,status:"raising",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);
+    setLegs(ls=>[...ls,{id:`${n}`,publicId:`Legio ${n}`,name:`Legio ${n}`,str:0,max:5000,status:"raising",prog:0,location:"Roma",commander:"Unassigned",commanderId:null,legateId:null,legateName:"",armyCommand:"Independent"}]);
     setMsg("New legion recruitment started. Save to keep it.");
   };
   const sc={active:T.blue,raising:T.gold,destroyed:T.rhi,unraised:T.fnt,repairing:T.gold};
@@ -3221,9 +3271,9 @@ function ALegions({D,onRefresh}){
       <Card><STit c="Legions" sub="Assign commanders and army commands here."/>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(360px,1fr))",gap:"0.6rem"}}>
           {legs.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
-            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {l.name}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
+            <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {legionDisplayName(l)}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>
-              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander / Consul",l.commander,v=>updLeg(i,"commander",v))}<div><Lbl c="Legate Under Commander"/><select value={l.legateId||""} onChange={e=>setLegateForLegion(i,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{legateOptions.map(p=><option key={p.id||"none"} value={p.id}>{p.latinName}{p.id&&isAwayOnCampaign(p)?" — away":""}</option>)}</select></div>{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
+              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander / Consul",l.commander,v=>updLeg(i,"commander",v))}<div><Lbl c="Legatus Under Commander"/><select value={l.legateId||""} onChange={e=>setLegateForLegion(i,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{legateOptions.map(p=><option key={p.id||"none"} value={p.id}>{p.latinName}{p.id&&isAwayOnCampaign(p)?" — away":""}</option>)}</select></div>{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
               <div><Lbl c="Status"/><select value={l.status} onChange={e=>updLeg(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.35rem 0.5rem",fontFamily:"'Cinzel',serif"}}><option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option></select></div>
             </div>
           </div>)}
