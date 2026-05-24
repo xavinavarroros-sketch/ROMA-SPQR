@@ -477,6 +477,36 @@ const calcInc=(regs,game={})=>{let g=0,f=0;regs.forEach(r=>{const m=RS[r.s]?.m||
 const compress=(file,mx=600)=>new Promise(res=>{const c=document.createElement('canvas'),img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{const s=Math.min(mx/img.width,mx/img.height,1);c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',0.75));};img.src=u;});
 const pushN=async(title,body,forId="all")=>{const all=await db.get("spqr_n")||[];all.push({id:Date.now()+Math.random().toString(36).slice(2),title,body,for:forId,ts:Date.now()});await db.set("spqr_n",all.slice(-200));};
 
+const notifyPlayersByRole=async(players=[],roles=[],title,body)=>{
+  const wanted=new Set((roles||[]).filter(Boolean));
+  const targets=(players||[]).filter(p=>p?.id&&wanted.has(p.role));
+  if(!targets.length){await pushN(title,body);return;}
+  for(const p of targets)await pushN(title,body,p.id);
+};
+const notifyQuaestors=async(title,body,players=null)=>{
+  const roster=players||await db.get("spqr_p")||[];
+  await notifyPlayersByRole(roster,["quaestor_1","quaestor_2"],title,body);
+};
+const stateDebtFields=g=>{
+  const game={...DEF_GAME,...(g||{})};
+  return [
+    {key:"gold",label:"Gold",emoji:"🪙",unit:"T",value:Number(game.gold||0)},
+    {key:"food",label:"Food",emoji:"🌾",unit:"M",value:Number(game.food||0)},
+    {key:"pop",label:"Manpower",emoji:"👥",unit:"men",value:Number(game.pop||0)},
+  ].filter(x=>x.value<0);
+};
+const isStateInDebt=g=>stateDebtFields(g).length>0;
+const stateDebtText=g=>stateDebtFields(g).map(x=>`${x.emoji} ${x.label}: ${fmt(x.value)} ${x.unit}`).join(" · ");
+function StateDebtWarning({game}){
+  const debt=stateDebtFields(game);
+  if(!debt.length)return null;
+  return <div style={{maxWidth:980,margin:"0.75rem auto 0",background:"#FFF1F1",border:`3px solid ${T.rhi}`,borderLeft:`10px solid ${T.rhi}`,padding:"0.9rem 1rem",boxShadow:"0 6px 18px rgba(163,32,32,0.18)"}}>
+    <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.rhi,letterSpacing:"0.12em",fontSize:"0.95rem"}}>🚨 MASSIVE STATE DEBT WARNING</div>
+    <div style={{marginTop:"0.35rem",color:T.text,lineHeight:1.45}}>The Republic has fallen below zero resources. Emergency action is required before further recruitment, purchases or transfers.</div>
+    <div style={{marginTop:"0.4rem",fontFamily:"'Cinzel',serif",color:T.rhi,fontWeight:900}}>{stateDebtText(game)}</div>
+  </div>;
+}
+
 const activeLegions=legs=>(legs||[]).filter(l=>l.status==="active");
 const activeFleets=fleets=>(fleets||[]).filter(f=>f.status==="active");
 const fleetTriremes=fleets=>activeFleets(fleets).reduce((sum,f)=>sum+Number(f.triremes??f.ships??0),0);
@@ -521,6 +551,17 @@ const treasuryActionText=a=>{
   if(a.type==="gold-transfer")return `Send ${Number(a.amount||0)}T state gold to ${a.playerName||"a senator"}`;
   if(a.type==="tax-change")return `Set estate taxes to ${Number(a.goldTax||0)}% gold and ${Number(a.foodTax||0)}% food`;
   return a.note||"Treasury action";
+};
+
+const consulRecruitmentText=a=>{
+  if(!a)return "Recruitment action";
+  return `Recruit ${a.forceEmoji||"⚔️"} ${a.forceName||a.forceTypeName||"unit"} — ${Number(a.men||0)} men, ${Number(a.gold||0)}T gold, ${Number(a.food||0)}M food`;
+};
+const buildRecruitmentUnit=(ft,counts={})=>{
+  const stamp=Date.now().toString(36);
+  if(ft.type==="fleet")return {id:`classis_${Number(counts.fleets||0)+1}_${stamp}`,typeId:ft.id,name:ft.name,triremes:1,status:"raising",location:"Ostia",commander:"Unassigned",commanderId:null,legateId:null,legateName:"",recruitedByConsuls:true};
+  if(ft.type==="cavalry")return {id:`cav_${Number(counts.cavalry||0)+1}_${stamp}`,typeId:ft.id,name:ft.name,str:0,max:Number(ft.men||0),status:"raising",location:"Roma",commander:"Unassigned",commanderId:null,armyCommand:"Independent",recruitedByConsuls:true};
+  return {id:`unit_${Number(counts.legions||0)+1}_${stamp}`,typeId:ft.id,name:ft.name,str:0,max:Number(ft.men||0),status:"raising",prog:0,location:"Roma",commander:"Unassigned",commanderId:null,armyCommand:"Independent",legateId:null,legateName:"",recruitedByConsuls:true};
 };
 
 
@@ -997,7 +1038,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
       <STit c="Pending / Queued Motions" sub="Motions awaiting GM approval, rejected by GM, or queued behind the active motion."/>
       {[...pendingLike].reverse().map(m=>{
         const isSel=selMotion===m.id;
-        const eligible=votingEligiblePlayers(players||[]);
+        const eligible=votingEligiblePlayers(D.players||[]);
         const eligibleVotes=voteCountFromEligible(m.votes||{},eligible).map(([,v])=>v);
         const yeas=eligibleVotes.filter(v=>v==="yea").length;
         const nays=eligibleVotes.filter(v=>v==="nay").length;
@@ -1165,51 +1206,89 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   };
 
   const isConsul=role.startsWith("consul");
-  const [praetorAssign,setPraetorAssign]=useState({playerId:"",title:"Praetor Militare",command:""});
+  const canCommandLegions=isConsul||role.startsWith("dictator")||role.startsWith("magister_equitum")||role.startsWith("praetor");
+  const [praetorAssign,setPraetorAssign]=useState({playerId:"",title:"Praetor Militare",command:"",legionId:""});
   const [fieldPraetors,setFieldPraetors]=useState([]);
   const [legateAssign,setLegateAssign]=useState({legionId:"",playerId:""});
-  useEffect(()=>{ if(isConsul){setLegateAssign(x=>({legionId:x.legionId||((legions||[])[0]?.id||""),playerId:x.playerId||((players||[])[0]?.id||"")}));}},[isConsul,legions,players]);
-  useEffect(()=>{ if(isConsul && !praetorAssign.playerId && players?.length) setPraetorAssign(x=>({...x,playerId:players[0].id})); },[isConsul,players,praetorAssign.playerId]);
-  useEffect(()=>{let alive=true;(async()=>{if(!isConsul)return;const cfg=await db.get("spqr_cfg")||{};if(alive)setFieldPraetors(cfg.fieldPraetors||[]);})();return()=>{alive=false};},[isConsul,players?.length]);
+  const myCommandedLegions=(legions||[]).filter(l=>String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName));
+  const manageableLegions=(legions||[]).filter(l=>isConsul||String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName));
+  useEffect(()=>{ if(canCommandLegions){setLegateAssign(x=>({legionId:x.legionId||((manageableLegions||[])[0]?.id||((legions||[])[0]?.id||"")),playerId:x.playerId||((players||[])[0]?.id||"")}));}},[canCommandLegions,legions,players]);
+  useEffect(()=>{ if(canCommandLegions && !praetorAssign.playerId && players?.length) setPraetorAssign(x=>({...x,playerId:players[0].id,legionId:x.legionId||((manageableLegions||[])[0]?.id||"")})); },[canCommandLegions,players,praetorAssign.playerId,legions]);
+  useEffect(()=>{let alive=true;(async()=>{if(!canCommandLegions)return;const cfg=await db.get("spqr_cfg")||{};if(alive)setFieldPraetors(cfg.fieldPraetors||[]);})();return()=>{alive=false};},[canCommandLegions,players?.length]);
+  const takeCommandOfLegion=async(legion)=>{
+    if(!canCommandLegions)return alert("Your office cannot take field command.");
+    const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
+    const nextLegions=allLegions.map(l=>String(l.id)===String(legion.id)?{...l,commanderId:user.id,commander:user.latinName,commanderRole:pos.title,commanderAssignedAt:new Date().toISOString()}:l);
+    const allPlayers=await db.get("spqr_p")||players||[];
+    const nextPlayers=allPlayers.map(p=>p.id===user.id?{...p,awayCampaign:true,campaignReason:`Commander of ${legion.name||`Legio ${legion.id}`}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
+    await db.set("spqr_l",nextLegions);
+    await db.set("spqr_p",nextPlayers);
+    await addHistory(user.id,"Legion Command Taken",`${user.latinName} took command of ${legion.name||`Legio ${legion.id}`}. Marked away from Rome.`,"office");
+    await pushN("Legion Command Assigned",`${user.latinName} has taken command of ${legion.name||`Legio ${legion.id}`}.`);
+    await pushN("Away from Rome",`You are now away from Rome as commander of ${legion.name||`Legio ${legion.id}`}. Senate motions, elections and Forum access are restricted until recalled.`,user.id);
+    onRefresh&&onRefresh();
+  };
   const assignFieldPraetor=async()=>{
-    if(!isConsul)return alert("Only Consuls can assign field Praetors.");
+    if(!canCommandLegions)return alert("Your office cannot assign field Praetors.");
     const target=players.find(p=>p.id===praetorAssign.playerId); if(!target)return alert("Choose a senator.");
+    const selectedLegion=(legions||[]).find(l=>String(l.id)===String(praetorAssign.legionId))||manageableLegions[0];
+    if(!selectedLegion)return alert("Take command of a legion first, or ask the GM to assign you one.");
+    if(!isConsul && !(String(selectedLegion.commanderId||"")===String(user.id)||String(selectedLegion.commander||"")===String(user.latinName)))return alert("You can only assign staff under legions you command.");
     const cfg=await db.get("spqr_cfg")||{};
-    const entry={id:`fp_${Date.now()}_${Math.random().toString(36).slice(2)}`,playerId:target.id,playerName:target.latinName,title:praetorAssign.title||"Praetor Militare",command:praetorAssign.command||"Assigned to assist with army command.",assignedBy:user.latinName,assignedById:user.id,session:sLab(game||DEF_GAME),ts:Date.now(),active:true};
-    const next=[entry,...(cfg.fieldPraetors||[]).map(x=>x.playerId===target.id?{...x,active:false,removedAt:Date.now(),removedBy:user.latinName}:x)].slice(0,80);
+    const entry={id:`fp_${Date.now()}_${Math.random().toString(36).slice(2)}`,playerId:target.id,playerName:target.latinName,title:praetorAssign.title||"Praetor Militare",command:praetorAssign.command||`Assigned to assist ${selectedLegion.name||`Legio ${selectedLegion.id}`}.`,legionId:selectedLegion.id,legionName:selectedLegion.name||`Legio ${selectedLegion.id}`,assignedBy:user.latinName,assignedById:user.id,session:sLab(game||DEF_GAME),ts:Date.now(),active:true};
+    const next=[entry,...(cfg.fieldPraetors||[]).map(x=>x.playerId===target.id&&x.legionId===selectedLegion.id?{...x,active:false,removedAt:Date.now(),removedBy:user.latinName}:x)].slice(0,80);
+    const allPlayers=await db.get("spqr_p")||players||[];
     await db.set("spqr_cfg",{...cfg,fieldPraetors:next});
+    await db.set("spqr_p",allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`${entry.title} attached to ${entry.legionName}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p));
     setFieldPraetors(next);
-    await addHistory(target.id,"Field Praetor Assigned",`${target.latinName} was assigned as ${entry.title} by ${user.latinName}. Command: ${entry.command}`,"office");
-    await pushN("Field Praetor Assigned",`${target.latinName} has been assigned as ${entry.title} by ${user.latinName}.`);
+    await addHistory(target.id,"Field Praetor Assigned",`${target.latinName} was assigned as ${entry.title} under ${entry.legionName} by ${user.latinName}. Command: ${entry.command}`,"office");
+    await pushN("Field Praetor Assigned",`${target.latinName} has been assigned as ${entry.title} under ${entry.legionName} by ${user.latinName}.`);
+    await pushN("Away from Rome",`You have been marked away from Rome as ${entry.title} under ${entry.legionName}. Senate motions, elections and Forum access are restricted until recalled.`,target.id);
     setPraetorAssign(x=>({...x,command:""})); onRefresh&&onRefresh();
   };
   const removeFieldPraetor=async(id)=>{
-    if(!isConsul)return;
+    if(!canCommandLegions)return;
     const cfg=await db.get("spqr_cfg")||{};
+    const removed=(cfg.fieldPraetors||[]).find(x=>x.id===id);
+    if(removed && !isConsul && removed.assignedById!==user.id)return alert("You can only remove field Praetors you assigned.");
     const next=(cfg.fieldPraetors||[]).map(x=>x.id===id?{...x,active:false,removedAt:Date.now(),removedBy:user.latinName}:x);
-    await db.set("spqr_cfg",{...cfg,fieldPraetors:next});setFieldPraetors(next);onRefresh&&onRefresh();
+    await db.set("spqr_cfg",{...cfg,fieldPraetors:next});
+    if(removed?.playerId){
+      const allLegions=await db.get("spqr_l")||legions||[];
+      const stillLegate=(allLegions||[]).some(l=>String(l.legateId||"")===String(removed.playerId));
+      const stillFieldPraetor=next.some(x=>x.active!==false&&String(x.playerId||"")===String(removed.playerId));
+      if(!stillLegate&&!stillFieldPraetor){const allPlayers=await db.get("spqr_p")||players||[];await db.set("spqr_p",allPlayers.map(p=>p.id===removed.playerId?{...p,awayCampaign:false,campaignReason:"",campaignRecalledBy:user.latinName,campaignRecalledAt:new Date().toISOString()}:p));}
+    }
+    setFieldPraetors(next);onRefresh&&onRefresh();
   };
   const assignLegateToLegion=async()=>{
-    if(!isConsul)return alert("Only Consuls can assign legates from this panel.");
+    if(!canCommandLegions)return alert("Your office cannot assign legates from this panel.");
     const target=players.find(p=>p.id===legateAssign.playerId); if(!target)return alert("Choose a senator to serve as legate.");
     const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
     const chosen=allLegions.find(l=>String(l.id)===String(legateAssign.legionId)); if(!chosen)return alert("Choose a legion.");
-    const nextLegions=allLegions.map(l=>String(l.id)===String(chosen.id)?{...l,legateId:target.id,legateName:target.latinName,commander:target.latinName,assignedBy:user.latinName,assignedById:user.id,legateAssignedAt:new Date().toISOString()}:l);
+    if(!isConsul && !(String(chosen.commanderId||"")===String(user.id)||String(chosen.commander||"")===String(user.latinName)))return alert("You can only assign legates under legions you command.");
+    const nextLegions=allLegions.map(l=>String(l.id)===String(chosen.id)?{...l,legateId:target.id,legateName:target.latinName,legateAssignedBy:user.latinName,legateAssignedById:user.id,legateAssignedAt:new Date().toISOString()}:l);
     const allPlayers=await db.get("spqr_p")||players||[];
-    const nextPlayers=allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`Legate commanding ${chosen.name||`Legio ${chosen.id}`}`,campaignAssignedBy:user.latinName,campaignSince:new Date().toISOString()}:p);
+    const nextPlayers=allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`Legate under ${chosen.commander||user.latinName} in ${chosen.name||`Legio ${chosen.id}`}`,campaignAssignedBy:user.latinName,campaignSince:p.campaignSince||new Date().toISOString()}:p);
     await db.set("spqr_l",nextLegions);
     await db.set("spqr_p",nextPlayers);
-    await addHistory(target.id,"Legate Assigned",`${target.latinName} was appointed legate of ${chosen.name||`Legio ${chosen.id}`} by ${user.latinName}. Marked away from Rome.`,"office");
-    await pushN("Legate Assigned",`${target.latinName} has been appointed legate of ${chosen.name||`Legio ${chosen.id}`} by ${user.latinName}.`);
+    await addHistory(target.id,"Legate Assigned",`${target.latinName} was appointed legate of ${chosen.name||`Legio ${chosen.id}`} under commander ${chosen.commander||user.latinName} by ${user.latinName}. Marked away from Rome.`,"office");
+    await pushN("Legate Assigned",`${target.latinName} has been appointed legate of ${chosen.name||`Legio ${chosen.id}`} under ${chosen.commander||user.latinName}.`);
     await pushN("Away from Rome",`You have been marked away from Rome as legate of ${chosen.name||`Legio ${chosen.id}`}. Senate motions, elections and Forum access are restricted until recalled.`,target.id);
     onRefresh&&onRefresh();
   };
   const recallLegateFromLegion=async(legion)=>{
-    if(!isConsul)return;
+    if(!canCommandLegions)return;
+    if(!isConsul && !(String(legion.commanderId||"")===String(user.id)||String(legion.commander||"")===String(user.latinName)))return alert("You can only recall legates from legions you command.");
     const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
     const targetId=legion.legateId;
-    await db.set("spqr_l",allLegions.map(l=>String(l.id)===String(legion.id)?{...l,legateId:null,legateName:"",commander:l.commander===legion.legateName?"Unassigned":l.commander,recalledBy:user.latinName,recalledAt:new Date().toISOString()}:l));
-    if(targetId){const allPlayers=await db.get("spqr_p")||players||[];await db.set("spqr_p",allPlayers.map(p=>p.id===targetId?{...p,awayCampaign:false,campaignReason:"",campaignRecalledBy:user.latinName,campaignRecalledAt:new Date().toISOString()}:p));await pushN("Recalled to Rome",`You have been recalled from ${legion.name||`Legio ${legion.id}`}. Senate motions and elections are available again.`,targetId);}
+    await db.set("spqr_l",allLegions.map(l=>String(l.id)===String(legion.id)?{...l,legateId:null,legateName:"",recalledBy:user.latinName,recalledAt:new Date().toISOString()}:l));
+    if(targetId){
+      const cfg=await db.get("spqr_cfg")||{};
+      const stillFieldPraetor=(cfg.fieldPraetors||[]).some(x=>x.active!==false&&String(x.playerId||"")===String(targetId));
+      if(!stillFieldPraetor){const allPlayers=await db.get("spqr_p")||players||[];await db.set("spqr_p",allPlayers.map(p=>p.id===targetId?{...p,awayCampaign:false,campaignReason:"",campaignRecalledBy:user.latinName,campaignRecalledAt:new Date().toISOString()}:p));}
+      await pushN("Recalled to Rome",`You have been recalled from ${legion.name||`Legio ${legion.id}`}. Senate motions and elections are available again.`,targetId);
+    }
     onRefresh&&onRefresh();
   };
   const isQuaestor=role.startsWith("quaestor");
@@ -1261,13 +1340,19 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const limits=limits0||{}; const used=qPurchasesThisSeason(limits,qKey,g0||game||DEF_GAME);
     if(used>=4)return alert("This Quaestor has already bought 4 state properties this season.");
     const g={...DEF_GAME,...(g0||game||{})};
-    if(Number(g.gold||0)<Number(biz.costGold||0)||Number(g.food||0)<Number(biz.costFood||0))return alert("The state treasury does not have enough gold/food to buy this property.");
+    if(Number(g.gold||0)<Number(biz.costGold||0)||Number(g.food||0)<Number(biz.costFood||0)){
+      await addWealthLog({type:"state-property-denied-no-funds",session:sLab(g),text:`${user.latinName} attempted to buy ${biz.name} in ${region.name}, but the state lacked funds. Required ${biz.costGold}T gold and ${biz.costFood}M food. Available ${g.gold}T gold and ${g.food}M food.`});
+      await notifyQuaestors("State Property Purchase Denied",`${user.latinName} attempted to buy ${biz.name} in ${region.name}, but the Republic lacks sufficient gold/food.`);
+      return alert("Denied: the state treasury does not have enough gold/food to buy this property.");
+    }
     const newAsset={id:Date.now().toString()+Math.random().toString(36).slice(2),ownerId:STATE_OWNER_ID,ownerName:STATE_OWNER_NAME,typeId:biz.id,regionId:region.id,regionName:region.name,boughtAt:sLab(g),ts:Date.now(),boughtByQuaestor:user.latinName};
     const nextGame={...g,gold:Number(g.gold||0)-Number(biz.costGold||0),food:Number(g.food||0)-Number(biz.costFood||0),foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)-Number(biz.costFood||0)})};
     const nextLimits={...limits,[qPurchaseKey(qKey,g)]:used+1};
     await safeSetAssets([...assets,newAsset],"quaestor state property purchase",{allowDrop:0});await db.set("spqr_g",nextGame);await db.set("spqr_quaestor_property_buys",nextLimits);
     await addWealthLog({type:"state-property-buy",session:sLab(g),text:`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State for ${biz.costGold}T gold and ${biz.costFood}M food. Quaestor seasonal purchases: ${used+1}/4.`});
     await pushN("State Property Purchased",`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State.`);
+    await notifyQuaestors("State Spending Executed — Property",`${user.latinName} purchased ${biz.name} in ${region.name} for the Roman State. Cost deducted: ${biz.costGold}T gold and ${biz.costFood}M food.`);
+    if(isStateInDebt(nextGame))await pushN("🚨 Massive State Debt Warning",`The Republic is now in debt: ${stateDebtText(nextGame)}.`);
     await loadEstateData();onRefresh&&onRefresh();
   };
   const pendingTreasury=(treasuryActions||[]).filter(a=>a.status==="pending");
@@ -1306,6 +1391,86 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   };
 
 
+  const [consulForceTypes,setConsulForceTypes]=useState(FORCE_TYPES);
+  const [consulRecruit,setConsulRecruit]=useState({forceTypeId:"roman_legion",note:""});
+  const [consulRecruitRequests,setConsulRecruitRequests]=useState([]);
+  const loadConsulRecruitment=useCallback(async()=>{
+    const [fts,reqs]=await Promise.all([db.get("spqr_force_types"),db.get("spqr_consul_recruitment_requests")]);
+    const list=(fts&&fts.length)?fts:FORCE_TYPES;
+    setConsulForceTypes(list);
+    setConsulRecruitRequests(reqs||[]);
+    setConsulRecruit(x=>({forceTypeId:x.forceTypeId||(list[0]?.id||"roman_legion"),note:x.note||""}));
+  },[]);
+  useEffect(()=>{if(isConsul)loadConsulRecruitment();},[isConsul,loadConsulRecruitment,game.gold,game.food,game.pop]);
+  const selectedConsulForce=consulForceTypes.find(ft=>ft.id===consulRecruit.forceTypeId)||consulForceTypes[0]||FORCE_TYPES[0];
+  const pendingConsulRecruitments=(consulRecruitRequests||[]).filter(r=>r.status==="pending");
+  const proposeConsulRecruitment=async()=>{
+    if(!isConsul)return alert("Only Consuls can propose recruitment from this panel.");
+    const fts=(await db.get("spqr_force_types"))||consulForceTypes||FORCE_TYPES;
+    const ft=fts.find(x=>x.id===consulRecruit.forceTypeId)||fts[0];
+    if(!ft)return alert("Choose a recruitable unit type.");
+    const g=await db.get("spqr_g")||game||DEF_GAME;
+    if(Number(g.gold||0)<Number(ft.gold||0)||Number(g.food||0)<Number(ft.food||0)||Number(g.pop||0)<Number(ft.men||0)){
+      return alert("The Republic does not currently have enough gold, food or manpower for this recruitment.");
+    }
+    const reqs=await db.get("spqr_consul_recruitment_requests")||[];
+    const entry={id:`cr_${Date.now()}_${Math.random().toString(36).slice(2)}`,status:"pending",type:"recruit-unit",forceTypeId:ft.id,forceName:ft.name,forceEmoji:ft.emoji||"⚔️",forceKind:ft.type||"legion",men:Number(ft.men||0),gold:Number(ft.gold||0),food:Number(ft.food||0),turns:Number(ft.turns||1),proposerRole:role,proposerId:user.id,proposerName:user.latinName,session:sLab(g),note:consulRecruit.note||"",ts:Date.now()};
+    await db.set("spqr_consul_recruitment_requests",[entry,...reqs].slice(0,300));
+    await addWealthLog({type:"consul-recruitment-request",session:entry.session,text:`${user.latinName} proposed: ${consulRecruitmentText(entry)}. Awaiting approval by the other Consul. Quaestors notified of the potential state spending.`});
+    await pushN("Consular Recruitment Approval Required",`${user.latinName} proposed: ${consulRecruitmentText(entry)}. The other Consul must approve.`);
+    await notifyQuaestors("State Spending Notice — Recruitment",`${user.latinName} proposed recruiting ${ft.emoji||"⚔️"} ${ft.name} for ${ft.gold||0}T gold, ${ft.food||0}M food and ${ft.men||0} manpower. Quaestors should monitor treasury capacity.`);
+    setConsulRecruit(x=>({...x,note:""}));
+    await loadConsulRecruitment();
+    onRefresh&&onRefresh();
+  };
+  const approveConsulRecruitment=async(req)=>{
+    if(!isConsul)return alert("Only a Consul can approve recruitment.");
+    if(req.proposerRole===role||String(req.proposerId||"")===String(user.id))return alert("The other Consul must approve this recruitment.");
+    const [reqs0,g0,fts0,legs0,cav0,fleets0]=await Promise.all([db.get("spqr_consul_recruitment_requests"),db.get("spqr_g"),db.get("spqr_force_types"),db.get("spqr_l"),db.get("spqr_cav"),db.get("spqr_f")]);
+    const reqs=reqs0||[];
+    const current=reqs.find(x=>x.id===req.id);
+    if(!current||current.status!=="pending")return alert("This recruitment request is no longer pending.");
+    const fts=(fts0&&fts0.length)?fts0:FORCE_TYPES;
+    const ft=fts.find(x=>x.id===current.forceTypeId)||{id:current.forceTypeId,type:current.forceKind,name:current.forceName,emoji:current.forceEmoji,men:current.men,gold:current.gold,food:current.food,turns:current.turns};
+    const g={...DEF_GAME,...(g0||game||{})};
+    if(Number(g.gold||0)<Number(current.gold||0)||Number(g.food||0)<Number(current.food||0)||Number(g.pop||0)<Number(current.men||0)){
+      const next=reqs.map(x=>x.id===current.id?{...x,status:"denied_no_funds",deniedBy:user.latinName,deniedByRole:role,deniedAt:Date.now(),denialReason:"Insufficient state gold, food or manpower"}:x);
+      await db.set("spqr_consul_recruitment_requests",next);
+      await addWealthLog({type:"consul-recruitment-denied-no-funds",session:sLab(g),text:`Recruitment denied for ${current.forceName}: insufficient state funds/manpower. Required ${current.gold}T gold, ${current.food}M food and ${current.men} manpower. Available ${g.gold}T gold, ${g.food}M food and ${g.pop} manpower.`});
+      await pushN("Recruitment Denied — No Funds",`${current.forceName} could not be recruited because the Republic lacks sufficient gold, food or manpower.`);
+      await notifyQuaestors("Recruitment Denied — Treasury Failed",`${current.forceName} was denied due to insufficient state resources. Required ${current.gold}T / ${current.food}M / ${current.men} men. Available ${g.gold}T / ${g.food}M / ${g.pop} men.`);
+      await loadConsulRecruitment();
+      onRefresh&&onRefresh();
+      return alert("Denied: the Republic no longer has enough gold, food or manpower for this recruitment.");
+    }
+    const legs=legs0||legions||DEF_LEGIONS, cav=cav0||cavalry||DEF_CAVALRY, fleetsList=fleets0||fleets||DEF_FLEETS;
+    const unit=buildRecruitmentUnit(ft,{legions:legs.length,cavalry:cav.length,fleets:fleetsList.length});
+    const nextGame={...g,gold:Number(g.gold||0)-Number(current.gold||0),food:Number(g.food||0)-Number(current.food||0),pop:Number(g.pop||0)-Number(current.men||0),foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)-Number(current.food||0)})};
+    if((ft.type||current.forceKind)==="fleet")await db.set("spqr_f",[...fleetsList,unit]);
+    else if((ft.type||current.forceKind)==="cavalry")await db.set("spqr_cav",[...cav,unit]);
+    else await db.set("spqr_l",[...legs,unit]);
+    await db.set("spqr_g",nextGame);
+    const next=reqs.map(x=>x.id===current.id?{...x,status:"approved",approvedBy:user.latinName,approvedByRole:role,approvedAt:Date.now(),createdUnitId:unit.id,createdUnitName:unit.name}:x);
+    await db.set("spqr_consul_recruitment_requests",next);
+    await addWealthLog({type:"consul-recruitment-approved",session:sLab(nextGame),text:`${user.latinName} approved recruitment: ${consulRecruitmentText(current)}. Unit created as ${unit.name}. Quaestors notified of state spending.`});
+    await pushN("Consular Recruitment Approved",`${user.latinName} approved ${current.forceName}. The unit is now raising.`);
+    await notifyQuaestors("State Spending Executed — Recruitment",`${user.latinName} approved recruitment of ${current.forceName}. Cost deducted: ${current.gold}T gold, ${current.food}M food and ${current.men} manpower.`);
+    if(isStateInDebt(nextGame))await pushN("🚨 Massive State Debt Warning",`The Republic is now in debt: ${stateDebtText(nextGame)}.`);
+    await loadConsulRecruitment();
+    onRefresh&&onRefresh();
+  };
+  const rejectConsulRecruitment=async(req)=>{
+    if(!isConsul)return alert("Only a Consul can reject recruitment.");
+    if(req.proposerRole===role||String(req.proposerId||"")===String(user.id))return alert("The other Consul must reject this recruitment.");
+    const reqs=await db.get("spqr_consul_recruitment_requests")||[];
+    const next=reqs.map(x=>x.id===req.id?{...x,status:"rejected",rejectedBy:user.latinName,rejectedByRole:role,rejectedAt:Date.now()}:x);
+    await db.set("spqr_consul_recruitment_requests",next);
+    await addWealthLog({type:"consul-recruitment-rejected",session:sLab(game||DEF_GAME),text:`${user.latinName} rejected recruitment: ${consulRecruitmentText(req)}.`});
+    await loadConsulRecruitment();
+    onRefresh&&onRefresh();
+  };
+
+
   return(
     <div className="office-panel" style={{background:`linear-gradient(135deg, ${pos.bg||T.card} 0%, #FFFFFF 52%, ${pos.bg||T.card} 100%)`,border:`2px solid ${pos.color}`,borderTop:`10px solid ${pos.color}`,boxShadow:`inset 0 0 0 9999px ${pos.bg||T.bg}55, 0 0 0 1px ${pos.color}33`,padding:"1rem",minHeight:"70vh",borderRadius:"8px"}}>
       <style>{`.office-panel .spqr-card{background:${pos.bg||T.card} !important;border-color:${pos.color}66 !important;box-shadow:0 0 0 1px ${pos.color}22 inset;} .office-panel .spqr-card .spqr-title{color:${pos.color} !important;} .office-panel textarea,.office-panel input,.office-panel select{border-color:${pos.color}88 !important;}`}</style>
@@ -1329,7 +1494,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
       </Card>
 
       {/* Relevant data pane */}
-      {(isConsul||isEmergency)&&(
+      {(canCommandLegions||isEmergency)&&(
         <Card>
           <STit c="Legion Status"/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"0.35rem"}}>
@@ -1342,18 +1507,61 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           </div>
         </Card>
       )}
+
       {isConsul&&(
         <Card>
-          <STit c="Consular Legate Commands" sub="Assign senators as legates to command specific legions. Assigned legates are automatically marked away from Rome, so they cannot see Senate motions, vote, or participate in elections until recalled."/>
+          <STit c="Consular Recruitment — Dual Consul Approval" sub="A Consul may propose recruitment, but the unit is only raised after the other Consul approves. Cost is paid from the state stockpile on approval."/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.45rem",marginBottom:"0.7rem"}}>
+            <Stat label="🪙 State Gold" value={`${fmt(game.gold)}T`} color={RES.gold.color}/>
+            <Stat label="🌾 State Food" value={`${fmt(game.food)}M`} color={RES.food.color}/>
+            <Stat label="👥 Manpower" value={fmt(game.pop)} color={RES.men.color}/>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
-            <div><Lbl c="Legion"/><select value={legateAssign.legionId} onChange={e=>setLegateAssign(x=>({...x,legionId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(legions||[]).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · {l.location||"Unknown"}</option>)}</select></div>
+            <div><Lbl c="Recruitable Unit"/><select value={consulRecruit.forceTypeId} onChange={e=>setConsulRecruit(x=>({...x,forceTypeId:e.target.value}))} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{consulForceTypes.map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name} — {fmt(ft.men)} men · {fmt(ft.gold)}T/{fmt(ft.food)}M</option>)}</select></div>
+            <Inp label="Public Note" value={consulRecruit.note} onChange={v=>setConsulRecruit(x=>({...x,note:v}))} placeholder="Recruit to reinforce the northern campaign..."/>
+            <Btn v="green" onClick={proposeConsulRecruitment}>Submit for Other Consul Approval</Btn>
+          </div>
+          {selectedConsulForce&&<div style={{marginTop:"0.45rem",color:T.mut}}>Selected: <b>{selectedConsulForce.emoji} {selectedConsulForce.name}</b> · Type <b>{selectedConsulForce.type}</b> · Cost <b>{fmt(selectedConsulForce.gold)}T</b> / <b>{fmt(selectedConsulForce.food)}M</b> · Manpower <b>{fmt(selectedConsulForce.men)}</b> · Raising time <b>{selectedConsulForce.turns||1} turn(s)</b>.</div>}
+          <div style={{marginTop:"0.8rem"}}>
+            <STit c="Pending Consular Recruitment"/>
+            {pendingConsulRecruitments.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No pending recruitment proposals.</div>:pendingConsulRecruitments.map(r=><div key={r.id} style={{padding:"0.55rem",border:`1px solid ${T.border}`,background:T.bg,marginBottom:"0.4rem"}}>
+              <b>{consulRecruitmentText(r)}</b><br/><small>Proposed by {r.proposerName} · {r.session}{r.note?` · ${r.note}`:""}</small>
+              <Row gap="0.35rem" wrap><Btn sm v="green" disabled={r.proposerRole===role||String(r.proposerId||"")===String(user.id)} onClick={()=>approveConsulRecruitment(r)}>Approve</Btn><Btn sm v="red" disabled={r.proposerRole===role||String(r.proposerId||"")===String(user.id)} onClick={()=>rejectConsulRecruitment(r)}>Reject</Btn>{(r.proposerRole===role||String(r.proposerId||"")===String(user.id))&&<span style={{fontSize:"0.8rem",color:T.mut}}>Waiting for the other Consul</span>}</Row>
+            </div>)}
+          </div>
+          <div style={{marginTop:"0.8rem"}}>
+            <STit c="Consular Recruitment History"/>
+            {(consulRecruitRequests||[]).filter(r=>r.status!=="pending").length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No approved or rejected recruitments yet.</div>:(consulRecruitRequests||[]).filter(r=>r.status!=="pending").slice(0,30).map(r=><div key={r.id} style={{padding:"0.4rem 0",borderBottom:`1px solid ${T.border}`}}><b style={{color:r.status==="approved"?T.green:T.rhi,textTransform:"uppercase"}}>{r.status}</b> — {consulRecruitmentText(r)} <small style={{color:T.mut}}>· proposed by {r.proposerName}{r.approvedBy?` · approved by ${r.approvedBy}`:""}{r.rejectedBy?` · rejected by ${r.rejectedBy}`:""}</small></div>)}
+          </div>
+        </Card>
+      )}
+
+      {canCommandLegions&&(
+        <Card>
+          <STit c="Legion Command" sub="Take direct command of a legion. Once you command it, you may appoint legates and field Praetors under you. Commanders away on campaign cannot vote in Rome."/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.5rem"}}>
+            {(legions||[]).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName)?T.green:T.fnt}`,padding:"0.6rem"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {l.name||`Legio ${l.id}`}</div>
+              <div style={{color:T.mut,fontSize:"0.9rem"}}>Commander: <b>{l.commander||"Unassigned"}</b></div>
+              <div style={{color:T.mut,fontSize:"0.9rem"}}>Legate: <b>{l.legateName||"None"}</b></div>
+              {(String(l.commanderId||"")===String(user.id)||String(l.commander||"")===String(user.latinName))?<Badge c="YOU COMMAND THIS" color={T.green} sm/>:<Btn v="green" sm onClick={()=>takeCommandOfLegion(l)}>Take Command</Btn>}
+            </div>)}
+          </div>
+        </Card>
+      )}
+      {canCommandLegions&&(
+        <Card>
+          <STit c="Campaign Staff — Legates" sub="Assign senators as legates under the legion commander. This does not replace the legion commander name; the Consul or commander remains listed as Commander, and the legate appears separately below him."/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+            <div><Lbl c="Legion"/><select value={legateAssign.legionId} onChange={e=>setLegateAssign(x=>({...x,legionId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · Commander: {l.commander||"Unassigned"}</option>)}</select></div>
             <div><Lbl c="Senator / Legate"/><select value={legateAssign.playerId} onChange={e=>setLegateAssign(x=>({...x,playerId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(players||[]).map(p=><option key={p.id} value={p.id}>{p.latinName}{isAwayOnCampaign(p)?" — already away":""}</option>)}</select></div>
             <Btn v="green" onClick={assignLegateToLegion}>⚔️ Assign Legate</Btn>
           </div>
           <div style={{marginTop:"0.75rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.5rem"}}>
-            {(legions||[]).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${l.legateId?T.gold:T.fnt}`,padding:"0.6rem"}}>
+            {(manageableLegions.length?manageableLegions:(legions||[])).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${l.legateId?T.gold:T.fnt}`,padding:"0.6rem"}}>
               <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {l.name||`Legio ${l.id}`}</div>
               <div style={{color:T.mut,fontSize:"0.9rem"}}>Location: {l.location||"Unknown"}</div>
+              <div style={{color:T.mut,fontSize:"0.9rem"}}>Commander: <b>{l.commander||"Unassigned"}</b></div>
               <div style={{marginTop:"0.25rem"}}>Legate: <b>{l.legateName||"None"}</b></div>
               {l.legateId&&<Btn v="ghost" sm onClick={()=>recallLegateFromLegion(l)}>Recall Legate</Btn>}
             </div>)}
@@ -1361,16 +1569,17 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
         </Card>
       )}
 
-      {isConsul&&(
+      {canCommandLegions&&(
         <Card>
-          <STit c="Field Praetors — Army Command Assistants" sub="Consuls may appoint senators as temporary Praetors to help command armies. This does not wipe existing offices; it creates a visible military assignment."/>
+          <STit c="Field Praetors — Army Command Assistants" sub="Commanders may appoint senators as temporary Praetors under a specific legion. This does not wipe existing offices; it creates a visible military assignment."/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+            <div><Lbl c="Legion / Command"/><select value={praetorAssign.legionId} onChange={e=>setPraetorAssign({...praetorAssign,legionId:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{(manageableLegions.length?manageableLegions:(legions||[])).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · {l.commander||"Unassigned"}</option>)}</select></div>
             <div><Lbl c="Senator"/><select value={praetorAssign.playerId} onChange={e=>setPraetorAssign({...praetorAssign,playerId:e.target.value})} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}>{players.map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div>
             <Inp label="Title" value={praetorAssign.title} onChange={v=>setPraetorAssign({...praetorAssign,title:v})} placeholder="Praetor Militare"/>
             <Inp label="Command / Assignment" value={praetorAssign.command} onChange={v=>setPraetorAssign({...praetorAssign,command:v})} placeholder="Assist Legio II in Campania..."/>
             <Btn v="green" onClick={assignFieldPraetor}>Assign Praetor</Btn>
           </div>
-          <div style={{display:"grid",gap:"0.4rem",marginTop:"0.75rem"}}>{(fieldPraetors||[]).filter(x=>x.active!==false).length?fieldPraetors.filter(x=>x.active!==false).map(fp=><div key={fp.id} style={{border:`1px solid ${T.border}`,background:T.bg,padding:"0.45rem 0.55rem",display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div><b>{fp.title}</b> — {fp.playerName}<br/><small style={{color:T.mut}}>Assigned by {fp.assignedBy} · {fp.session} · {fp.command}</small></div><Btn sm v="red" onClick={()=>removeFieldPraetor(fp.id)}>Remove</Btn></div>):<div style={{color:T.fnt,fontStyle:"italic"}}>No active field Praetors assigned.</div>}</div>
+          <div style={{display:"grid",gap:"0.4rem",marginTop:"0.75rem"}}>{(fieldPraetors||[]).filter(x=>x.active!==false).length?fieldPraetors.filter(x=>x.active!==false).map(fp=><div key={fp.id} style={{border:`1px solid ${T.border}`,background:T.bg,padding:"0.45rem 0.55rem",display:"flex",justifyContent:"space-between",gap:"0.5rem",flexWrap:"wrap"}}><div><b>{fp.title}</b> — {fp.playerName}<br/><small style={{color:T.mut}}>Under {fp.legionName||"Campaign Staff"} · Assigned by {fp.assignedBy} · {fp.session} · {fp.command}</small></div><Btn sm v="red" onClick={()=>removeFieldPraetor(fp.id)}>Remove</Btn></div>):<div style={{color:T.fnt,fontStyle:"italic"}}>No active field Praetors assigned.</div>}</div>
         </Card>
       )}
       {role.startsWith("magister_equitum")&&(
@@ -2674,6 +2883,7 @@ function PlayerApp({user:initUser,onLogout}){
         </div>
       </div>
       {away&&<div style={{maxWidth:780,margin:"0.75rem auto 0"}}><AwayCampaignNotice user={user} context="Senate motions, Forum speeches and elections"/></div>}
+      <StateDebtWarning game={D.game}/>
       {inactivePrompt&&<div style={{maxWidth:780,margin:"0.75rem auto 0",background:"#FFF7ED",border:`2px solid ${T.gold}`,borderLeft:`8px solid ${T.gold}`,padding:"0.85rem 1rem",boxShadow:"0 4px 14px rgba(0,0,0,0.08)",fontFamily:"Georgia,serif"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:"1rem",alignItems:"center",flexWrap:"wrap"}}>
           <div>
@@ -2727,6 +2937,7 @@ function AOverview({D}){
   const vacant=Object.keys(POS).filter(k=>!(D.players||[]).find(p=>p.role===k));
   return(
     <div>
+      <StateDebtWarning game={D.game}/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"0.5rem",marginBottom:"1rem"}}>
         <Stat label="Session" value={D.game?.session||1}/>
         <Stat label="Year" value={`${D.game?.year||218} BC`}/>
@@ -2936,7 +3147,7 @@ function ALegions({D,onRefresh}){
   const [msg,setMsg]=useState("");
   const players=D.players||[];
   const legateOptions=[{id:"",latinName:"— No Legate —"},...players];
-  const setLegateForLegion=(i,playerId)=>{const p=players.find(x=>x.id===playerId);setLegs(ls=>ls.map((l,j)=>j===i?{...l,legateId:p?.id||null,legateName:p?.latinName||"",commander:p?.latinName||l.commander||"Unassigned"}:l));};
+  const setLegateForLegion=(i,playerId)=>{const p=players.find(x=>x.id===playerId);setLegs(ls=>ls.map((l,j)=>j===i?{...l,legateId:p?.id||null,legateName:p?.latinName||""}:l));};
   useEffect(()=>{
     setLegs((D.legions||DEF_LEGIONS).map(l=>({name:l.name||`Legio ${l.id}`,max:l.max||5000,str:l.str??5000,commander:l.commander||"Unassigned",armyCommand:l.armyCommand||"Independent",...l})));
     setCav((D.cavalry||DEF_CAVALRY).map(c=>({commander:"Unassigned",...c})));
@@ -2990,7 +3201,7 @@ function ALegions({D,onRefresh}){
           {legs.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {l.name}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>
-              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander",l.commander,v=>updLeg(i,"commander",v))}<div><Lbl c="Legate Commander"/><select value={l.legateId||""} onChange={e=>setLegateForLegion(i,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{legateOptions.map(p=><option key={p.id||"none"} value={p.id}>{p.latinName}{p.id&&isAwayOnCampaign(p)?" — away":""}</option>)}</select></div>{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
+              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander / Consul",l.commander,v=>updLeg(i,"commander",v))}<div><Lbl c="Legate Under Commander"/><select value={l.legateId||""} onChange={e=>setLegateForLegion(i,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{legateOptions.map(p=><option key={p.id||"none"} value={p.id}>{p.latinName}{p.id&&isAwayOnCampaign(p)?" — away":""}</option>)}</select></div>{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
               <div><Lbl c="Status"/><select value={l.status} onChange={e=>updLeg(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.35rem 0.5rem",fontFamily:"'Cinzel',serif"}}><option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option></select></div>
             </div>
           </div>)}
@@ -3037,8 +3248,8 @@ function ABackupRestore({onRefresh}){
   const [msg,setMsg]=useState("");
   const fileRef=useRef();
   const privateFileRef=useRef();
-  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types","spqr_auctions","spqr_treasury_actions","spqr_quaestor_property_buys"];
-  const privateKeys=["spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_treasury_actions","spqr_auctions","spqr_quaestor_property_buys"];
+  const keys=["spqr_g","spqr_l","spqr_r","spqr_p","spqr_m","spqr_o","spqr_deadline","spqr_cfg","spqr_laws","spqr_n","spqr_econ","spqr_election","spqr_elections","spqr_cav","spqr_f","spqr_biz","spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_history","spqr_parties","spqr_cemetery","spqr_force_types","spqr_auctions","spqr_treasury_actions","spqr_quaestor_property_buys","spqr_consul_recruitment_requests"];
+  const privateKeys=["spqr_assets","spqr_wealth","spqr_reputation","spqr_replog","spqr_rep_rules","spqr_wealthlog","spqr_donations","spqr_treasury_actions","spqr_auctions","spqr_quaestor_property_buys","spqr_consul_recruitment_requests"];
   const downloadJson=(data,filename)=>{
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
@@ -3275,7 +3486,7 @@ function AResources({D,onRefresh}){
   };
   const restartGame=async()=>{
     if(!confirm("Restart the campaign? This will reset resources, legions, regions, motions, orders, deadlines, elections and notifications. Senators and setup images/links are kept."))return;
-    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_CAVALRY,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);await db.set("spqr_biz",DEF_BUSINESSES);await safeSetAssets([],"GM campaign reset",{allowWipe:true});await safeSetWealth({},"GM campaign reset",{allowWipe:true,mergeMissing:false});await db.set("spqr_donations",[]);await db.set("spqr_wealthlog",[]);await db.set("spqr_history",[]);await db.set("spqr_parties",[]);await db.set("spqr_auctions",[]);await db.set("spqr_quaestor_property_buys",{});
+    await db.set("spqr_g",DEF_GAME);await db.set("spqr_l",DEF_LEGIONS);await db.set("spqr_cav",DEF_CAVALRY);await db.set("spqr_f",DEF_FLEETS);await db.set("spqr_r",DEF_REGIONS);await db.set("spqr_m",[]);await db.set("spqr_o",[]);await db.set("spqr_deadline",null);await db.set("spqr_n",[]);await db.set("spqr_econ",[economySnapshot(DEF_GAME,DEF_REGIONS,DEF_LEGIONS,DEF_CAVALRY,DEF_FLEETS)]);await db.set("spqr_election",null);await db.set("spqr_elections",[]);await db.set("spqr_biz",DEF_BUSINESSES);await safeSetAssets([],"GM campaign reset",{allowWipe:true});await safeSetWealth({},"GM campaign reset",{allowWipe:true,mergeMissing:false});await db.set("spqr_donations",[]);await db.set("spqr_wealthlog",[]);await db.set("spqr_history",[]);await db.set("spqr_parties",[]);await db.set("spqr_auctions",[]);await db.set("spqr_quaestor_property_buys",{});await db.set("spqr_consul_recruitment_requests",[]);
     setG(DEF_GAME);setRegs(DEF_REGIONS.map(r=>({...r})));setMsg("Game restarted in Winter 218 BC.");onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   return <div>
@@ -3971,6 +4182,7 @@ export default function App(){
           db.set("spqr_n",[]),
           db.set("spqr_cfg",{loginOpen:true,senateImage:null,legendkeeperUrl:null}),
           db.set("spqr_treasury_actions",[]),
+          db.set("spqr_consul_recruitment_requests",[]),
         ]);
       }
       setReady(true);
