@@ -1343,12 +1343,12 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const ng={...g,foodMarketPct:pct,foodMarketStock:marketFoodAvailable({...g,foodMarketPct:pct}),foodMarketPrice:nextSell,foodMarketSellPrice:nextSell,foodMarketBuyPrice:nextBuy,aedileFoodPriceSeason:priceChanged?season:g.aedileFoodPriceSeason};
     await db.set("spqr_g",ng);
     const available=marketFoodAvailable(ng);
-    await addWealthLog({type:"market-control",session:sLab(ng),text:`${user.latinName} set the Roman food market to ${pct}% of the state stockpile: ${available}M available. State sells food at ${nextSell}T per 1M and buys food at ${nextBuy}T per 1M.${priceChanged?" Food prices are now locked for this season.":""}`});
+    await addWealthLog({type:"market-control",affectsState:true,actor:user.latinName,session:sLab(ng),text:`${user.latinName} set the Roman food market to ${pct}% of the state stockpile: ${available}M available. State sells food at ${nextSell}T per 1M and buys food at ${nextBuy}T per 1M.${priceChanged?" Food prices are now locked for this season.":""}`});
     const wl=await db.get("spqr_wealthlog")||[];setEconomicLog(wl);
     await pushN("State Food Market Updated",`${user.latinName} set ${pct}% of state food for the market: ${available}M available. State sells at ${nextSell}T/1M and buys at ${nextBuy}T/1M.${priceChanged?" Prices are locked for this season.":""}`);
     onRefresh&&onRefresh();
   };
-  const officeEconomicLog=(economicLog||[]).filter(e=>["market","state-food-sale","state-food-transfer","market-control","donation","quaestor-approved","quaestor-request"].includes(e.type)).slice(-60).reverse();
+  const officeEconomicLog=(economicLog||[]).filter(e=>["market","state-food-sale","state-food-bought","state-food-transfer","market-control","donation","quaestor-approved","quaestor-request","state-property-buy","state-property-denied-no-funds","consul-recruitment-request","consul-recruitment-approved","consul-recruitment-denied-no-funds","state-economy-cycle","state-provincial-income","state-private-tax","state-military-upkeep","state-estate-income"].includes(e.type)||e.affectsState===true).slice(-100).reverse();
 
   const [foodGrant,setFoodGrant]=useState({playerId:"",amount:""});
   useEffect(()=>{ if(!foodGrant.playerId && players?.length) setFoodGrant(f=>({...f,playerId:players[0].id})); },[players]);
@@ -1359,7 +1359,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const wealth=await db.get("spqr_wealth")||{}; const w=wealthOf(wealth,pid);
     await db.set("spqr_g",{...g,food:Number(g.food||0)-amt});
     await safeSetWealth({...wealth,[pid]:{...w,food:Number(w.food||0)+amt}},"state food grant");
-    await addWealthLog({type:"state-food-transfer",playerId:pid,session:sLab(g),text:`${user.latinName} sent ${amt}M state food to ${target.latinName}.`});
+    await addWealthLog({type:"state-food-transfer",affectsState:true,playerId:pid,playerName:target.latinName,actor:user.latinName,to:target.latinName,foodOut:amt,session:sLab(g),text:`${user.latinName} sent ${amt}M state food to ${target.latinName}.`});
     await pushN("State Food Transfer",`${user.latinName} sent ${amt}M state food to ${target.latinName}.`);
     setFoodGrant({playerId:pid,amount:""}); onRefresh&&onRefresh();
   };
@@ -1390,7 +1390,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     if(used>=4)return alert("This Quaestor has already bought 4 state properties this season.");
     const g={...DEF_GAME,...(g0||game||{})};
     if(Number(g.gold||0)<Number(biz.costGold||0)||Number(g.food||0)<Number(biz.costFood||0)){
-      await addWealthLog({type:"state-property-denied-no-funds",session:sLab(g),text:`${user.latinName} attempted to buy ${biz.name} in ${region.name}, but the state lacked funds. Required ${biz.costGold}T gold and ${biz.costFood}M food. Available ${g.gold}T gold and ${g.food}M food.`});
+      await addWealthLog({type:"state-property-denied-no-funds",affectsState:true,actor:user.latinName,goldOut:0,foodOut:0,session:sLab(g),text:`${user.latinName} attempted to buy ${biz.name} in ${region.name}, but the state lacked funds. Required ${biz.costGold}T gold and ${biz.costFood}M food. Available ${g.gold}T gold and ${g.food}M food.`});
       await notifyQuaestors("State Property Purchase Denied",`${user.latinName} attempted to buy ${biz.name} in ${region.name}, but the Republic lacks sufficient gold/food.`);
       return alert("Denied: the state treasury does not have enough gold/food to buy this property.");
     }
@@ -1398,7 +1398,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const nextGame={...g,gold:Number(g.gold||0)-Number(biz.costGold||0),food:Number(g.food||0)-Number(biz.costFood||0),foodMarketStock:marketFoodAvailable({...g,food:Number(g.food||0)-Number(biz.costFood||0)})};
     const nextLimits={...limits,[qPurchaseKey(qKey,g)]:used+1};
     await safeSetAssets([...assets,newAsset],"quaestor state property purchase",{allowDrop:0});await db.set("spqr_g",nextGame);await db.set("spqr_quaestor_property_buys",nextLimits);
-    await addWealthLog({type:"state-property-buy",session:sLab(g),text:`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State for ${biz.costGold}T gold and ${biz.costFood}M food. Quaestor seasonal purchases: ${used+1}/4.`});
+    await addWealthLog({type:"state-property-buy",affectsState:true,actor:user.latinName,to:STATE_OWNER_NAME,goldOut:Number(biz.costGold||0),foodOut:Number(biz.costFood||0),session:sLab(g),text:`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State for ${biz.costGold}T gold and ${biz.costFood}M food. Quaestor seasonal purchases: ${used+1}/4.`});
     await pushN("State Property Purchased",`${user.latinName} bought ${biz.name} in ${region.name} for the Roman State.`);
     await notifyQuaestors("State Spending Executed — Property",`${user.latinName} purchased ${biz.name} in ${region.name} for the Roman State. Cost deducted: ${biz.costGold}T gold and ${biz.costFood}M food.`);
     if(isStateInDebt(nextGame))await pushN("🚨 Massive State Debt Warning",`The Republic is now in debt: ${stateDebtText(nextGame)}.`);
@@ -1411,7 +1411,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const entry={id:`ta_${Date.now()}_${Math.random().toString(36).slice(2)}`,status:"pending",type:qAct.type,proposerRole:qKey,proposerId:user.id,proposerName:user.latinName,session:sLab(g),ts:Date.now(),playerId:qAct.playerId,playerName:target?.latinName||"",amount:Math.floor(Number(qAct.amount)||0),goldTax:Number(qAct.goldTax||0),foodTax:Number(qAct.foodTax||0),note:qAct.note||""};
     if(entry.type==="gold-transfer"&&(!entry.amount||entry.amount<=0))return alert("Enter a valid gold amount.");
     await db.set("spqr_treasury_actions",[entry,...acts].slice(0,300));
-    await addWealthLog({type:"quaestor-request",session:entry.session,text:`${user.latinName} proposed treasury action: ${treasuryActionText(entry)}. Awaiting approval by the other Quaestor.`});
+    await addWealthLog({type:"quaestor-request",affectsState:true,actor:user.latinName,playerId:entry.playerId,playerName:entry.playerName,goldOut:entry.type==="gold-transfer"?entry.amount:0,session:entry.session,text:`${user.latinName} proposed treasury action: ${treasuryActionText(entry)}. Awaiting approval by the other Quaestor.`});
     await pushN("Quaestor Approval Required",`${user.latinName} proposed: ${treasuryActionText(entry)}. The other Quaestor must approve.`);
     setQAct({type:"gold-transfer",playerId:qAct.playerId,amount:"",goldTax:"",foodTax:"",note:""}); onRefresh&&onRefresh();
   };
@@ -1428,7 +1428,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     await db.set("spqr_g",ng);
     const next=acts.map(x=>x.id===a.id?{...x,status:"approved",approvedBy:user.latinName,approvedByRole:qKey,approvedAt:Date.now()}:x);
     await db.set("spqr_treasury_actions",next);
-    await addWealthLog({type:"quaestor-approved",playerId:a.playerId||null,session:sLab(ng),text:`${user.latinName} approved treasury action: ${treasuryActionText(a)}.`});
+    await addWealthLog({type:"quaestor-approved",affectsState:true,actor:user.latinName,playerId:a.playerId||null,playerName:a.playerName||"",goldOut:a.type==="gold-transfer"?Number(a.amount||0):0,session:sLab(ng),text:`${user.latinName} approved treasury action: ${treasuryActionText(a)}.`});
     await pushN("Treasury Action Approved",`${user.latinName} approved: ${treasuryActionText(a)}.`);
     onRefresh&&onRefresh();
   };
@@ -1465,7 +1465,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const reqs=await db.get("spqr_consul_recruitment_requests")||[];
     const entry={id:`cr_${Date.now()}_${Math.random().toString(36).slice(2)}`,status:"pending",type:"recruit-unit",forceTypeId:ft.id,forceName:ft.name,forceEmoji:ft.emoji||"⚔️",forceKind:ft.type||"legion",men:Number(ft.men||0),gold:Number(ft.gold||0),food:Number(ft.food||0),turns:Number(ft.turns||1),proposerRole:role,proposerId:user.id,proposerName:user.latinName,session:sLab(g),note:consulRecruit.note||"",ts:Date.now()};
     await db.set("spqr_consul_recruitment_requests",[entry,...reqs].slice(0,300));
-    await addWealthLog({type:"consul-recruitment-request",session:entry.session,text:`${user.latinName} proposed: ${consulRecruitmentText(entry)}. Awaiting approval by the other Consul. Quaestors notified of the potential state spending.`});
+    await addWealthLog({type:"consul-recruitment-request",affectsState:true,actor:user.latinName,goldOut:Number(entry.gold||0),foodOut:Number(entry.food||0),manpowerOut:Number(entry.men||0),session:entry.session,text:`${user.latinName} proposed: ${consulRecruitmentText(entry)}. Awaiting approval by the other Consul. Quaestors notified of the potential state spending.`});
     await pushN("Consular Recruitment Approval Required",`${user.latinName} proposed: ${consulRecruitmentText(entry)}. The other Consul must approve.`);
     await notifyQuaestors("State Spending Notice — Recruitment",`${user.latinName} proposed recruiting ${ft.emoji||"⚔️"} ${ft.name} for ${ft.gold||0}T gold, ${ft.food||0}M food and ${ft.men||0} manpower. Quaestors should monitor treasury capacity.`);
     setConsulRecruit(x=>({...x,note:""}));
@@ -1485,7 +1485,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     if(Number(g.gold||0)<Number(current.gold||0)||Number(g.food||0)<Number(current.food||0)||Number(g.pop||0)<Number(current.men||0)){
       const next=reqs.map(x=>x.id===current.id?{...x,status:"denied_no_funds",deniedBy:user.latinName,deniedByRole:role,deniedAt:Date.now(),denialReason:"Insufficient state gold, food or manpower"}:x);
       await db.set("spqr_consul_recruitment_requests",next);
-      await addWealthLog({type:"consul-recruitment-denied-no-funds",session:sLab(g),text:`Recruitment denied for ${current.forceName}: insufficient state funds/manpower. Required ${current.gold}T gold, ${current.food}M food and ${current.men} manpower. Available ${g.gold}T gold, ${g.food}M food and ${g.pop} manpower.`});
+      await addWealthLog({type:"consul-recruitment-denied-no-funds",affectsState:true,goldOut:0,foodOut:0,manpowerOut:0,session:sLab(g),text:`Recruitment denied for ${current.forceName}: insufficient state funds/manpower. Required ${current.gold}T gold, ${current.food}M food and ${current.men} manpower. Available ${g.gold}T gold, ${g.food}M food and ${g.pop} manpower.`});
       await pushN("Recruitment Denied — No Funds",`${current.forceName} could not be recruited because the Republic lacks sufficient gold, food or manpower.`);
       await notifyQuaestors("Recruitment Denied — Treasury Failed",`${current.forceName} was denied due to insufficient state resources. Required ${current.gold}T / ${current.food}M / ${current.men} men. Available ${g.gold}T / ${g.food}M / ${g.pop} men.`);
       await loadConsulRecruitment();
@@ -1501,7 +1501,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     await db.set("spqr_g",nextGame);
     const next=reqs.map(x=>x.id===current.id?{...x,status:"approved",approvedBy:user.latinName,approvedByRole:role,approvedAt:Date.now(),createdUnitId:unit.id,createdUnitName:unit.name}:x);
     await db.set("spqr_consul_recruitment_requests",next);
-    await addWealthLog({type:"consul-recruitment-approved",session:sLab(nextGame),text:`${user.latinName} approved recruitment: ${consulRecruitmentText(current)}. Unit created as ${unit.name}. Quaestors notified of state spending.`});
+    await addWealthLog({type:"consul-recruitment-approved",affectsState:true,actor:user.latinName,goldOut:Number(current.gold||0),foodOut:Number(current.food||0),manpowerOut:Number(current.men||0),session:sLab(nextGame),text:`${user.latinName} approved recruitment: ${consulRecruitmentText(current)}. Unit created as ${unit.name}. Quaestors notified of state spending.`});
     await pushN("Consular Recruitment Approved",`${user.latinName} approved ${current.forceName}. The unit is now raising.`);
     await notifyQuaestors("State Spending Executed — Recruitment",`${user.latinName} approved recruitment of ${current.forceName}. Cost deducted: ${current.gold}T gold, ${current.food}M food and ${current.men} manpower.`);
     if(isStateInDebt(nextGame))await pushN("🚨 Massive State Debt Warning",`The Republic is now in debt: ${stateDebtText(nextGame)}.`);
@@ -1685,6 +1685,7 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           </div>
           <div style={{marginTop:"0.8rem"}}><STit c="Pending Quaestor Approvals"/>{pendingTreasury.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No pending treasury actions.</div>:pendingTreasury.map(a=><div key={a.id} style={{padding:"0.55rem",border:`1px solid ${T.border}`,background:T.bg,marginBottom:"0.4rem"}}><b>{treasuryActionText(a)}</b><br/><small>Proposed by {a.proposerName} · {a.session}{a.note?` · ${a.note}`:""}</small><Row gap="0.35rem" wrap><Btn sm v="green" disabled={a.proposerRole===qKey} onClick={()=>approveTreasuryAction(a)}>Approve</Btn><Btn sm v="red" disabled={a.proposerRole===qKey} onClick={()=>rejectTreasuryAction(a)}>Reject</Btn>{a.proposerRole===qKey&&<span style={{fontSize:"0.8rem",color:T.mut}}>Waiting for the other Quaestor</span>}</Row></div>)}</div>
           <div style={{marginTop:"0.8rem"}}><STit c="Quaestor Treasury History" sub="Approved, rejected and proposed treasury measures remain visible here for both Quaestors."/>{(treasuryActions||[]).length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No treasury measures recorded yet.</div>:<div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Status","Measure","Proposed By","Approved / Rejected By","Session","Note"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{(treasuryActions||[]).slice(0,80).map(a=>{const col=a.status==="approved"?T.gre:a.status==="rejected"?T.rhi:T.gold;return <tr key={a.id}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,color:col,fontWeight:900,textTransform:"uppercase"}}>{a.status||"pending"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{treasuryActionText(a)}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.proposerName||"Unknown"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.approvedBy||a.rejectedBy||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.session||"—"}</td><td style={{padding:"0.45rem",border:`1px solid ${T.border}`}}>{a.note||"—"}</td></tr>})}</tbody></table></div>}</div>
+          <div style={{marginTop:"0.8rem"}}><STit c="Detailed State Balance Ledger" sub="Visible to both Quaestors. Shows money and food entering or leaving the state: food market trades, private taxes by senator, recruitment, property purchases, military upkeep and estate income."/><StateLedgerTable entries={economicLog}/></div>
           <div style={{marginTop:"0.8rem"}}><STit c="State Market & Food Transaction Ledger" sub="Shows state market purchases, senator food sales to the state, donations, grants and market-rule changes."/>{officeEconomicLog.length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No market or state food transactions recorded yet.</div>:officeEconomicLog.map(e=><div key={e.id||e.ts} style={{padding:"0.4rem 0",borderBottom:`1px solid ${T.border}`}}>{e.session&&<b>{e.session}: </b>}{e.text}</div>)}</div>
         </Card>
       )}
@@ -1965,28 +1966,117 @@ function MapPanel({cfg}){
 }
 
 
-function EconomyGraph({history=[]}){
-  const data=(history||[]).slice(-8);
+function economyHistoryWithCurrent(history=[],currentSnap=null){
+  const list=Array.isArray(history)?history.filter(Boolean):[];
+  if(!currentSnap)return list;
+  const curLabel=currentSnap.label||"Current";
+  const idx=list.findIndex(x=>String(x.label||"")===String(curLabel));
+  if(idx>=0){const copy=[...list];copy[idx]={...copy[idx],...currentSnap,live:true};return copy;}
+  return [...list,{...currentSnap,live:true}];
+}
+function EconomyGraph({history=[],current=null}){
+  const all=economyHistoryWithCurrent(history,current);
+  const data=all.slice(-12);
   if(data.length===0)return <div style={{color:T.mut,fontStyle:"italic",fontSize:"1.05rem"}}>Economy history will appear after the GM advances at least one session.</div>;
   const maxGold=Math.max(1,...data.map(x=>Math.abs(x.netGold||0)));
   const maxFood=Math.max(1,...data.map(x=>Math.abs(x.netFood||0)));
   return(
-    <div style={{display:"grid",gridTemplateColumns:`repeat(${data.length},minmax(58px,1fr))`,gap:"0.45rem",alignItems:"end",minHeight:210,padding:"0.75rem",background:T.bg,border:`1px solid ${T.border}`,overflowX:"auto"}}>
-      {data.map((d,i)=>{
-        const gh=Math.max(8,Math.round(Math.abs(d.netGold||0)/maxGold*130));
-        const fh=Math.max(8,Math.round(Math.abs(d.netFood||0)/maxFood*130));
-        return <div key={i} style={{textAlign:"center",minWidth:58}}>
-          <div style={{height:150,display:"flex",alignItems:"flex-end",justifyContent:"center",gap:4}}>
-            <div title={`Net gold ${d.netGold}`} style={{height:gh,width:18,background:(d.netGold||0)>=0?T.gold:T.rhi,border:`1px solid ${T.border}`}}/>
-            <div title={`Net food ${d.netFood}`} style={{height:fh,width:18,background:(d.netFood||0)>=0?T.green:T.rhi,border:`1px solid ${T.border}`}}/>
-          </div>
-          <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.58rem",color:T.mut,marginTop:"0.35rem",lineHeight:1.2}}>{d.label}</div>
-          <div style={{fontSize:"0.9rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
-          <div style={{fontSize:"0.9rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
-        </div>;
-      })}
+    <div>
+      {data.length<=1&&<div style={{padding:"0.45rem",background:"#FFF7E6",border:`1px solid ${T.gold}`,color:T.ghi,marginBottom:"0.5rem"}}>Only one economy snapshot is currently saved. Previous seasons can only appear if they were recorded before the advance/reset. From now on, each season advance will append a new snapshot instead of replacing the chart.</div>}
+      <div style={{display:"grid",gridTemplateColumns:`repeat(${data.length},minmax(64px,1fr))`,gap:"0.45rem",alignItems:"end",minHeight:210,padding:"0.75rem",background:T.bg,border:`1px solid ${T.border}`,overflowX:"auto"}}>
+        {data.map((d,i)=>{
+          const gh=Math.max(8,Math.round(Math.abs(d.netGold||0)/maxGold*130));
+          const fh=Math.max(8,Math.round(Math.abs(d.netFood||0)/maxFood*130));
+          return <div key={`${d.label||i}-${d.ts||i}`} style={{textAlign:"center",minWidth:64}}>
+            <div style={{height:150,display:"flex",alignItems:"flex-end",justifyContent:"center",gap:4}}>
+              <div title={`Net gold ${d.netGold}`} style={{height:gh,width:18,background:(d.netGold||0)>=0?T.gold:T.rhi,border:`1px solid ${T.border}`}}/>
+              <div title={`Net food ${d.netFood}`} style={{height:fh,width:18,background:(d.netFood||0)>=0?T.green:T.rhi,border:`1px solid ${T.border}`}}/>
+            </div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.58rem",color:T.mut,marginTop:"0.35rem",lineHeight:1.2}}>{d.label}{d.live?" · live":""}</div>
+            <div style={{fontSize:"0.9rem",color:(d.netGold||0)>=0?T.ghi:T.rhi}}>{(d.netGold||0)>=0?"+":""}{d.netGold||0}T</div>
+            <div style={{fontSize:"0.9rem",color:(d.netFood||0)>=0?T.green:T.rhi}}>{(d.netFood||0)>=0?"+":""}{d.netFood||0}M</div>
+          </div>;
+        })}
+      </div>
+      <div style={{overflowX:"auto",marginTop:"0.65rem"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",minWidth:"720px",fontSize:"0.86rem"}}>
+          <thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Season","Gold Stock","Food Stock","Gold Income","Food Income","Gold Upkeep","Food Upkeep","Net Gold","Net Food"].map(h=><th key={h} style={{textAlign:"left",padding:"0.35rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
+          <tbody>{data.slice().reverse().map((d,i)=><tr key={`hist-${d.label||i}-${d.ts||i}`}>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,fontWeight:900}}>{d.label}{d.live?" · live":""}</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>{fmt(d.gold||0)}T</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:RES.food.color}}>{fmt(d.food||0)}M</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:T.gre}}>+{fmt(d.goldIncome||0)}T</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:T.gre}}>+{fmt(d.foodIncome||0)}M</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:T.rhi}}>-{fmt(d.goldUpkeep||0)}T</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:T.rhi}}>-{fmt(d.foodUpkeep||0)}M</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:(d.netGold||0)>=0?RES.gold.color:T.rhi}}>{(d.netGold||0)>=0?"+":""}{fmt(d.netGold||0)}T</td>
+            <td style={{padding:"0.35rem",border:`1px solid ${T.border}`,color:(d.netFood||0)>=0?RES.food.color:T.rhi}}>{(d.netFood||0)>=0?"+":""}{fmt(d.netFood||0)}M</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
     </div>
   );
+}
+
+const stateLedgerTypeLabel=t=>({
+  "state-economy-cycle":"Season Economy Cycle",
+  "state-provincial-income":"Provincial Income",
+  "state-private-tax":"Private Estate Tax",
+  "state-military-upkeep":"Military Upkeep",
+  "state-estate-income":"State Estate Income",
+  "state-property-buy":"State Property Purchase",
+  "state-property-denied-no-funds":"Property Denied",
+  "consul-recruitment-request":"Recruitment Proposed",
+  "consul-recruitment-approved":"Recruitment Approved",
+  "consul-recruitment-denied-no-funds":"Recruitment Denied",
+  "consul-recruitment-rejected":"Recruitment Rejected",
+  "state-food-sale":"Food Sold by State",
+  "state-food-bought":"Food Bought by State",
+  "state-food-transfer":"State Food Transfer",
+  "market-control":"Market Rule Change",
+  "donation":"Private Donation",
+  "quaestor-request":"Quaestor Request",
+  "quaestor-approved":"Quaestor Approved",
+  "quaestor-rejected":"Quaestor Rejected"
+}[t]||String(t||"State Entry"));
+const ledgerGoldIn=e=>Number((e.goldIn??e.stateGoldIn??(Number(e.goldDelta||0)>0?e.goldDelta:0))||0);
+const ledgerGoldOut=e=>Number((e.goldOut??e.stateGoldOut??(Number(e.goldDelta||0)<0?Math.abs(e.goldDelta):0))||0);
+const ledgerFoodIn=e=>Number((e.foodIn??e.stateFoodIn??(Number(e.foodDelta||0)>0?e.foodDelta:0))||0);
+const ledgerFoodOut=e=>Number((e.foodOut??e.stateFoodOut??(Number(e.foodDelta||0)<0?Math.abs(e.foodDelta):0))||0);
+const ledgerManpowerOut=e=>Number((e.manpowerOut??e.menOut??(Number(e.manpowerDelta||0)<0?Math.abs(e.manpowerDelta):0))||0);
+const stateLedgerEntries=(wealthlog=[])=>{
+  const wanted=new Set(["state-economy-cycle","state-provincial-income","state-private-tax","state-military-upkeep","state-estate-income","state-property-buy","state-property-denied-no-funds","consul-recruitment-request","consul-recruitment-approved","consul-recruitment-denied-no-funds","consul-recruitment-rejected","state-food-sale","state-food-bought","state-food-transfer","market-control","donation","quaestor-request","quaestor-approved","quaestor-rejected"]);
+  return (wealthlog||[]).filter(e=>wanted.has(e.type)||e.affectsState===true).slice().sort((a,b)=>Number(b.ts||0)-Number(a.ts||0));
+};
+function StateLedgerTable({entries=[]}){
+  const list=stateLedgerEntries(entries).slice(0,160);
+  const totals=list.reduce((a,e)=>({goldIn:a.goldIn+ledgerGoldIn(e),goldOut:a.goldOut+ledgerGoldOut(e),foodIn:a.foodIn+ledgerFoodIn(e),foodOut:a.foodOut+ledgerFoodOut(e),menOut:a.menOut+ledgerManpowerOut(e)}),{goldIn:0,goldOut:0,foodIn:0,foodOut:0,menOut:0});
+  if(!list.length)return <div style={{color:T.mut,fontStyle:"italic"}}>No detailed state ledger entries recorded yet. New income, taxes, buying/selling food, recruitment, property purchases and upkeep will appear here.</div>;
+  return <div>
+    <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.45rem",marginBottom:"0.65rem"}}>
+      <Stat label="🪙 Gold In" value={`+${fmt(totals.goldIn)}T`} color={RES.gold.color}/>
+      <Stat label="🪙 Gold Out" value={`-${fmt(totals.goldOut)}T`} color={T.rhi}/>
+      <Stat label="🌾 Food In" value={`+${fmt(totals.foodIn)}M`} color={RES.food.color}/>
+      <Stat label="🌾 Food Out" value={`-${fmt(totals.foodOut)}M`} color={T.rhi}/>
+      <Stat label="👥 Manpower Used" value={`-${fmt(totals.menOut)}`} color={T.rhi}/>
+    </div>
+    <div style={{overflowX:"auto"}}>
+      <table style={{width:"100%",borderCollapse:"collapse",minWidth:"980px",fontSize:"0.86rem"}}>
+        <thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Session","Type","From / To","Gold In","Gold Out","Food In","Food Out","Men","Details"].map(h=><th key={h} style={{textAlign:"left",padding:"0.4rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead>
+        <tbody>{list.map(e=><tr key={e.id||`${e.ts}-${e.type}`}>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>{e.session||"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,fontWeight:900}}>{stateLedgerTypeLabel(e.type)}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`}}>{e.from||e.to||e.playerName||e.actor||e.proposerName||"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,color:RES.gold.color}}>{ledgerGoldIn(e)?`+${fmt(ledgerGoldIn(e))}T`:"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,color:T.rhi}}>{ledgerGoldOut(e)?`-${fmt(ledgerGoldOut(e))}T`:"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,color:RES.food.color}}>{ledgerFoodIn(e)?`+${fmt(ledgerFoodIn(e))}M`:"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,color:T.rhi}}>{ledgerFoodOut(e)?`-${fmt(ledgerFoodOut(e))}M`:"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`,color:ledgerManpowerOut(e)?T.rhi:T.mut}}>{ledgerManpowerOut(e)?`-${fmt(ledgerManpowerOut(e))}`:"—"}</td>
+          <td style={{padding:"0.4rem",border:`1px solid ${T.border}`}}>{e.text||e.note||"—"}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  </div>;
 }
 
 
@@ -2058,7 +2148,7 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
       </Card>
       <Card>
         <STit c="Economy Trend" sub="Updated when the Game Master advances the session."/>
-        <EconomyGraph history={D.econ||[]}/>
+        <EconomyGraph history={D.econ||[]} current={snap}/>
         <div style={{display:"flex",gap:"0.8rem",marginTop:"0.5rem",fontSize:"0.9rem",color:T.mut,flexWrap:"wrap"}}><span style={goldStyle}>■ {RES.gold.emoji} Gold net</span><span style={foodStyle}>■ {RES.food.emoji} Food net</span></div>
       </Card>
       <Card>
@@ -3465,6 +3555,7 @@ function AResources({D,onRefresh}){
     await db.set("spqr_g",ng);
     setG(ng);
     setMsg("Military maintenance applied to the stockpile.");
+    await addWealthLog({type:"state-military-upkeep",affectsState:true,session:sLab(ng),goldOut:upkeepG,foodOut:upkeepF,text:`Manual military maintenance applied: ${upkeepG}T gold and ${upkeepF}M food paid for legions, cavalry and fleets.`});
     await pushN("treasury","Military Maintenance Applied",`The treasury paid ${upkeepG}T and the granaries issued ${upkeepF}M for legions, cavalry and fleets.`);
     onRefresh();setTimeout(()=>setMsg(""),3000);
   };
@@ -3480,6 +3571,8 @@ function AResources({D,onRefresh}){
     const nl=legs.map(l=>{if(l.status==="raising"){const np=(l.prog||0)+1;if(np>=lturns)return{...l,status:"active",str:l.max||5000,max:l.max||5000,prog:0};return{...l,prog:np};}return l;});
     await db.set("spqr_l",nl);
     let ng={...g,gold:Math.max(0,gold),food:Math.max(0,food),pop,year:newYear,season:newSeason,sessionInSeason:newSess,session};
+    await addWealthLog({type:"state-provincial-income",affectsState:true,session:sLab(ng),goldIn:inc.gold,foodIn:inc.food,text:`Provincial income added to the treasury: ${inc.gold}T gold and ${inc.food}M food.`});
+    await addWealthLog({type:"state-military-upkeep",affectsState:true,session:sLab(ng),goldOut:upkeepG,foodOut:upkeepF,text:`Military upkeep paid: ${upkeepG}T gold and ${upkeepF}M food for legions, cavalry and fleets.`});
     const hist=await db.get("spqr_econ")||[];
     await db.set("spqr_econ",[...hist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)].slice(-24));
     // Pay private estate/business income to senators once per advanced season.
@@ -3490,7 +3583,7 @@ function AResources({D,onRefresh}){
     const stateEstateIncome=(assets||[]).filter(a=>isStateOwner(a.ownerId)).reduce((acc,a)=>{const bz=getBiz(businesses,a.typeId);acc.gold+=effectiveGoldIncome(bz.incomeGold,g);acc.food+=effectiveFoodIncome(bz.incomeFood,g);return acc;},{gold:0,food:0});
     if(stateEstateIncome.gold||stateEstateIncome.food){
       ng={...ng,gold:Number(ng.gold||0)+stateEstateIncome.gold,food:Number(ng.food||0)+stateEstateIncome.food};
-      await addWealthLog({type:"state-estate-income",session:sLab(ng),text:`State-owned estates produced ${stateEstateIncome.gold}T gold and ${stateEstateIncome.food}M food for the Roman treasury.`});
+      await addWealthLog({type:"state-estate-income",affectsState:true,from:STATE_OWNER_NAME,session:sLab(ng),goldIn:stateEstateIncome.gold,foodIn:stateEstateIncome.food,text:`State-owned estates produced ${stateEstateIncome.gold}T gold and ${stateEstateIncome.food}M food for the Roman treasury.`});
     }
     const nextWealth={...wealth};
     let nextPlayers=[...players];
@@ -3520,6 +3613,9 @@ function AResources({D,onRefresh}){
       const bal=personalBalanceFor(pl.id,pl.role,assets,businesses,{...nextWealth,[pl.id]:w},g);
       totalTaxGold+=bal.taxGold;
       totalTaxFood+=bal.taxFood;
+      if(bal.taxGold||bal.taxFood){
+        await addWealthLog({type:"state-private-tax",affectsState:true,playerId:pl.id,playerName:pl.latinName,from:pl.latinName,session:sLab(ng),goldIn:bal.taxGold,foodIn:bal.taxFood,text:`Private estate tax collected from ${pl.latinName}: ${bal.taxGold}T gold and ${bal.taxFood}M food.`});
+      }
       const goldAfter=Number(w.gold||0)+bal.netGold;
       const foodAfter=Number(w.food||0)+bal.netFood;
       nextWealth[pl.id]={...w,gold:goldAfter,food:foodAfter,
@@ -3540,6 +3636,7 @@ function AResources({D,onRefresh}){
       ng={...ng,gold:Math.max(0,Number(ng.gold||0)+totalTaxGold),food:Math.max(0,Number(ng.food||0)+totalTaxFood)};
       await pushN("Private Taxes Collected",`The Quaestores collected ${totalTaxGold}T and ${totalTaxFood}M from private estate income.`);
     }
+    await addWealthLog({type:"state-economy-cycle",affectsState:true,session:sLab(ng),goldIn:inc.gold+totalTaxGold+stateEstateIncome.gold,foodIn:inc.food+totalTaxFood+stateEstateIncome.food,goldOut:upkeepG,foodOut:upkeepF,text:`Season economy cycle completed. Income: ${inc.gold}T/${inc.food}M provincial, ${totalTaxGold}T/${totalTaxFood}M private taxes, ${stateEstateIncome.gold}T/${stateEstateIncome.food}M state estates. Upkeep: ${upkeepG}T/${upkeepF}M military.`});
     await safeSetWealth(nextWealth,"private wealth update");
     await db.set("spqr_g",ng);
     const finalHist=await db.get("spqr_econ")||[];
