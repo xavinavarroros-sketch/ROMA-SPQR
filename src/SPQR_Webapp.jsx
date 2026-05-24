@@ -39,6 +39,12 @@ const CLASS_INFO={
 const classKey=cls=>String(cls||"").toLowerCase().replace(/[^a-z]/g,"");
 const getClassInfo=cls=>{const k=classKey(cls);return CLASS_INFO[k]||CLASS_INFO[k.includes("patric")?"patrician":k.includes("pleb")?"plebeian":k.includes("equest")?"equestrian":k.includes("novus")?"novus":k.includes("ally")?"ally":"patrician"];};
 const ClassBadge=({cls,sm})=>{const ci=getClassInfo(cls);return <span style={{display:"inline-block",background:ci.bg,border:`1px solid ${ci.color}`,color:ci.color,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{ci.emoji} {ci.label}</span>;};
+const isAwayOnCampaign=p=>!!(p?.awayCampaign||p?.awayFromRome||p?.onCampaign);
+const campaignReason=p=>p?.campaignReason||p?.awayReason||"Away from Rome on campaign";
+const votingEligiblePlayers=players=>(players||[]).filter(p=>!isAwayOnCampaign(p));
+const voteCountFromEligible=(votes={},eligiblePlayers=[])=>{const ids=new Set((eligiblePlayers||[]).map(p=>String(p.id)));return Object.entries(votes||{}).filter(([id])=>ids.has(String(id)));};
+const AwayCampaignBadge=({p,sm})=>isAwayOnCampaign(p)?<span style={{display:"inline-block",background:"#FFF7ED",border:`1px solid ${T.gold}`,color:T.ghi,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>⛺ Away on Campaign</span>:null;
+function AwayCampaignNotice({user,context="this political section"}){return <Card style={{borderLeft:`6px solid ${T.gold}`,background:"#FFF7ED"}}><STit c="⛺ Away from Rome" sub={`You are currently marked as on campaign. While away from Rome, you cannot access ${context}, propose motions, speak in the Senate/Forum, or vote in motions/elections.`}/><div style={{color:T.mut,lineHeight:1.5}}>Reason: <b>{campaignReason(user)}</b></div></Card>;}
 
 const CLASS_UPGRADES={
   plebeian:{to:"Equestrian",gold:800,food:100,label:"Rise from Plebeian to Equestrian"},
@@ -799,7 +805,7 @@ function SenatePanel({players,D,onGoVote}){
                 {p.avatar?<img src={p.avatar} style={{width:54,height:54,objectFit:"cover",borderRadius:"50%",border:`2px solid ${pos?pos.color:ci.color}`,flexShrink:0}} alt=""/>:<div style={{width:54,height:54,background:`${ci.color}22`,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.35rem",color:ci.color,fontFamily:"'Cinzel',serif",flexShrink:0}}>{ci.emoji}</div>}
                 <div style={{minWidth:0}}>
                   <div style={{fontFamily:"'Cinzel',serif",color:T.text,fontSize:"1.05rem",fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.latinName}</div>
-                  <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap",marginTop:"0.15rem"}}><ClassBadge cls={p.charClass} sm/>{p.discord&&<span style={{color:"#7289DA",fontSize:"0.85rem"}}>{p.discord}</span>}</div>
+                  <div style={{display:"flex",gap:"0.35rem",alignItems:"center",flexWrap:"wrap",marginTop:"0.15rem"}}><ClassBadge cls={p.charClass} sm/><AwayCampaignBadge p={p} sm/>{p.discord&&<span style={{color:"#7289DA",fontSize:"0.85rem"}}>{p.discord}</span>}</div>
                   {pos&&<div style={{marginTop:"0.2rem"}}><Badge c={pos.title} color={pos.color} sm/></div>}
                   {partyOf(parties,p.id)&&<div style={{marginTop:"0.2rem"}}><PartyBadge party={partyOf(parties,p.id)} sm/></div>}
                 </div>
@@ -815,10 +821,12 @@ function SenatePanel({players,D,onGoVote}){
 }
 
 function majorityInfoForMotion(motion,players){
-  const voterCount=(players||[]).length||0;
+  const eligible=votingEligiblePlayers(players||[]);
+  const voterCount=eligible.length||0;
   const majority=voterCount?Math.floor(voterCount/2)+1:0;
-  const ayeCount=Object.values(motion?.votes||{}).filter(v=>v==="yea").length;
-  const nayCount=Object.values(motion?.votes||{}).filter(v=>v==="nay").length;
+  const eligibleVotes=voteCountFromEligible(motion?.votes||{},eligible).map(([,v])=>v);
+  const ayeCount=eligibleVotes.filter(v=>v==="yea").length;
+  const nayCount=eligibleVotes.filter(v=>v==="nay").length;
   return {voterCount,majority,ayeCount,nayCount,ayeLeft:Math.max(majority-ayeCount,0),nayLeft:Math.max(majority-nayCount,0)};
 }
 
@@ -833,6 +841,7 @@ function MajorityStatus({motion,players}){
 }
 
 function VotingPanel({motions,players,user,game,onRefresh}){
+  if(isAwayOnCampaign(user))return <AwayCampaignNotice user={user} context="Senate motions and voting"/>;
   const [form,setForm]=useState({title:"",body:"",speech:"",effects:"",implementationOffice:"",sector:""});
   const [err,setErr]=useState("");const [ok,setOk]=useState("");
   const [selMotion,setSelMotion]=useState(null);
@@ -889,6 +898,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
     return motion;
   };
   const vote=async(motionId,choice)=>{
+    if(isAwayOnCampaign(user)){setErr("You are away from Rome on campaign and cannot vote in Senate motions.");return;}
     const all=await db.get("spqr_m")||[];
     const m=all.find(x=>x.id===motionId);
     if(!m||m.status!=="voting")return;
@@ -951,8 +961,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
         {voting.map(m=>{
           const myVote=m.votes?.[user.id];
           const isSel=selMotion===m.id;
-          const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
-          const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+          const eligible=votingEligiblePlayers(players);
+          const eligibleVotes=voteCountFromEligible(m.votes||{},eligible).map(([,v])=>v);
+          const yeas=eligibleVotes.filter(v=>v==="yea").length;
+          const nays=eligibleVotes.filter(v=>v==="nay").length;
           return(
             <Card key={m.id} style={{borderLeft:`3px solid ${T.gold}`}}>
               <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
@@ -985,8 +997,10 @@ function VotingPanel({motions,players,user,game,onRefresh}){
       <STit c="Pending / Queued Motions" sub="Motions awaiting GM approval, rejected by GM, or queued behind the active motion."/>
       {[...pendingLike].reverse().map(m=>{
         const isSel=selMotion===m.id;
-        const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
-        const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+        const eligible=votingEligiblePlayers(D.players||[]);
+        const eligibleVotes=voteCountFromEligible(m.votes||{},eligible).map(([,v])=>v);
+        const yeas=eligibleVotes.filter(v=>v==="yea").length;
+        const nays=eligibleVotes.filter(v=>v==="nay").length;
         return(
           <Card key={m.id} style={{borderLeft:`3px solid ${scol[m.status]||T.fnt}`}}>
             <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
@@ -1153,6 +1167,8 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
   const isConsul=role.startsWith("consul");
   const [praetorAssign,setPraetorAssign]=useState({playerId:"",title:"Praetor Militare",command:""});
   const [fieldPraetors,setFieldPraetors]=useState([]);
+  const [legateAssign,setLegateAssign]=useState({legionId:"",playerId:""});
+  useEffect(()=>{ if(isConsul){setLegateAssign(x=>({legionId:x.legionId||((legions||[])[0]?.id||""),playerId:x.playerId||((players||[])[0]?.id||"")}));}},[isConsul,legions,players]);
   useEffect(()=>{ if(isConsul && !praetorAssign.playerId && players?.length) setPraetorAssign(x=>({...x,playerId:players[0].id})); },[isConsul,players,praetorAssign.playerId]);
   useEffect(()=>{let alive=true;(async()=>{if(!isConsul)return;const cfg=await db.get("spqr_cfg")||{};if(alive)setFieldPraetors(cfg.fieldPraetors||[]);})();return()=>{alive=false};},[isConsul,players?.length]);
   const assignFieldPraetor=async()=>{
@@ -1172,6 +1188,29 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
     const cfg=await db.get("spqr_cfg")||{};
     const next=(cfg.fieldPraetors||[]).map(x=>x.id===id?{...x,active:false,removedAt:Date.now(),removedBy:user.latinName}:x);
     await db.set("spqr_cfg",{...cfg,fieldPraetors:next});setFieldPraetors(next);onRefresh&&onRefresh();
+  };
+  const assignLegateToLegion=async()=>{
+    if(!isConsul)return alert("Only Consuls can assign legates from this panel.");
+    const target=players.find(p=>p.id===legateAssign.playerId); if(!target)return alert("Choose a senator to serve as legate.");
+    const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
+    const chosen=allLegions.find(l=>String(l.id)===String(legateAssign.legionId)); if(!chosen)return alert("Choose a legion.");
+    const nextLegions=allLegions.map(l=>String(l.id)===String(chosen.id)?{...l,legateId:target.id,legateName:target.latinName,commander:target.latinName,assignedBy:user.latinName,assignedById:user.id,legateAssignedAt:new Date().toISOString()}:l);
+    const allPlayers=await db.get("spqr_p")||players||[];
+    const nextPlayers=allPlayers.map(p=>p.id===target.id?{...p,awayCampaign:true,campaignReason:`Legate commanding ${chosen.name||`Legio ${chosen.id}`}`,campaignAssignedBy:user.latinName,campaignSince:new Date().toISOString()}:p);
+    await db.set("spqr_l",nextLegions);
+    await db.set("spqr_p",nextPlayers);
+    await addHistory(target.id,"Legate Assigned",`${target.latinName} was appointed legate of ${chosen.name||`Legio ${chosen.id}`} by ${user.latinName}. Marked away from Rome.`,"office");
+    await pushN("Legate Assigned",`${target.latinName} has been appointed legate of ${chosen.name||`Legio ${chosen.id}`} by ${user.latinName}.`);
+    await pushN("Away from Rome",`You have been marked away from Rome as legate of ${chosen.name||`Legio ${chosen.id}`}. Senate motions, elections and Forum access are restricted until recalled.`,target.id);
+    onRefresh&&onRefresh();
+  };
+  const recallLegateFromLegion=async(legion)=>{
+    if(!isConsul)return;
+    const allLegions=await db.get("spqr_l")||legions||DEF_LEGIONS;
+    const targetId=legion.legateId;
+    await db.set("spqr_l",allLegions.map(l=>String(l.id)===String(legion.id)?{...l,legateId:null,legateName:"",commander:l.commander===legion.legateName?"Unassigned":l.commander,recalledBy:user.latinName,recalledAt:new Date().toISOString()}:l));
+    if(targetId){const allPlayers=await db.get("spqr_p")||players||[];await db.set("spqr_p",allPlayers.map(p=>p.id===targetId?{...p,awayCampaign:false,campaignReason:"",campaignRecalledBy:user.latinName,campaignRecalledAt:new Date().toISOString()}:p));await pushN("Recalled to Rome",`You have been recalled from ${legion.name||`Legio ${legion.id}`}. Senate motions and elections are available again.`,targetId);}
+    onRefresh&&onRefresh();
   };
   const isQuaestor=role.startsWith("quaestor");
   const isEmergency=role.startsWith("dictator")||role.startsWith("magister_equitum");
@@ -1303,6 +1342,25 @@ function MyOfficePanel({user,game,legions,cavalry=[],fleets=[],players,orders,de
           </div>
         </Card>
       )}
+      {isConsul&&(
+        <Card>
+          <STit c="Consular Legate Commands" sub="Assign senators as legates to command specific legions. Assigned legates are automatically marked away from Rome, so they cannot see Senate motions, vote, or participate in elections until recalled."/>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"0.55rem",alignItems:"end"}}>
+            <div><Lbl c="Legion"/><select value={legateAssign.legionId} onChange={e=>setLegateAssign(x=>({...x,legionId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(legions||[]).map(l=><option key={l.id} value={l.id}>{l.name||`Legio ${l.id}`} · {l.location||"Unknown"}</option>)}</select></div>
+            <div><Lbl c="Senator / Legate"/><select value={legateAssign.playerId} onChange={e=>setLegateAssign(x=>({...x,playerId:e.target.value}))} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem"}}>{(players||[]).map(p=><option key={p.id} value={p.id}>{p.latinName}{isAwayOnCampaign(p)?" — already away":""}</option>)}</select></div>
+            <Btn v="green" onClick={assignLegateToLegion}>⚔️ Assign Legate</Btn>
+          </div>
+          <div style={{marginTop:"0.75rem",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.5rem"}}>
+            {(legions||[]).map(l=><div key={l.id} style={{background:T.surf,border:`1px solid ${T.border}`,borderLeft:`4px solid ${l.legateId?T.gold:T.fnt}`,padding:"0.6rem"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontWeight:900}}>🛡️ {l.name||`Legio ${l.id}`}</div>
+              <div style={{color:T.mut,fontSize:"0.9rem"}}>Location: {l.location||"Unknown"}</div>
+              <div style={{marginTop:"0.25rem"}}>Legate: <b>{l.legateName||"None"}</b></div>
+              {l.legateId&&<Btn v="ghost" sm onClick={()=>recallLegateFromLegion(l)}>Recall Legate</Btn>}
+            </div>)}
+          </div>
+        </Card>
+      )}
+
       {isConsul&&(
         <Card>
           <STit c="Field Praetors — Army Command Assistants" sub="Consuls may appoint senators as temporary Praetors to help command armies. This does not wipe existing offices; it creates a visible military assignment."/>
@@ -1805,6 +1863,7 @@ function LegionsPublicPanel({D}){
           <UnitLine label="Strength" value={`${fmt(l.str||0)} / ${fmt(l.max||5000)}`}/>
           <UnitLine label="📍 Location" value={l.location||"Unknown"}/>
           <UnitLine label="🎖️ Commander" value={l.commander||"Unassigned"}/>
+          <UnitLine label="⚔️ Legate" value={l.legateName||"No legate assigned"}/>
           {l.status==="raising"&&<div style={{marginTop:"0.35rem",color:T.gold}}>Raising progress: {l.prog||0}/{game?.lturns||DEF_GAME.lturns}</div>}
         </div>)}
       </div>
@@ -1887,7 +1946,7 @@ function ElectionVoteRecord({election,players,onSelect}){
         {voters.map(v=>{const ci=getClassInfo(v.charClass);return <button key={v.id} onClick={()=>onSelect&&onSelect(v)} style={{display:"block",width:"100%",textAlign:"left",marginBottom:"0.25rem",padding:"0.35rem 0.45rem",background:ci.bg,border:`1px solid ${ci.color}`,borderRadius:8,cursor:"pointer",color:T.text}}><span style={{fontFamily:"'Cinzel',serif",fontWeight:800,color:ci.color}}>{ci.emoji} {v.latinName}</span></button>})}
       </div>})}
     </div>
-    <div style={{marginTop:"0.55rem",color:T.mut,fontSize:"0.88rem"}}>Not voted: <b>{Math.max(0,(players||[]).length-Object.keys(votes).length)}</b></div>
+    <div style={{marginTop:"0.55rem",color:T.mut,fontSize:"0.88rem"}}>Eligible not voted: <b>{Math.max(0,votingEligiblePlayers(players||[]).length-voteCountFromEligible(votes,votingEligiblePlayers(players||[])).length)}</b></div>
   </Card>;
 }
 
@@ -1925,6 +1984,7 @@ function ElectionCandidateCards({election,players,user,myVote,onVote,onSelect}){
 }
 
 function ElectionsPlayerPanel({user,D,onRefresh}){
+  if(isAwayOnCampaign(user))return <AwayCampaignNotice user={user} context="magistrate elections"/>;
   const elections=D.elections||normalizeElections(null,D.election);
   const players=D.players||[];
   const [speechBy,setSpeechBy]=useState({});
@@ -1936,6 +1996,7 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
   if(active.length===0)return <Card><STit c="Elections"/><div style={{color:T.mut}}>No election is currently open.</div></Card>;
   const visibleElection=active.find(e=>e.id===activeElectionId)||active[0];
   const stand=async(election)=>{
+    if(isAwayOnCampaign(user))return alert("You are away from Rome and cannot stand in elections until recalled.");
     if(election.status!=="candidacy")return;
     const office=POS[election.office];
     if((election.candidates||[]).some(c=>c.playerId===user.id))return;
@@ -1968,6 +2029,7 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
     await db.set("spqr_elections",updated);await db.set("spqr_election",null);await pushN("Election Candidacy Withdrawn",`${user.latinName} withdrew his candidacy for ${POS[election.office]?.title||"office"}.`);onRefresh&&onRefresh();
   };
   const vote=async(election,candidateId)=>{
+    if(isAwayOnCampaign(user))return alert("You are away from Rome and cannot vote in elections.");
     if(election.status!=="voting")return;
     const office=POS[election.office];
     const legacy=await db.get("spqr_election");
@@ -1986,7 +2048,8 @@ function ElectionsPlayerPanel({user,D,onRefresh}){
       const office=POS[election.office];
       const isCandidate=(election.candidates||[]).some(c=>c.playerId===user.id);
       const myVote=election.votes?.[user.id];
-      const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+      const eligible=votingEligiblePlayers(players);
+    const counts={};voteCountFromEligible(election.votes||{},eligible).forEach(([,id])=>counts[id]=(counts[id]||0)+1);
       return <Card key={election.id} style={{borderLeft:`6px solid ${office?.color||T.gold}`,background:office?.bg||T.card}}>
         <STit c={`${office?.emoji||"🏛️"} Election: ${office?.title||election.office}`} sub={`Phase: ${election.status.toUpperCase()} · Round ${election.round||1}`}/>
         <div style={{color:T.mut,lineHeight:1.6,marginBottom:"0.65rem"}}>{election.status==="candidacy"?"Declare your candidacy before the GM opens voting.":"Vote for one candidate. Each senator has one vote for this office."}</div>
@@ -2175,8 +2238,8 @@ function PartiesPanel({user,D,onRefresh}){
   const [parties,setParties]=useState(D.parties||[]);
   const [form,setForm]=useState({name:"",emoji:"🏛️",color:"#A32020",platform:"",description:"",history:""});
   const [msg,setMsg]=useState("");
-  useEffect(()=>{setParties(D.parties||[]);},[D.parties]);
   const players=D.players||[];
+  useEffect(()=>{setParties(D.parties||[]);},[D.parties]);
   const myParty=partyOf(parties,user.id);
   const invited=parties.filter(p=>(p.invites||[]).includes(user.id));
   const saveParties=async(next)=>{setParties(next);await db.set("spqr_parties",next);onRefresh&&onRefresh();};
@@ -2568,6 +2631,7 @@ function PlayerApp({user:initUser,onLogout}){
   useEffect(()=>{const h=e=>{if(e.detail?.tab)setTab(e.detail.tab);};window.addEventListener("spqr-nav",h);return()=>window.removeEventListener("spqr-nav",h);},[]);
 
   const pos=user.role?POS[user.role]:null;
+  const away=isAwayOnCampaign(user);
   const officeAccent=pos?.color||T.gold;
   const officeBg=pos?.bg||T.bg;
   const votingCount=D.motions.filter(m=>m.status==="voting").length;
@@ -2576,10 +2640,10 @@ function PlayerApp({user:initUser,onLogout}){
   const currentParty=partyOf(D.parties||[],user.id);
   const GROUPS=[
     {key:"gov",label:"🏛️ Government",tone:"gov",tabs:[
-      {k:"senate",l:"Senate"},{k:"voting",l:`Motions${votingCount>0?` (${votingCount})`:""}`},{k:"orders",l:"Orders"},{k:"resources",l:"Economy"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},{k:"elections",l:"Elections"},...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
+      ...(!away?[{k:"senate",l:"Senate"},{k:"voting",l:`Motions${votingCount>0?` (${votingCount})`:""}`}]:[]),{k:"orders",l:"Orders"},{k:"resources",l:"Economy"},{k:"legions",l:"Legions"},{k:"magistrates",l:"Magistrates"},{k:"courts",l:"Courts"},...(!away?[{k:"elections",l:"Elections"}]:[]),...(pos?[{k:"office",l:`${pos.abbr}`,tone:"office"}]:[])
     ]},
     {key:"personal",label:"👤 Personal",tone:"personal",tabs:[
-      {k:"wealth",l:"Private Wealth"},{k:"reputation",l:"Reputation"},{k:"forum",l:"Forum"},{k:"parties",l:"Parties"},{k:"character",l:"Character"}
+      {k:"wealth",l:"Private Wealth"},{k:"reputation",l:"Reputation"},...(!away?[{k:"forum",l:"Forum"}]:[]),{k:"parties",l:"Parties"},{k:"character",l:"Character"}
     ]},
     {key:"records",label:"📜 Records",tone:"records",tabs:[
       {k:"cemetery",l:"Cemetery"},{k:"laws",l:"Laws"},{k:"map",l:"Map"}
@@ -2609,6 +2673,7 @@ function PlayerApp({user:initUser,onLogout}){
           <Btn v="ghost" sm onClick={onLogout}>Exit</Btn>
         </div>
       </div>
+      {away&&<div style={{maxWidth:780,margin:"0.75rem auto 0"}}><AwayCampaignNotice user={user} context="Senate motions, Forum speeches and elections"/></div>}
       {inactivePrompt&&<div style={{maxWidth:780,margin:"0.75rem auto 0",background:"#FFF7ED",border:`2px solid ${T.gold}`,borderLeft:`8px solid ${T.gold}`,padding:"0.85rem 1rem",boxShadow:"0 4px 14px rgba(0,0,0,0.08)",fontFamily:"Georgia,serif"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:"1rem",alignItems:"center",flexWrap:"wrap"}}>
           <div>
@@ -2626,8 +2691,8 @@ function PlayerApp({user:initUser,onLogout}){
       </div>
       <div className="spqr-shell" style={{maxWidth:1120,margin:"0 auto",padding:"1rem"}}>
         <ErrorBoundary key={tab}>
-        {tab==="senate"    &&<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>}
-        {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>}
+        {tab==="senate"    &&(away?<AwayCampaignNotice user={user} context="the Senate"/>:<SenatePanel players={D.players} D={D} onGoVote={()=>setTab("voting")}/>)}
+        {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>} 
         {tab==="orders"    &&<OrdersPanel orders={D.orders} game={D.game} players={D.players}/>} 
         {tab==="resources" &&<ResourcesRegionsPanel D={D} editable={false}/>} 
         {tab==="legions"   &&<LegionsPublicPanel D={D}/>} 
@@ -2637,7 +2702,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} orders={D.orders} deadline={D.deadline} treasuryActions={D.treasuryActions||[]} motions={D.motions||[]} onRefresh={refresh}/>}
         {tab==="wealth"    &&<PersonalWealthPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="reputation"&&<ReputationPanel user={user} D={D} onRefresh={refresh}/>}
-        {tab==="forum"&&<ForumPanel D={D} user={user} onRefresh={refresh}/>}
+        {tab==="forum"&&(away?<AwayCampaignNotice user={user} context="the Forum"/>:<ForumPanel D={D} user={user} onRefresh={refresh}/>)}
         {tab==="parties"   &&<PartiesPanel user={user} D={D} onRefresh={refresh}/>}
         {tab==="cemetery" &&<CemeteryPanel cemetery={D.cemetery||[]} players={D.players||[]}/>}
         {tab==="character" &&<CharacterPanel user={user} onUpdate={setUser}/>}
@@ -2713,6 +2778,16 @@ function ASenators({D,onRefresh}){
       await pushN("Position Removed","Your position has been removed by the GM",playerId);
       await addHistory(playerId,"Office Removed",`${p?.latinName||"A senator"} left office.`,"office");
     }
+    onRefresh();
+  };
+  const toggleCampaignAway=async(player)=>{
+    const players=await db.get("spqr_p")||[];
+    const nextAway=!isAwayOnCampaign(player);
+    const reason=nextAway?(prompt("Campaign / absence reason",player.campaignReason||"On campaign outside Rome")||"On campaign outside Rome"):"";
+    const updated=players.map(p=>p.id===player.id?{...p,awayCampaign:nextAway,campaignReason:reason,campaignSince:nextAway?(p.campaignSince||new Date().toISOString()):"",campaignRecalledAt:nextAway?"":new Date().toISOString()}:p);
+    await db.set("spqr_p",updated);
+    await addHistory(player.id,nextAway?"Marked Away from Rome":"Recalled to Rome",nextAway?`${player.latinName} was marked away from Rome: ${reason}.`:`${player.latinName} was recalled to Rome and political rights restored.`,"office");
+    await pushN(nextAway?"Away from Rome":"Recalled to Rome",nextAway?`You have been marked away from Rome: ${reason}. Senate motions, Forum access and elections are restricted.`:"You have been recalled to Rome. Senate motions, Forum access and elections are restored.",player.id);
     onRefresh();
   };
   const removePlayer=async(playerId)=>{
@@ -2814,7 +2889,7 @@ function ASenators({D,onRefresh}){
                 <div>
                   <button onClick={()=>setSelected(p)} style={{background:"none",border:"none",padding:0,cursor:"pointer",fontFamily:"'Cinzel',serif",color:T.blue,fontWeight:800,fontSize:"1rem",textDecoration:"underline"}}>{p.latinName}</button>
                   <div style={{color:T.mut,fontSize:"0.75rem"}}>{p.username}</div>
-                  <div style={{marginTop:"0.15rem",display:"flex",gap:"0.25rem",flexWrap:"wrap",alignItems:"center"}}><ClassBadge cls={p.charClass} sm/>{isInactiveSenator(p)&&<Badge c="💤 Sleeping" color={T.mut} sm/>}</div>
+                  <div style={{marginTop:"0.15rem",display:"flex",gap:"0.25rem",flexWrap:"wrap",alignItems:"center"}}><ClassBadge cls={p.charClass} sm/><AwayCampaignBadge p={p} sm/>{isInactiveSenator(p)&&<Badge c="💤 Sleeping" color={T.mut} sm/>}</div>
                   {p.discord&&<div style={{color:"#7289DA",fontSize:"0.9rem"}}>{p.discord}</div>}
                   <div style={{color:T.fnt,fontSize:"0.78rem"}}>Last seen: {timeAgo(lastActiveTs(p))}</div>
                 </div>
@@ -2822,7 +2897,7 @@ function ASenators({D,onRefresh}){
               <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
                 {pos&&<Badge c={pos.title} color={pos.color} sm/>}
                   {partyOf(parties,p.id)&&<div style={{marginTop:"0.18rem"}}><PartyBadge party={partyOf(parties,p.id)} sm/></div>}
-                <Btn v="red" sm onClick={()=>killPlayer(p.id)}>Kill / Cemetery</Btn><Btn v="ghost" sm onClick={()=>removePlayer(p.id)}>Remove</Btn>
+                <Btn v={isAwayOnCampaign(p)?"green":"gold"} sm onClick={()=>toggleCampaignAway(p)}>{isAwayOnCampaign(p)?"Recall to Rome":"Mark Away"}</Btn><Btn v="red" sm onClick={()=>killPlayer(p.id)}>Kill / Cemetery</Btn><Btn v="ghost" sm onClick={()=>removePlayer(p.id)}>Remove</Btn>
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:"0.6rem",alignItems:"end"}}>
@@ -2859,6 +2934,9 @@ function ALegions({D,onRefresh}){
   const [forceTypes,setForceTypes]=useState(FORCE_TYPES);
   const [selectedForce,setSelectedForce]=useState("roman_legion");
   const [msg,setMsg]=useState("");
+  const players=D.players||[];
+  const legateOptions=[{id:"",latinName:"— No Legate —"},...players];
+  const setLegateForLegion=(i,playerId)=>{const p=players.find(x=>x.id===playerId);setLegs(ls=>ls.map((l,j)=>j===i?{...l,legateId:p?.id||null,legateName:p?.latinName||"",commander:p?.latinName||l.commander||"Unassigned"}:l));};
   useEffect(()=>{
     setLegs((D.legions||DEF_LEGIONS).map(l=>({name:l.name||`Legio ${l.id}`,max:l.max||5000,str:l.str??5000,commander:l.commander||"Unassigned",armyCommand:l.armyCommand||"Independent",...l})));
     setCav((D.cavalry||DEF_CAVALRY).map(c=>({commander:"Unassigned",...c})));
@@ -2869,7 +2947,15 @@ function ALegions({D,onRefresh}){
   const updLeg=(i,k,v)=>setLegs(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="str"||k==="max"||k==="prog")?Number(v):v}:l));
   const updCav=(i,k,v)=>setCav(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="str"||k==="max")?Number(v):v}:l));
   const updFleet=(i,k,v)=>setFleets(ls=>ls.map((l,j)=>j===i?{...l,[k]:(k==="triremes")?Number(v):v}:l));
-  const save=async()=>{await db.set("spqr_l",legs);await db.set("spqr_cav",cav);await db.set("spqr_f",fleets);await db.set("spqr_force_types",forceTypes);setMsg("Military forces saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
+  const save=async()=>{
+    await db.set("spqr_l",legs);await db.set("spqr_cav",cav);await db.set("spqr_f",fleets);await db.set("spqr_force_types",forceTypes);
+    const assignedLegateIds=new Set((legs||[]).map(l=>l.legateId).filter(Boolean));
+    if(assignedLegateIds.size){
+      const allPlayers=await db.get("spqr_p")||players||[];
+      await db.set("spqr_p",allPlayers.map(p=>assignedLegateIds.has(p.id)?{...p,awayCampaign:true,campaignReason:p.campaignReason||"Legate commanding a legion",campaignSince:p.campaignSince||new Date().toISOString()}:p));
+    }
+    setMsg("Military forces saved. Assigned legates are marked away from Rome.");onRefresh();setTimeout(()=>setMsg(""),2500);
+  };
   const addLegion=()=>{const n=legs.length+1;setLegs(ls=>[...ls,{id:`${n}`,name:`Legio ${n}`,str:5000,max:5000,status:"active",prog:0,location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);};
   const addCav=()=>{const n=cav.length+1;setCav(ls=>[...ls,{id:`eq_${n}`,name:`Equites ${n}`,str:600,max:600,status:"active",location:"Roma",commander:"Unassigned",armyCommand:"Independent"}]);};
   const addFleet=()=>{const n=fleets.length+1;setFleets(ls=>[...ls,{id:`classis_${n}`,name:`Classis ${n}`,triremes:20,status:"active",location:"Ostia",commander:"Unassigned"}]);};
@@ -2904,7 +2990,7 @@ function ALegions({D,onRefresh}){
           {legs.map((l,i)=><div key={`${l.id}-${i}`} style={{background:T.card,border:`1px solid ${T.border}`,borderLeft:`5px solid ${sc[l.status]||T.border}`,padding:"0.75rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:"0.5rem",alignItems:"center",marginBottom:"0.5rem",flexWrap:"wrap"}}><b style={{fontFamily:"'Cinzel',serif",color:T.text}}>🛡️ {l.name}</b><Btn v="red" sm onClick={()=>remove(setLegs,i,"legion")}>Remove</Btn></div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:"0.5rem"}}>
-              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander",l.commander,v=>updLeg(i,"commander",v))}{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
+              {field("Legion ID",l.id,v=>updLeg(i,"id",v))}{field("Legion Name",l.name,v=>updLeg(i,"name",v))}<div><Lbl c="Force Type"/><select value={l.typeId||"roman_legion"} onChange={e=>updLeg(i,"typeId",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{forceTypes.filter(ft=>ft.type==="legion").map(ft=><option key={ft.id} value={ft.id}>{ft.emoji} {ft.name}</option>)}</select></div>{field("Strength",l.str,v=>updLeg(i,"str",v),"number")}{field("Max Soldiers",l.max,v=>updLeg(i,"max",v),"number")}{field("Stationed Location",l.location,v=>updLeg(i,"location",v))}{field("Commander",l.commander,v=>updLeg(i,"commander",v))}<div><Lbl c="Legate Commander"/><select value={l.legateId||""} onChange={e=>setLegateForLegion(i,e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.35rem 0.5rem"}}>{legateOptions.map(p=><option key={p.id||"none"} value={p.id}>{p.latinName}{p.id&&isAwayOnCampaign(p)?" — away":""}</option>)}</select></div>{field("Progress",l.prog,v=>updLeg(i,"prog",v),"number")}
               <div><Lbl c="Status"/><select value={l.status} onChange={e=>updLeg(i,"status",e.target.value)} style={{width:"100%",background:T.surf,border:`1px solid ${T.border}`,color:sc[l.status]||T.mut,padding:"0.35rem 0.5rem",fontFamily:"'Cinzel',serif"}}><option value="active">Active</option><option value="raising">Raising</option><option value="destroyed">Destroyed</option><option value="unraised">Unraised</option></select></div>
             </div>
           </div>)}
@@ -3538,7 +3624,7 @@ function AElections({D,onRefresh}){
   };
   const openVoting=async(election)=>{
     if((election.candidates||[]).length<1){setMsg("There are no candidates yet for this office.");return;}
-    await updateElection(election.id,{status:"voting",votes:{}});
+    await updateElection(election.id,{status:"voting",votes:{},eligibleVoters:votingEligiblePlayers(players).map(p=>p.id)});
     await pushN("Election Voting Open",`Voting has opened for ${POS[election.office]?.title||election.office}.`);
     setMsg("Voting phase opened.");
   };
