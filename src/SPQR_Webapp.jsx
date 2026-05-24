@@ -1150,7 +1150,7 @@ function VotingGrid({motion,players}){
 function OrdersPanel({orders,game,players}){
   // Group by session label
   const grouped={};
-  orders.forEach(o=>{const k=o.session||"Unknown";if(!grouped[k])grouped[k]=[];grouped[k].push(o);});
+  (orders||[]).filter(o=>!o.hidden&&o.status!=="closed").forEach(o=>{const k=o.session||"Unknown";if(!grouped[k])grouped[k]=[];grouped[k].push(o);});
   const sessions=Object.keys(grouped).sort().reverse();
   const currSess=sLab(game);
   const roleColor=role=>POS[role]?.color||T.mut;
@@ -1173,7 +1173,7 @@ function OrdersPanel({orders,game,players}){
                     <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontSize:"0.9rem",fontWeight:700}}>{pos?.title||o.role}</span>
                     <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
                   </div>
-                  <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
+                  <Badge c={o.status==="closed"?"CLOSED":o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="closed"?T.blue:o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
                 </div>
                 <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,background:T.bg,padding:"0.4rem 0.6rem",border:`1px solid ${T.fnt}`,whiteSpace:"pre-wrap"}}>{o.text}</div>
               </Card>
@@ -3704,23 +3704,75 @@ function AMotions({D,onRefresh}){
 }
 
 function AOrders({D,onRefresh}){
-  const [resForm,setResForm]=useState(null); // {orderId, text, imgUrl}
+  const [resForm,setResForm]=useState(null); // {orderId, text, imgUrl, closeAfter}
   const [deadline,setDeadline]=useState(D.deadline?.deadline||"");
   const [dlMsg,setDlMsg]=useState("");
+  const [sessionFilter,setSessionFilter]=useState("current");
+  const [statusFilter,setStatusFilter]=useState("open");
+  const [roleFilter,setRoleFilter]=useState("all");
+  const [hideHidden,setHideHidden]=useState(false);
+  const [compactOrders,setCompactOrders]=useState(false);
 
-  const grouped={};
-  (D.orders||[]).forEach(o=>{const k=o.session||"?";if(!grouped[k])grouped[k]=[];grouped[k].push(o);});
-  const sessions=Object.keys(grouped).sort().reverse();
   const currSess=sLab(D.game||DEF_GAME);
+  const allOrders=(D.orders||[]).slice().sort((a,b)=>{
+    const sa=String(a.session||""); const sb=String(b.session||"");
+    if(sa!==sb)return sb.localeCompare(sa);
+    return new Date(b.created||0)-new Date(a.created||0);
+  });
+  const allSessions=[...new Set(allOrders.map(o=>o.session||"?"))].sort().reverse();
+  const allRoles=[...new Set(allOrders.map(o=>o.role).filter(Boolean))].sort((a,b)=>(POS[a]?.title||a).localeCompare(POS[b]?.title||b));
+  const statusOf=o=>o.hidden?"hidden":(o.status||"pending");
+  const isOpenOrder=o=>!["resolved","closed","deadline_missed"].includes(o.status)&&!o.hidden;
+  const statusMeta=o=>{
+    if(o.hidden)return {label:"HIDDEN",color:T.mut,bg:"#F2EEE6",icon:"◼"};
+    if(o.status==="closed")return {label:"CLOSED",color:T.blue,bg:"#EEF4FF",icon:"■"};
+    if(o.status==="resolved")return {label:"RESOLVED",color:T.gre,bg:"#F0FFF4",icon:"■"};
+    if(o.status==="deadline_missed")return {label:"MISSED",color:T.rhi,bg:"#FFF1F1",icon:"■"};
+    return {label:"OPEN",color:T.gold,bg:"#FFF7E6",icon:"■"};
+  };
+  const shownOrders=allOrders.filter(o=>{
+    if(hideHidden&&o.hidden)return false;
+    if(sessionFilter==="current"&&(o.session||"?")!==currSess)return false;
+    if(sessionFilter!=="all"&&sessionFilter!=="current"&&(o.session||"?")!==sessionFilter)return false;
+    if(roleFilter!=="all"&&o.role!==roleFilter)return false;
+    if(statusFilter==="open"&&!isOpenOrder(o))return false;
+    if(statusFilter==="pending"&&(o.status||"pending")!=="pending")return false;
+    if(statusFilter==="resolved"&&o.status!=="resolved")return false;
+    if(statusFilter==="closed"&&o.status!=="closed")return false;
+    if(statusFilter==="missed"&&o.status!=="deadline_missed")return false;
+    if(statusFilter==="hidden"&&!o.hidden)return false;
+    return true;
+  });
+  const grouped={};
+  shownOrders.forEach(o=>{const k=o.session||"?";if(!grouped[k])grouped[k]=[];grouped[k].push(o);});
+  const sessions=Object.keys(grouped).sort().reverse();
+  const countOpen=allOrders.filter(isOpenOrder).length;
+  const countResolved=allOrders.filter(o=>o.status==="resolved"&&!o.hidden).length;
+  const countClosed=allOrders.filter(o=>o.status==="closed"&&!o.hidden).length;
+  const countHidden=allOrders.filter(o=>o.hidden).length;
 
-  const submitRes=async()=>{
+  const updateOrder=async(orderId,patch,notify=false)=>{
+    const all=await db.get("spqr_o")||[];
+    const o=all.find(x=>x.id===orderId);
+    if(!o)return;
+    const updated={...o,...patch,updated:new Date().toISOString()};
+    await db.set("spqr_o",all.map(x=>x.id===orderId?updated:x));
+    if(notify&&updated.playerId){
+      await pushN("order_resolved",`Order Status Updated`,`Your order as ${updated.roleName||updated.role} for ${updated.session} is now ${String(updated.status||"pending").toUpperCase()}.`,updated.playerId);
+    }
+    onRefresh();
+  };
+
+  const submitRes=async(closeAfter=false)=>{
     if(!resForm)return;
     const all=await db.get("spqr_o")||[];
     const o=all.find(x=>x.id===resForm.orderId);
     if(!o)return;
-    const updated={...o,status:"resolved",resolution:resForm.text,resolutionImage:resForm.imgUrl||null};
+    const finalStatus=closeAfter?"closed":"resolved";
+    const updated={...o,status:finalStatus,resolution:resForm.text,resolutionImage:resForm.imgUrl||null,resolvedAt:o.resolvedAt||new Date().toISOString(),closedAt:closeAfter?new Date().toISOString():o.closedAt||null,hidden:closeAfter?true:!!o.hidden};
     await db.set("spqr_o",all.map(x=>x.id===resForm.orderId?updated:x));
-    await pushN("order_resolved",`Resolution from the GM`,`Your orders as ${o.roleName} for ${o.session} have been resolved.`,o.playerId);
+    await pushN("order_resolved",`Resolution from the GM`,`Your orders as ${o.roleName||o.role} for ${o.session} have been resolved.`,o.playerId);
+    if(closeAfter){await pushN("order_resolved",`Order Closed`,`Your resolved order for ${o.session} has been closed and hidden from the active order board.`,o.playerId);}
     setResForm(null);onRefresh();
   };
 
@@ -3732,7 +3784,6 @@ function AOrders({D,onRefresh}){
   };
 
   const closeDeadline=async()=>{
-    // Mark all un-submitted offices as missed for current session
     const all=await db.get("spqr_o")||[];
     const players=await db.get("spqr_p")||[];
     const roleHolders=players.filter(p=>p.role);
@@ -3741,7 +3792,7 @@ function AOrders({D,onRefresh}){
       const already=all.find(o=>o.session===currSess&&o.role===p.role);
       if(!already){
         const pos=POS[p.role];
-        newOrders.push({id:Date.now()+Math.random().toString(36).slice(2),playerId:p.id,playerName:p.latinName,role:p.role,roleName:pos?.title||p.role,text:"[No orders filed — deadline missed]",session:currSess,status:"deadline_missed",resolution:null,resolutionImage:null,created:new Date().toISOString()});
+        newOrders.push({id:Date.now()+Math.random().toString(36).slice(2),playerId:p.id,playerName:p.latinName,role:p.role,roleName:pos?.title||p.role,text:"[No orders filed — deadline missed]",session:currSess,status:"deadline_missed",resolution:null,resolutionImage:null,hidden:false,created:new Date().toISOString()});
         pushN("deadline",`Deadline Missed`,`Your orders as ${pos?.title||p.role} were not filed before the deadline.`,p.id);
       }
     });
@@ -3750,11 +3801,10 @@ function AOrders({D,onRefresh}){
     onRefresh();setDlMsg("Deadline closed. Missing offices marked.");
   };
 
-  const posColor=role=>POS[role]?.color||T.mut;
+  const FilterButton=({active,onClick,children,color=T.gold})=><button onClick={onClick} style={{background:active?`${color}22`:T.card,border:`1px solid ${active?color:T.border}`,color:active?color:T.text,padding:"0.38rem 0.55rem",fontFamily:"'Cinzel',serif",fontSize:"0.68rem",letterSpacing:"0.08em",fontWeight:active?900:600}}>{children}</button>;
 
   return(
     <div>
-      {/* Deadline control */}
       <Card>
         <STit c="Order Deadline"/>
         <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:"0.4rem",alignItems:"end"}}>
@@ -3770,47 +3820,79 @@ function AOrders({D,onRefresh}){
         )}
       </Card>
 
-      {/* Orders by session */}
+      <Card>
+        <STit c="Order Board Filters" sub="Square flags show each order status. Use filters to focus only on open, resolved, closed, missed or hidden orders."/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"0.55rem",marginBottom:"0.65rem"}}>
+          <div style={{border:`1px solid ${T.gold}`,background:"#FFF7E6",padding:"0.55rem",textAlign:"center"}}><div style={{fontFamily:"'Cinzel',serif",fontSize:"1.2rem",color:T.gold,fontWeight:900}}>{countOpen}</div><div style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.12em"}}>OPEN</div></div>
+          <div style={{border:`1px solid ${T.gre}`,background:"#F0FFF4",padding:"0.55rem",textAlign:"center"}}><div style={{fontFamily:"'Cinzel',serif",fontSize:"1.2rem",color:T.gre,fontWeight:900}}>{countResolved}</div><div style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.12em"}}>RESOLVED</div></div>
+          <div style={{border:`1px solid ${T.blue}`,background:"#EEF4FF",padding:"0.55rem",textAlign:"center"}}><div style={{fontFamily:"'Cinzel',serif",fontSize:"1.2rem",color:T.blue,fontWeight:900}}>{countClosed}</div><div style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.12em"}}>CLOSED</div></div>
+          <div style={{border:`1px solid ${T.mut}`,background:"#F2EEE6",padding:"0.55rem",textAlign:"center"}}><div style={{fontFamily:"'Cinzel',serif",fontSize:"1.2rem",color:T.mut,fontWeight:900}}>{countHidden}</div><div style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.12em"}}>HIDDEN</div></div>
+        </div>
+        <Row gap="0.35rem" wrap>
+          <FilterButton active={statusFilter==="open"} onClick={()=>setStatusFilter("open")}>Open</FilterButton>
+          <FilterButton active={statusFilter==="all"} onClick={()=>setStatusFilter("all")}>All</FilterButton>
+          <FilterButton active={statusFilter==="pending"} onClick={()=>setStatusFilter("pending")}>Pending</FilterButton>
+          <FilterButton active={statusFilter==="resolved"} color={T.gre} onClick={()=>setStatusFilter("resolved")}>Resolved</FilterButton>
+          <FilterButton active={statusFilter==="closed"} color={T.blue} onClick={()=>setStatusFilter("closed")}>Closed</FilterButton>
+          <FilterButton active={statusFilter==="missed"} color={T.rhi} onClick={()=>setStatusFilter("missed")}>Missed</FilterButton>
+          <FilterButton active={statusFilter==="hidden"} color={T.mut} onClick={()=>setStatusFilter("hidden")}>Hidden</FilterButton>
+          <FilterButton active={hideHidden} color={T.mut} onClick={()=>setHideHidden(v=>!v)}>Hide Hidden</FilterButton>
+          <FilterButton active={compactOrders} color={T.ghi} onClick={()=>setCompactOrders(v=>!v)}>Compact</FilterButton>
+        </Row>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:"0.45rem",marginTop:"0.65rem"}}>
+          <div><Lbl c="Session"/><select value={sessionFilter} onChange={e=>setSessionFilter(e.target.value)} style={{width:"100%",background:T.bg,border:`1px solid ${T.border}`,padding:"0.42rem"}}><option value="current">Current Session</option><option value="all">All Sessions</option>{allSessions.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+          <div><Lbl c="Office"/><select value={roleFilter} onChange={e=>setRoleFilter(e.target.value)} style={{width:"100%",background:T.bg,border:`1px solid ${T.border}`,padding:"0.42rem"}}><option value="all">All Offices</option>{allRoles.map(r=><option key={r} value={r}>{POS[r]?.emoji||"🏛️"} {POS[r]?.title||r}</option>)}</select></div>
+        </div>
+      </Card>
+
       {sessions.map(sess=>(
         <div key={sess}>
           <div style={{fontFamily:"'Cinzel',serif",color:T.gold,fontSize:"0.9rem",letterSpacing:"0.15em",marginBottom:"0.4rem",marginTop:"0.75rem",display:"flex",gap:"0.5rem",alignItems:"center"}}>
-            {sess}{sess===currSess&&<Badge c="CURRENT" color={T.gold} sm/>}
+            {sess}{sess===currSess&&<Badge c="CURRENT" color={T.gold} sm/>}<Badge c={`${grouped[sess].length} SHOWN`} color={T.mut} sm/>
           </div>
           {grouped[sess].map(o=>{
             const pos=o.role?POS[o.role]:null;
+            const meta=statusMeta(o);
+            const isResolved=o.status==="resolved";
+            const isClosed=o.status==="closed";
             return(
-              <Card key={o.id} style={{borderLeft:`3px solid ${pos?.color||T.fnt}`,marginBottom:"0.4rem"}}>
-                <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"0.4rem",marginBottom:"0.35rem"}}>
+              <Card key={o.id} style={{borderLeft:`7px solid ${meta.color}`,marginBottom:"0.45rem",background:o.hidden?"#F8F3EA":T.card}}>
+                <div style={{display:"grid",gridTemplateColumns:"42px 1fr auto",gap:"0.55rem",alignItems:"start"}}>
+                  <div title={meta.label} style={{width:34,height:34,display:"flex",alignItems:"center",justifyContent:"center",background:meta.bg,border:`2px solid ${meta.color}`,color:meta.color,fontWeight:900,fontSize:"1.1rem"}}>■</div>
                   <div>
-                    <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:700,fontSize:"0.9rem"}}>{pos?.title||o.role}</span>
-                    <span style={{color:T.mut,fontSize:"0.75rem",marginLeft:"0.5rem"}}>— {o.playerName}</span>
+                    <div style={{display:"flex",gap:"0.4rem",alignItems:"center",flexWrap:"wrap"}}>
+                      <span style={{fontFamily:"'Cinzel',serif",color:pos?.color||T.mut,fontWeight:900,fontSize:"0.95rem"}}>{pos?.emoji} {pos?.title||o.role}</span>
+                      <span style={{color:T.mut,fontSize:"0.78rem"}}>— {o.playerName}</span>
+                      <Badge c={meta.label} color={meta.color} sm/>
+                    </div>
+                    <div style={{fontSize:"0.72rem",color:T.mut,fontFamily:"'Cinzel',serif",letterSpacing:"0.08em",marginTop:"0.15rem"}}>Session: {o.session||"?"} · Submitted: {o.created?new Date(o.created).toLocaleString():"Unknown"}</div>
                   </div>
-                  <Badge c={o.status==="resolved"?"RESOLVED":o.status==="deadline_missed"?"MISSED":"PENDING"} color={o.status==="resolved"?T.gre:o.status==="deadline_missed"?T.rhi:T.gold} sm/>
+                  <div style={{display:"flex",gap:"0.25rem",flexWrap:"wrap",justifyContent:"flex-end"}}>
+                    {o.status!=="deadline_missed"&&<Btn sm v="dark" onClick={()=>setResForm({orderId:o.id,text:o.resolution||"",imgUrl:o.resolutionImage||"",closeAfter:false})}>{o.resolution?"✎ Edit":"✍ Resolve"}</Btn>}
+                    {isResolved&&<Btn sm v="gold" onClick={()=>updateOrder(o.id,{status:"closed",hidden:true,closedAt:new Date().toISOString()},true)}>Close</Btn>}
+                    {isClosed&&<Btn sm v="ghost" onClick={()=>updateOrder(o.id,{status:"resolved",hidden:false,closedAt:null})}>Reopen</Btn>}
+                    <Btn sm v={o.hidden?"green":"ghost"} onClick={()=>updateOrder(o.id,{hidden:!o.hidden})}>{o.hidden?"Show":"Hide"}</Btn>
+                  </div>
                 </div>
-                <div style={{fontSize:"0.88rem",lineHeight:1.5,color:T.text,background:T.bg,padding:"0.4rem 0.6rem",border:`1px solid ${T.fnt}`,marginBottom:"0.4rem",whiteSpace:"pre-wrap"}}>{o.text}</div>
-                {o.resolution&&(
-                  <div style={{padding:"0.4rem 0.6rem",background:"#0a0a1a",border:`1px solid #4060C0`,marginBottom:"0.4rem",fontSize:"0.82rem",color:"#A0B0E0",whiteSpace:"pre-wrap"}}><span style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.1em",display:"block",marginBottom:"0.2rem"}}>GM RESOLUTION:</span>{o.resolution}</div>
-                )}
-                {o.status!=="deadline_missed"&&(
-                  <Btn sm v="dark" onClick={()=>setResForm({orderId:o.id,text:o.resolution||"",imgUrl:o.resolutionImage||""})}>
-                    {o.status==="resolved"?"✎ Edit Resolution":"✍ Resolve This Order"}
-                  </Btn>
+                {!compactOrders&&<div style={{fontSize:"0.92rem",lineHeight:1.5,color:T.text,background:T.bg,padding:"0.55rem 0.7rem",border:`1px solid ${T.fnt}`,marginTop:"0.55rem",whiteSpace:"pre-wrap"}}>{o.text}</div>}
+                {o.resolution&&(!compactOrders||statusFilter==="resolved"||statusFilter==="closed")&&(
+                  <div style={{padding:"0.5rem 0.65rem",background:"#EEF4FF",border:`1px solid ${T.blue}`,marginTop:"0.45rem",fontSize:"0.84rem",color:T.text,whiteSpace:"pre-wrap"}}><span style={{fontFamily:"'Cinzel',serif",fontSize:"0.65rem",letterSpacing:"0.1em",display:"block",marginBottom:"0.2rem",color:T.blue}}>GM RESOLUTION:</span>{o.resolution}</div>
                 )}
               </Card>
             );
           })}
         </div>
       ))}
-      {sessions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No orders submitted yet.</div>}
+      {sessions.length===0&&<div style={{color:T.mut,fontStyle:"italic",fontSize:"0.88rem"}}>No orders match the current filters.</div>}
 
-      {/* Resolution modal */}
       {resForm&&(
         <Modal title="RESOLVE ORDER" onClose={()=>setResForm(null)} wide>
-          <div style={{fontSize:"0.88rem",color:T.mut,marginBottom:"0.75rem",fontStyle:"italic"}}>Write the outcome of this order. Only the office holder will see this resolution.</div>
+          <div style={{fontSize:"0.88rem",color:T.mut,marginBottom:"0.75rem",fontStyle:"italic"}}>Write the outcome of this order. Use “Submit & Close” when the order is fully resolved and you want it hidden from the active board.</div>
           <Inp label="Resolution Text" value={resForm.text} onChange={v=>setResForm(f=>({...f,text:v}))} rows={6} placeholder="Describe what happened as a result of these orders…"/>
           <Inp label="Attach Image / Map URL (optional)" value={resForm.imgUrl} onChange={v=>setResForm(f=>({...f,imgUrl:v}))} placeholder="https://…"/>
-          <Row gap="0.5rem">
-            <Btn v="gold" onClick={submitRes}>✓ Submit Resolution</Btn>
+          <Row gap="0.5rem" wrap>
+            <Btn v="gold" onClick={()=>submitRes(false)}>✓ Submit Resolution</Btn>
+            <Btn v="green" onClick={()=>submitRes(true)}>✓ Submit & Close</Btn>
             <Btn v="ghost" onClick={()=>setResForm(null)}>Cancel</Btn>
           </Row>
         </Modal>
