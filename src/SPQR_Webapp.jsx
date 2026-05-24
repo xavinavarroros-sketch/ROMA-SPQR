@@ -997,7 +997,7 @@ function VotingPanel({motions,players,user,game,onRefresh}){
       <STit c="Pending / Queued Motions" sub="Motions awaiting GM approval, rejected by GM, or queued behind the active motion."/>
       {[...pendingLike].reverse().map(m=>{
         const isSel=selMotion===m.id;
-        const eligible=votingEligiblePlayers(D.players||[]);
+        const eligible=votingEligiblePlayers(players||[]);
         const eligibleVotes=voteCountFromEligible(m.votes||{},eligible).map(([,v])=>v);
         const yeas=eligibleVotes.filter(v=>v==="yea").length;
         const nays=eligibleVotes.filter(v=>v==="nay").length;
