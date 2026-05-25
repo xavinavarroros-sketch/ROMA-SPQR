@@ -1,0 +1,2587 @@
+{
+  "type": "rome-yes-private-wealth-reputation-assets-backup",
+  "version": 2,
+  "exportedAt": "2026-05-25T08:29:07.919Z",
+  "session": "218 BC · Early Summer · Turn 2",
+  "keys": {
+    "spqr_assets": [
+      {
+        "id": "restored_current_1779473450966_0",
+        "ts": 1779473450966,
+        "typeId": "olive_farm",
+        "ownerId": "1779053841991",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Nero Avitus Corvus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 18:17:01"
+      },
+      {
+        "id": "restored_current_1779473450966_1",
+        "ts": 1779473450966,
+        "typeId": "olive_farm",
+        "ownerId": "1779052726695",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Marcus Teutonicus Berolinensis",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 18:17:05"
+      },
+      {
+        "id": "restored_current_1779473450966_2",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Roman State",
+        "regionName": "Picenum",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Gaius Flaminius",
+        "recoveredFromLogDate": "18/5/2026, 18:24:59"
+      },
+      {
+        "id": "restored_current_1779473450966_3",
+        "ts": 1779473450966,
+        "typeId": "olive_farm",
+        "ownerId": "1779053841991",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Nero Avitus Corvus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 18:26:21"
+      },
+      {
+        "id": "restored_current_1779473450966_4",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "1779074089153",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Publius Cornelius Scipio",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 18:44:09"
+      },
+      {
+        "id": "restored_current_1779473450966_5",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "1779052954150",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "calabria",
+        "ownerName": "Gaius Pictus Perictus",
+        "regionName": "Calabria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 19:10:52"
+      },
+      {
+        "id": "restored_current_1779473450966_6",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779121616635",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Benedictus Vopiscus Cassianus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 19:53:49"
+      },
+      {
+        "id": "restored_current_1779473450966_7",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779121616635",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Benedictus Vopiscus Cassianus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 19:53:49"
+      },
+      {
+        "id": "restored_current_1779473450966_8",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "1779052576016",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "calabria",
+        "ownerName": "Fabius Minimus",
+        "regionName": "Calabria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 20:38:19"
+      },
+      {
+        "id": "restored_current_1779473450966_9",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "1779052576016",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "calabria",
+        "ownerName": "Fabius Minimus",
+        "regionName": "Calabria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 20:38:20"
+      },
+      {
+        "id": "restored_current_1779473450966_10",
+        "ts": 1779473450966,
+        "typeId": "pasture",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Roman State",
+        "regionName": "Samnium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Gaius Flaminius",
+        "recoveredFromLogDate": "18/5/2026, 20:40:05"
+      },
+      {
+        "id": "restored_current_1779473450966_11",
+        "ts": 1779473450966,
+        "typeId": "fishery",
+        "ownerId": "1779094947607",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Lucius Valcarius Velor",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 20:42:39"
+      },
+      {
+        "id": "restored_current_1779473450966_12",
+        "ts": 1779473450966,
+        "typeId": "pasture",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "lucania",
+        "ownerName": "Roman State",
+        "regionName": "Lucania",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Gaius Flaminius",
+        "recoveredFromLogDate": "18/5/2026, 20:57:03"
+      },
+      {
+        "id": "restored_current_1779473450966_13",
+        "ts": 1779473450966,
+        "typeId": "olive_farm",
+        "ownerId": "1779126675530",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Adeodatus Pistorius",
+        "regionName": "Campania",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 21:40:44"
+      },
+      {
+        "id": "restored_current_1779473450966_14",
+        "ts": 1779473450966,
+        "typeId": "pasture",
+        "ownerId": "1779130996088",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Caius Herminus Aenaes",
+        "regionName": "Samnium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 21:52:14"
+      },
+      {
+        "id": "restored_current_1779473450966_15",
+        "ts": 1779473450966,
+        "typeId": "pasture",
+        "ownerId": "1779130996088",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Caius Herminus Aenaes",
+        "regionName": "Samnium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 21:52:20"
+      },
+      {
+        "id": "restored_current_1779473450966_16",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779139298913",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Spurius Papinianus Rufus",
+        "regionName": "Campania",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "18/5/2026, 23:38:23"
+      },
+      {
+        "id": "restored_current_1779473450966_17",
+        "ts": 1779473450966,
+        "typeId": "small_vineyard",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Roman State",
+        "regionName": "Apulia",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Gaius Sempronius Gracchus",
+        "recoveredFromLogDate": "19/5/2026, 10:58:03"
+      },
+      {
+        "id": "restored_current_1779473450966_18",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779052561016",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "etruria",
+        "ownerName": "Quintus Velcha",
+        "regionName": "Etruria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 11:03:20"
+      },
+      {
+        "id": "restored_current_1779473450966_19",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779052561016",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "etruria",
+        "ownerName": "Quintus Velcha",
+        "regionName": "Etruria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 11:04:12"
+      },
+      {
+        "id": "restored_current_1779473450966_20",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779051260863",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Titus Pullo",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 11:12:09"
+      },
+      {
+        "id": "restored_current_1779473450966_21",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779051260863",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Titus Pullo",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 11:12:15"
+      },
+      {
+        "id": "restored_current_1779473450966_22",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:30:41"
+      },
+      {
+        "id": "restored_current_1779473450966_23",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:30:43"
+      },
+      {
+        "id": "restored_current_1779473450966_24",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:30:44"
+      },
+      {
+        "id": "restored_current_1779473450966_25",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:30:51"
+      },
+      {
+        "id": "restored_current_1779473450966_26",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:30:59"
+      },
+      {
+        "id": "restored_current_1779473450966_27",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Roman State",
+        "regionName": "Campania",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:39:32"
+      },
+      {
+        "id": "restored_current_1779473450966_28",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Roman State",
+        "regionName": "Campania",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:40:25"
+      },
+      {
+        "id": "restored_current_1779473450966_29",
+        "ts": 1779473450966,
+        "typeId": "small_vineyard",
+        "ownerId": "1779139298913",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Spurius Papinianus Rufus",
+        "regionName": "Campania",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 11:40:49"
+      },
+      {
+        "id": "restored_current_1779473450966_30",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Roman State",
+        "regionName": "Campania",
+        "recoveryNote": "Assigned to Roman State because the owner appears in death logs. Owner is dead in logs; assigned to Roman State.",
+        "inheritedFrom": "Quintus Fabius",
+        "recoveredFromLogDate": "19/5/2026, 11:45:32"
+      },
+      {
+        "id": "restored_current_1779473450966_31",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779188793400",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Marcellus Ofilius",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 13:08:05"
+      },
+      {
+        "id": "restored_current_1779473450966_32",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779121616635",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Benedictus Vopiscus Cassianus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 14:03:28"
+      },
+      {
+        "id": "restored_current_1779473450966_33",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779121616635",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Benedictus Vopiscus Cassianus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 14:03:36"
+      },
+      {
+        "id": "restored_current_1779473450966_34",
+        "ts": 1779473450966,
+        "typeId": "goat_herd",
+        "ownerId": "1779125248227",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Titus Flaminius Vercus",
+        "regionName": "Samnium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 15:49:34"
+      },
+      {
+        "id": "restored_current_1779473450966_35",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779125248227",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Titus Flaminius Vercus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 15:51:39"
+      },
+      {
+        "id": "restored_current_1779473450966_36",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779059691017",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 16:08:58"
+      },
+      {
+        "id": "restored_current_1779473450966_37",
+        "ts": 1779473450966,
+        "typeId": "goat_herd",
+        "ownerId": "1779059691017",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Samnium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 16:10:39"
+      },
+      {
+        "id": "restored_current_1779473450966_38",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779108855858",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Gaius Maenius",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 16:33:45"
+      },
+      {
+        "id": "restored_current_1779473450966_39",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779108855858",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Gaius Maenius",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 16:34:52"
+      },
+      {
+        "id": "restored_current_1779473450966_40",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779108012195",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "umbria",
+        "ownerName": "Sextus Praetorio",
+        "regionName": "Umbria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 17:44:45"
+      },
+      {
+        "id": "restored_current_1779473450966_41",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779108012195",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "umbria",
+        "ownerName": "Sextus Praetorio",
+        "regionName": "Umbria",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "19/5/2026, 17:45:54"
+      },
+      {
+        "id": "restored_current_1779473450966_42",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779126675530",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Adeodatus Pistorius",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 7:27:28"
+      },
+      {
+        "id": "restored_current_1779473450966_43",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779188793400",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Marcellus Ofilius",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 14:23:05"
+      },
+      {
+        "id": "restored_current_1779473450966_44",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "1779188793400",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Marcellus Ofilius",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 14:24:04"
+      },
+      {
+        "id": "restored_current_1779473450966_45",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "1779052726695",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Marcus Teutonicus Berolinensis",
+        "regionName": "Campania",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 17:44:45"
+      },
+      {
+        "id": "restored_current_1779473450966_46",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779053841991",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Nero Avitus Corvus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 18:15:36"
+      },
+      {
+        "id": "restored_current_1779473450966_47",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779254954121",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Lucius Valerius Corvinus",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 19:05:40"
+      },
+      {
+        "id": "restored_current_1779473450966_48",
+        "ts": 1779473450966,
+        "typeId": "merchant_house",
+        "ownerId": "1779117219531",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Aulus Domitius Ahenobarbus",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 21:27:01"
+      },
+      {
+        "id": "restored_current_1779473450966_49",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779182046412",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Lucretius Valerius Laurentius",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "20/5/2026, 21:34:21"
+      },
+      {
+        "id": "restored_current_1779473450966_50",
+        "ts": 1779473450966,
+        "typeId": "grain_estate",
+        "ownerId": "1779254954121",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Lucius Valerius Corvinus",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "21/5/2026, 2:24:19"
+      },
+      {
+        "id": "restored_current_1779473450966_51",
+        "ts": 1779473450966,
+        "typeId": "olive_farm",
+        "ownerId": "1779348151666",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Horatio Marcellus Agrippa",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "21/5/2026, 10:02:38"
+      },
+      {
+        "id": "restored_current_1779473450966_52",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Roman State",
+        "regionName": "Picenum",
+        "recoveryNote": "Sold to Roman State via state-property-buyback on 22/5/2026, 12:49:24.",
+        "inheritedFrom": "Horatio Marcellus Agrippa",
+        "recoveredFromLogDate": "22/5/2026, 12:49:24"
+      },
+      {
+        "id": "restored_current_1779473450966_53",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779126675530",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Adeodatus Pistorius",
+        "regionName": "Latium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "21/5/2026, 14:15:20"
+      },
+      {
+        "id": "restored_current_1779473450966_54",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "1779130996088",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "samnium",
+        "ownerName": "Caius Herminus Aenaes",
+        "regionName": "Samnium",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "21/5/2026, 21:40:31"
+      },
+      {
+        "id": "restored_current_1779473450966_55",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Roman State",
+        "regionName": "Picenum",
+        "recoveryNote": "Sold to Roman State via state-property-buyback on 22/5/2026, 12:49:26.",
+        "inheritedFrom": "Horatio Marcellus Agrippa",
+        "recoveredFromLogDate": "22/5/2026, 12:49:26"
+      },
+      {
+        "id": "restored_current_1779473450966_56",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Roman State",
+        "regionName": "Picenum",
+        "recoveryNote": "Sold to Roman State via state-property-buyback on 22/5/2026, 12:50:55.",
+        "inheritedFrom": "Horatio Marcellus Agrippa",
+        "recoveredFromLogDate": "22/5/2026, 12:50:55"
+      },
+      {
+        "id": "restored_current_1779473450966_57",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Roman State",
+        "regionName": "Picenum",
+        "recoveryNote": "Sold to Roman State via state-property-buyback on 22/5/2026, 12:55:39.",
+        "inheritedFrom": "Horatio Marcellus Agrippa",
+        "recoveredFromLogDate": "22/5/2026, 12:55:39"
+      },
+      {
+        "id": "restored_current_1779473450966_58",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "1779348151666",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Horatio Marcellus Agrippa",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "22/5/2026, 6:51:11"
+      },
+      {
+        "id": "restored_current_1779473450966_59",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "1779348151666",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Horatio Marcellus Agrippa",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "22/5/2026, 6:51:17"
+      },
+      {
+        "id": "restored_current_1779473450966_60",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "1779348151666",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Horatio Marcellus Agrippa",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "22/5/2026, 6:51:56"
+      },
+      {
+        "id": "restored_current_1779473450966_61",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779348151666",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "picenum",
+        "ownerName": "Horatio Marcellus Agrippa",
+        "regionName": "Picenum",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "22/5/2026, 6:52:37"
+      },
+      {
+        "id": "restored_current_1779473450966_62",
+        "ts": 1779473450966,
+        "typeId": "bakery",
+        "ownerId": "1779433433896",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "apulia",
+        "ownerName": "Abner Wasso Solidus",
+        "regionName": "Apulia",
+        "recoveryNote": "Match ownerName to current player latinName during restore.",
+        "recoveredFromLogDate": "22/5/2026, 9:14:09"
+      },
+      {
+        "id": "restored_current_1779473450966_63",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Reconstructed from state buyback log; purchase event not found in uploaded logs. Seller was Paulus Maximus.",
+        "inheritedFrom": "Paulus Maximus",
+        "recoveredFromLogDate": "22/5/2026, 18:12:33"
+      },
+      {
+        "id": "restored_current_1779473450966_64",
+        "ts": 1779473450966,
+        "typeId": "market_stall",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "latium",
+        "ownerName": "Roman State",
+        "regionName": "Latium",
+        "recoveryNote": "Reconstructed from state buyback log; purchase event not found in uploaded logs. Seller was Paulus Maximus.",
+        "inheritedFrom": "Paulus Maximus",
+        "recoveredFromLogDate": "22/5/2026, 18:12:34"
+      },
+      {
+        "id": "restored_current_1779473450966_65",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Roman State",
+        "regionName": "Campania",
+        "recoveryNote": "Reconstructed from state buyback log; purchase event not found in uploaded logs. Seller was Paulus Maximus.",
+        "inheritedFrom": "Paulus Maximus",
+        "recoveredFromLogDate": "22/5/2026, 18:15:52"
+      },
+      {
+        "id": "restored_current_1779473450966_66",
+        "ts": 1779473450966,
+        "typeId": "small_workshop",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "campania",
+        "ownerName": "Roman State",
+        "regionName": "Campania",
+        "recoveryNote": "Reconstructed from state buyback log; purchase event not found in uploaded logs. Seller was Paulus Maximus.",
+        "inheritedFrom": "Paulus Maximus",
+        "recoveredFromLogDate": "22/5/2026, 18:15:53"
+      },
+      {
+        "id": "restored_current_1779473450966_67",
+        "ts": 1779473450966,
+        "typeId": "fishing_boat",
+        "ownerId": "__state__",
+        "boughtAt": "Recovered from latest GM registry logs",
+        "regionId": "calabria",
+        "ownerName": "Roman State",
+        "regionName": "Calabria",
+        "recoveryNote": "Reconstructed from state buyback log; purchase event not found in uploaded logs. Seller was Paulus Maximus.",
+        "inheritedFrom": "Paulus Maximus",
+        "recoveredFromLogDate": "22/5/2026, 18:17:14"
+      },
+      {
+        "id": "1779473903358wte3c1vqj7t",
+        "ts": 1779473903358,
+        "typeId": "small_workshop",
+        "ownerId": "1779446644347",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "ownerName": "Tiberius Anthony Corvinus",
+        "regionName": "Campania"
+      },
+      {
+        "id": "1779473909958w0aauz3r9tc",
+        "ts": 1779473909958,
+        "typeId": "small_workshop",
+        "ownerId": "1779446644347",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "ownerName": "Tiberius Anthony Corvinus",
+        "regionName": "Campania"
+      },
+      {
+        "id": "17794739366973gy9m9jen69",
+        "ts": 1779473936697,
+        "typeId": "goat_herd",
+        "ownerId": "1779467433964",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "umbria",
+        "ownerName": "Quintus Ulpius Silanus",
+        "regionName": "Umbria"
+      },
+      {
+        "id": "1779473940393pwc1786m3t",
+        "ts": 1779473940393,
+        "typeId": "bakery",
+        "ownerId": "1779467433964",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "umbria",
+        "ownerName": "Quintus Ulpius Silanus",
+        "regionName": "Umbria"
+      },
+      {
+        "id": "1779474600590mxtfmp3fdrd",
+        "ts": 1779474600590,
+        "typeId": "market_stall",
+        "ownerId": "1779453211853",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Traianus Varinius Collatinus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "177947463718623mho7wq8tb",
+        "ts": 1779474637186,
+        "typeId": "fishing_boat",
+        "ownerId": "1779453211853",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Traianus Varinius Collatinus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "1779477727842g7aurby0md4",
+        "ts": 1779477727842,
+        "typeId": "fishery",
+        "ownerId": "1779392072062",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "ownerName": "Octavius Marcus Victor",
+        "regionName": "Campania"
+      },
+      {
+        "id": "1779477809305y4ednvphm6",
+        "ts": 1779477809305,
+        "typeId": "small_workshop",
+        "ownerId": "1779392072062",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "ownerName": "Octavius Marcus Victor",
+        "regionName": "Campania"
+      },
+      {
+        "id": "1779478594049jwpdrayk2rj",
+        "ts": 1779478594049,
+        "typeId": "timber_rights",
+        "ownerId": "1779464900130",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "samnium",
+        "ownerName": "Marcus Falcidius Festus",
+        "regionName": "Samnium"
+      },
+      {
+        "id": "1779480379843p8tubws2b6i",
+        "ts": 1779480379844,
+        "typeId": "fishing_boat",
+        "ownerId": "1779053841991",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Nero Avitus Corvus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "1779480386689cfw7oray4f4",
+        "ts": 1779480386689,
+        "typeId": "fishing_boat",
+        "ownerId": "1779053841991",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Nero Avitus Corvus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "1779481277175nu3zu0kndn",
+        "ts": 1779481277175,
+        "typeId": "fishery",
+        "ownerId": "1779148620641",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Syrus Ursus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "1779481355169fgyt5ngfdjj",
+        "ts": 1779481355169,
+        "typeId": "market_stall",
+        "ownerId": "1779148620641",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "calabria",
+        "ownerName": "Syrus Ursus",
+        "regionName": "Calabria"
+      },
+      {
+        "id": "1779482581285zz60sn3ugbe",
+        "ts": 1779482581285,
+        "typeId": "fishery",
+        "ownerId": "1779139298913",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "bruttium",
+        "ownerName": "Spurius Papinianus Rufus",
+        "regionName": "Bruttium"
+      },
+      {
+        "id": "1779505924918o3o4wadwqp",
+        "ts": 1779505924918,
+        "typeId": "timber_rights",
+        "ownerId": "1779267672281",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "etruria",
+        "ownerName": "Paulus Maximus",
+        "regionName": "Etruria"
+      },
+      {
+        "id": "177951537605089bah2czigf",
+        "ts": 1779515376050,
+        "typeId": "timber_rights",
+        "ownerId": "1779074089153",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "bruttium",
+        "ownerName": "Publius Cornelius Scipio",
+        "regionName": "Bruttium"
+      },
+      {
+        "id": "17795205770363lpsmg32kim",
+        "ts": 1779520577036,
+        "typeId": "timber_rights",
+        "ownerId": "__state__",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "samnium",
+        "ownerName": "Roman State",
+        "regionName": "Samnium",
+        "boughtByQuaestor": "Spurius Papinianus Rufus"
+      },
+      {
+        "id": "1779520601974u0c2g4a9ins",
+        "ts": 1779520601974,
+        "typeId": "timber_rights",
+        "ownerId": "__state__",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "etruria",
+        "ownerName": "Roman State",
+        "regionName": "Etruria",
+        "boughtByQuaestor": "Spurius Papinianus Rufus"
+      },
+      {
+        "id": "1779528347113nd5aq4l684h",
+        "ts": 1779528347113,
+        "typeId": "small_workshop",
+        "ownerId": "1779433433896",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "apulia",
+        "ownerName": "Abner Wasso Solidus",
+        "regionName": "Apulia"
+      },
+      {
+        "id": "1779528352517ag9y1mppsx",
+        "ts": 1779528352517,
+        "typeId": "pasture",
+        "ownerId": "1779433433896",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "apulia",
+        "ownerName": "Abner Wasso Solidus",
+        "regionName": "Apulia"
+      },
+      {
+        "id": "1779550968664dks47abdhip",
+        "ts": 1779550968664,
+        "typeId": "small_vineyard",
+        "ownerId": "1779052726695",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Marcus Teutonicus Berolinensis",
+        "regionName": "Latium"
+      },
+      {
+        "id": "1779551524371cyrvowcnla9",
+        "ts": 1779551524371,
+        "typeId": "small_vineyard",
+        "ownerId": "1779054650967",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Quintus Fabius Numerius",
+        "regionName": "Latium"
+      },
+      {
+        "id": "1779551597837sahelj1bqkl",
+        "ts": 1779551597837,
+        "typeId": "bakery",
+        "ownerId": "1779054650967",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "samnium",
+        "ownerName": "Quintus Fabius Numerius",
+        "regionName": "Samnium"
+      },
+      {
+        "id": "1779629037701d1bjw0dd8s",
+        "ts": 1779629037701,
+        "typeId": "market_stall",
+        "ownerId": "1779267672281",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Paulus Maximus",
+        "regionName": "Latium"
+      },
+      {
+        "id": "1779635422557ngshmyn9nz",
+        "ts": 1779635422559,
+        "typeId": "grain_estate",
+        "ownerId": "1779635302819",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Latium"
+      },
+      {
+        "id": "1779635537206l0rr4nm80s",
+        "ts": 1779635537206,
+        "typeId": "market_stall",
+        "ownerId": "1779635302819",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Latium"
+      },
+      {
+        "id": "1779635677378yg6pfagfywo",
+        "ts": 1779635677378,
+        "typeId": "small_workshop",
+        "ownerId": "1779635302819",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "apulia",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Apulia"
+      },
+      {
+        "id": "1779635695066eoafz4iwgz7",
+        "ts": 1779635695066,
+        "typeId": "market_stall",
+        "ownerId": "1779635302819",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "apulia",
+        "ownerName": "Gaius Tarquinius Scipio",
+        "regionName": "Apulia"
+      },
+      {
+        "id": "1779640241350abaqembivs",
+        "ts": 1779640241350,
+        "typeId": "timber_rights",
+        "ownerId": "1779094947607",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "bruttium",
+        "ownerName": "Lucius Valcarius Velor",
+        "regionName": "Bruttium"
+      },
+      {
+        "id": "17796430301392g36rxi35in",
+        "ts": 1779643030139,
+        "typeId": "pasture",
+        "ownerId": "1779115375363",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "samnium",
+        "ownerName": "Gaius Ursulus Tertius",
+        "regionName": "Samnium"
+      },
+      {
+        "id": "1779657642715geilit9yalp",
+        "ts": 1779657642715,
+        "typeId": "olive_farm",
+        "ownerId": "1779656915693",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "ownerName": "Quintus Servius Rufus",
+        "regionName": "Campania"
+      },
+      {
+        "id": "1779657722043b4ri0fgrgj",
+        "ts": 1779657722043,
+        "typeId": "market_stall",
+        "ownerId": "1779656915693",
+        "boughtAt": "218 BC · Early Summer · Turn 2",
+        "regionId": "latium",
+        "ownerName": "Quintus Servius Rufus",
+        "regionName": "Latium"
+      }
+    ],
+    "spqr_wealth": {
+      "1779051260863": {
+        "food": 90,
+        "gold": 204,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052561016": {
+        "food": 33,
+        "gold": 45,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052576016": {
+        "food": 83,
+        "gold": 21,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052660326": {
+        "food": 80,
+        "gold": 300,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052726695": {
+        "food": 52,
+        "gold": 30,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052757333": {
+        "food": 130,
+        "gold": 300,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779052954150": {
+        "food": 164,
+        "gold": 60,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779053841991": {
+        "food": 32,
+        "gold": 55,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779053866800": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779054131653": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779054650967": {
+        "food": 63,
+        "gold": 25,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779059691017": {
+        "food": 130,
+        "gold": 279,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779062664617": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779070082578": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779074089153": {
+        "food": 60,
+        "gold": 2,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779094947607": {
+        "food": 82,
+        "gold": 67,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779108012195": {
+        "food": 73,
+        "gold": 15,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779108855858": {
+        "food": 67,
+        "gold": 8,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779115375363": {
+        "food": 0,
+        "gold": 100,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779117219531": {
+        "food": 124,
+        "gold": 51,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779117451341": {
+        "food": 80,
+        "gold": 310,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779120331147": {
+        "food": 80,
+        "gold": 565,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779121616635": {
+        "food": 60,
+        "gold": 109,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779125248227": {
+        "food": 86,
+        "gold": 7,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779126675530": {
+        "food": 44,
+        "gold": 72,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779130996088": {
+        "food": 13,
+        "gold": 150,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779133728149": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779137530076": {
+        "food": 130,
+        "gold": 320,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779139298913": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779148620641": {
+        "food": 63,
+        "gold": 75,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779182046412": {
+        "food": 148,
+        "gold": 72,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779187254057": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779188793400": {
+        "food": 34,
+        "gold": 42,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779197057536": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779220877782": {
+        "food": 0,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779254954121": {
+        "food": 84,
+        "gold": 9,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779267672281": {
+        "food": 90,
+        "gold": 55,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779348151666": {
+        "food": 18,
+        "gold": 50,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779392072062": {
+        "food": 50,
+        "gold": 35,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779433433896": {
+        "food": 42,
+        "gold": 15,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779446644347": {
+        "food": 64,
+        "gold": 10,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779453211853": {
+        "food": 56,
+        "gold": 50,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779464900130": {
+        "food": 40,
+        "gold": 0,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779467433964": {
+        "food": 10,
+        "gold": 13,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779486027351": {
+        "food": 140,
+        "gold": 420,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779635302819": {
+        "food": 97,
+        "gold": 5,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      },
+      "1779656915693": {
+        "food": 60,
+        "gold": 15,
+        "debtFoodSince": null,
+        "debtGoldSince": null,
+        "householdFood": 10,
+        "householdGold": 10
+      }
+    },
+    "spqr_reputation": {
+      "1779052726695": {
+        "score": 75,
+        "scandals": []
+      },
+      "1779054650967": {
+        "score": 66,
+        "scandals": []
+      },
+      "1779074089153": {
+        "score": 80,
+        "scandals": []
+      },
+      "1779120331147": {
+        "score": 45,
+        "scandals": []
+      },
+      "1779348151666": {
+        "score": 55,
+        "scandals": []
+      },
+      "1779433433896": {
+        "score": 45,
+        "scandals": []
+      },
+      "1779446644347": {
+        "score": 68,
+        "scandals": []
+      },
+      "1779452478558": {
+        "score": 58,
+        "scandals": []
+      },
+      "1779453211853": {
+        "score": 42,
+        "scandals": []
+      },
+      "1779467433964": {
+        "score": 52,
+        "scandals": []
+      },
+      "1779486027351": {
+        "score": 60,
+        "scandals": []
+      },
+      "1779635302819": {
+        "score": 60,
+        "scandals": []
+      },
+      "1779656915693": {
+        "score": 52,
+        "scandals": []
+      }
+    },
+    "spqr_replog": [
+      {
+        "id": "1779206269064ts8ax4tljs",
+        "ts": 1779206269064,
+        "roll": 96,
+        "text": "SLANDER FAILED: A campaign against Titus Pullo failed to take hold.",
+        "type": "slander",
+        "outcome": "failure",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779187254057",
+        "targetId": "1779051260863",
+        "playerName": "Lucius Vorenus ",
+        "targetName": "Titus Pullo"
+      },
+      {
+        "id": "1779206289009qthat1r0q",
+        "ts": 1779206289009,
+        "roll": 66,
+        "text": "SLANDER FAILED: A campaign against Titus Pullo failed to take hold.",
+        "type": "slander",
+        "outcome": "failure",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779187254057",
+        "targetId": "1779051260863",
+        "playerName": "Lucius Vorenus ",
+        "targetName": "Titus Pullo"
+      },
+      {
+        "id": "17792072202088yncl03ceg",
+        "ts": 1779207220208,
+        "roll": 70,
+        "text": "PARTIAL SLANDER: Rumours circulate about Titus Pullo, but the impact is limited. Reputation -2.",
+        "type": "slander",
+        "outcome": "partial",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779187254057",
+        "targetId": "1779051260863",
+        "playerName": "Lucius Vorenus ",
+        "targetName": "Titus Pullo"
+      },
+      {
+        "id": "1779207268039abrm9zquj9u",
+        "ts": 1779207268039,
+        "text": "Titus Pullo spent 50T on Small Counter-Campaign against scandal \"Weak rumour: Titus Pullo speaks loudly of Rome, yet whispers grow that his loyalty is to his own purse before the Republic. While honest senators sacrifice wealth and honour for the war against Hannibal, Pullo is said to hide behind empty patriotic words, seeking office, influence and profit while others bleed for Italy. Some now ask whether such a man serves Rome or only himself.\".",
+        "type": "counter",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863",
+        "playerName": "Titus Pullo"
+      },
+      {
+        "id": "1779207497646liwvj4v7szk",
+        "ts": 1779207497646,
+        "roll": 65,
+        "text": "PARTIAL SLANDER: Rumours circulate about Titus Pullo, but the impact is limited. Reputation -8.",
+        "type": "slander",
+        "outcome": "partial",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779187254057",
+        "targetId": "1779051260863",
+        "playerName": "Lucius Vorenus ",
+        "targetName": "Titus Pullo"
+      },
+      {
+        "id": "1779208044061lwwwvb3a5xc",
+        "ts": 1779208043886,
+        "text": "SLANDER SPREADS: Lucius Vorenus  has been publicly marked by rumour: \"He is not my friend\". Reputation -10.",
+        "type": "slander",
+        "method": "Forum gossip and client networks",
+        "outcome": "success",
+        "session": "218 BC · Summer · Turn 1",
+        "evidence": "none",
+        "playerId": "1779051260863",
+        "targetId": "1779187254057",
+        "anonymous": true,
+        "playerName": "Titus Pullo",
+        "targetName": "Lucius Vorenus "
+      },
+      {
+        "id": "1779208052339u2ky4p1asia",
+        "ts": 1779208052339,
+        "text": "Titus Pullo spent 40T/0M on Temple Offering and gained +3 reputation.",
+        "type": "boost",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863",
+        "playerName": "Titus Pullo"
+      },
+      {
+        "id": "1779208058856n7nk1hfrm4",
+        "ts": 1779208058856,
+        "text": "Titus Pullo spent 70T/40M on Grain Charity and gained +6 reputation.",
+        "type": "boost",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863",
+        "playerName": "Titus Pullo"
+      },
+      {
+        "id": "1779269323700w9dydcwewsn",
+        "ts": 1779269323700,
+        "text": "Paulus Maximus spent 70T/40M on Grain Charity and gained +6 reputation.",
+        "type": "boost",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779267672281",
+        "playerName": "Paulus Maximus"
+      },
+      {
+        "id": "1779290079473ojyqwp14k6",
+        "ts": 1779290078052,
+        "text": "SLANDER SPREADS: Fabius Minimus has been publicly marked by rumour: \"Fabius Minimus wants the monarchy back and wants the executive power all for himself\". Reputation -5.",
+        "type": "slander",
+        "method": "Forum gossip and client networks",
+        "outcome": "success",
+        "session": "218 BC · Summer · Turn 1",
+        "evidence": "His Senate speech ",
+        "playerId": "1779125248227",
+        "targetId": "1779052576016",
+        "anonymous": true,
+        "playerName": "Titus Flaminius Vercus",
+        "targetName": "Fabius Minimus"
+      },
+      {
+        "id": "1779425224322cvsd3s20m9i",
+        "ts": 1779425224322,
+        "text": "Horatio Marcellus Agrippa spent 40T/0M on Temple Offering and gained +3 reputation.",
+        "type": "boost",
+        "session": "218 BC · Winter · Turn 1",
+        "playerId": "1779348151666",
+        "playerName": "Horatio Marcellus Agrippa"
+      },
+      {
+        "id": "1779434922915msqlxm8evm",
+        "ts": 1779434922915,
+        "text": "Abner Wasso Solidus spent 40T/0M on Temple Offering and gained +3 reputation.",
+        "type": "boost",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779433433896",
+        "playerName": "Abner Wasso Solidus"
+      },
+      {
+        "id": "1779448459202cp2p3an7hvv",
+        "ts": 1779448459202,
+        "text": "Tiberius Anthony Corvinus spent 90T/0M on Veteran Patronage and gained +8 reputation.",
+        "type": "boost",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779446644347",
+        "playerName": "Tiberius Anthony Corvinus"
+      },
+      {
+        "id": "1779456391120y442cx4djx",
+        "ts": 1779456391120,
+        "text": "Quintus Ulpius Silanus spent 70T/40M on Grain Charity and gained +6 reputation.",
+        "type": "boost",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779452478558",
+        "playerName": "Quintus Ulpius Silanus"
+      },
+      {
+        "id": "1779549231678xdfwx6fjw6h",
+        "ts": 1779549231678,
+        "text": "Lucius Vipsanius spent 40T/0M on Temple Offering and gained +3 reputation.",
+        "type": "boost",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779120331147",
+        "playerName": "Lucius Vipsanius"
+      },
+      {
+        "id": "1779551748488bo7wwsrl6hd",
+        "ts": 1779551748488,
+        "text": "Quintus Fabius Numerius spent 70T/40M on Grain Charity and gained +6 reputation.",
+        "type": "boost",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779054650967",
+        "playerName": "Quintus Fabius Numerius"
+      }
+    ],
+    "spqr_rep_rules": {
+      "starting": {
+        "ally": 44,
+        "novus": 45,
+        "plebeian": 42,
+        "patrician": 60,
+        "equestrian": 52
+      },
+      "boostActions": [
+        {
+          "id": "temple_offering",
+          "desc": "Public piety and visible offerings to the gods.",
+          "gain": 3,
+          "name": "Temple Offering",
+          "emoji": "🏛️",
+          "costFood": 0,
+          "costGold": 40
+        },
+        {
+          "id": "grain_charity",
+          "desc": "Distribute grain or aid to poorer citizens and clients.",
+          "gain": 6,
+          "name": "Grain Charity",
+          "emoji": "🌾",
+          "costFood": 40,
+          "costGold": 70
+        },
+        {
+          "id": "veteran_gift",
+          "desc": "Support veterans, wounded soldiers and military families.",
+          "gain": 8,
+          "name": "Veteran Patronage",
+          "emoji": "🛡️",
+          "costFood": 0,
+          "costGold": 90
+        },
+        {
+          "id": "public_games",
+          "desc": "Sponsor public spectacle, games and public goodwill.",
+          "gain": 12,
+          "name": "Public Games",
+          "emoji": "🎭",
+          "costFood": 40,
+          "costGold": 160
+        }
+      ],
+      "counterActions": [
+        {
+          "id": "minor_counter",
+          "desc": "Speeches, denials and friendly clients defending your name.",
+          "name": "Small Counter-Campaign",
+          "emoji": "🛡️",
+          "remove": 5,
+          "costGold": 50
+        },
+        {
+          "id": "major_counter",
+          "desc": "Public defense, witnesses, charity and pressure on the rumour network.",
+          "name": "Major Rehabilitation",
+          "emoji": "⚖️",
+          "remove": 12,
+          "costGold": 130
+        }
+      ],
+      "slanderActions": [
+        {
+          "id": "minor",
+          "desc": "Forum gossip, tavern talk and whispers among clients.",
+          "name": "Minor Rumour",
+          "emoji": "🗣️",
+          "impact": 5,
+          "partial": 2,
+          "success": 55,
+          "backfire": 5,
+          "costGold": 35,
+          "backfireChance": 15
+        },
+        {
+          "id": "medium",
+          "desc": "Paid informants, pamphlets, witnesses and coordinated rumours.",
+          "name": "Organized Slander",
+          "emoji": "📜",
+          "impact": 10,
+          "partial": 5,
+          "success": 50,
+          "backfire": 10,
+          "costGold": 85,
+          "backfireChance": 20
+        },
+        {
+          "id": "major",
+          "desc": "A large political attack that can ruin a candidate if believed.",
+          "name": "Major Scandal Campaign",
+          "emoji": "🔥",
+          "impact": 18,
+          "partial": 8,
+          "success": 45,
+          "backfire": 18,
+          "costGold": 180,
+          "backfireChance": 25
+        }
+      ]
+    },
+    "spqr_wealthlog": [
+      {
+        "id": "1779128645653s72vc8be7l",
+        "ts": 1779128645653,
+        "text": "Aulus Domitius Ahenobarbus bought 95M food from the Roman state market for 190T gold.",
+        "type": "market",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "17791830528294z9qwzvrgui",
+        "ts": 1779183052829,
+        "text": "Gaius Sempronius Gracchus bought 20M food from the Roman state market for 40T gold.",
+        "type": "market",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779198631616wwh06ksewx9",
+        "ts": 1779198631616,
+        "text": "Titus Flaminius Vercus bought 6M food from the Roman state market for 12T gold.",
+        "type": "market",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779288867837vpkpky2k9zg",
+        "ts": 1779288867837,
+        "text": "Titus Pullo proposed treasury action: Set estate taxes to 10% gold and 5% food. Awaiting approval by the other Quaestor.",
+        "type": "quaestor-request",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779288954298g42510fld5e",
+        "ts": 1779288954298,
+        "text": "Lucius Vorenus  rejected treasury action: Set estate taxes to 10% gold and 5% food.",
+        "type": "quaestor-rejected",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779288981465q6r7vihken",
+        "ts": 1779288981465,
+        "text": "Lucius Vorenus  proposed treasury action: Set estate taxes to 10% gold and 5% food. Awaiting approval by the other Quaestor.",
+        "type": "quaestor-request",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "17792889873620yyh9pn4gtgp",
+        "ts": 1779288987362,
+        "text": "Titus Pullo approved treasury action: Set estate taxes to 10% gold and 5% food.",
+        "type": "quaestor-approved",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863"
+      },
+      {
+        "id": "1779305173083trrw227dsm",
+        "ts": 1779305173083,
+        "text": "Lucretius Valerius Laurentius transferred 120T gold to Aulus Domitius Ahenobarbus.",
+        "type": "transfer",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779367866458ch4j9atbixb",
+        "ts": 1779367866458,
+        "text": "Titus Pullo updated the Roman food market: 450M available at 2T per 1M.",
+        "type": "market-control",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779369873880ihbulbso4xi",
+        "ts": 1779369873880,
+        "text": "Titus Pullo opened a 48h auction for 🧺 Market Stall in Latium. Seller: Titus Pullo. Starting bid: 500T gold.",
+        "type": "property-auction",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863"
+      },
+      {
+        "id": "1779369928472z2yxlxxfqaq",
+        "ts": 1779369928472,
+        "text": "Lucius Vorenus  bid 502T gold for 🧺 Market Stall in Latium.",
+        "type": "property-auction-bid",
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779187254057"
+      },
+      {
+        "id": "1779370127343flyyhc6gt2h",
+        "ts": 1779370127343,
+        "text": "Titus Pullo set the Roman food market to 10% of the state stockpile: 432M currently available at 2T per 1M.",
+        "type": "market-control",
+        "session": "218 BC · Summer · Turn 1"
+      },
+      {
+        "id": "1779392387819ns7o02pjtcp",
+        "ts": 1779392387819,
+        "text": "Caius Herminus Aenaes sold 50M food to the Roman state for 25T gold. State: +50M food, -25T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779435603440csv08rdobt",
+        "ts": 1779435603440,
+        "text": "Magnus Paterus Johnsonius died. The Roman State inherited 160T gold, 80M food and 0 properties/estates.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779053866800"
+      },
+      {
+        "id": "17794356278958s7teor2w",
+        "ts": 1779435627895,
+        "text": "Vilinus Flavius Stancius died. The Roman State inherited 160T gold, 80M food and 0 properties/estates.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779070082578"
+      },
+      {
+        "id": "1779435663586emhhrb7ibjm",
+        "ts": 1779435663586,
+        "text": "Ianus Canis Capulus died. The Roman State inherited 160T gold, 80M food and 0 properties/estates.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779062664617"
+      },
+      {
+        "id": "1779435753503a1h1o4qr91i",
+        "ts": 1779435753503,
+        "text": "Lucius Vorenus  died. The Roman State inherited 160T gold, 80M food and 0 properties/estates.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779187254057"
+      },
+      {
+        "id": "restore_1779438930185",
+        "ts": 1779438930185,
+        "text": "GM restored 63 properties from registry logs. Unmatched owners: none.",
+        "type": "asset-recovery",
+        "session": "Recovered"
+      },
+      {
+        "id": "17794411305264h5j12el3j5",
+        "ts": 1779441130526,
+        "text": "Spurius Papinianus Rufus sold 20M food to the Roman state for 10T gold. State: +20M food, -10T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "177944121307379ghgx2ulw",
+        "ts": 1779441213073,
+        "text": "Spurius Papinianus Rufus sold 40M food to the Roman state for 20T gold. State: +40M food, -20T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779442288494rhw09e02rio",
+        "ts": 1779442288494,
+        "text": "Lucius Valerius Corvinus transferred 2M food to Spurius Papinianus Rufus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779443211260l9apthxjp9",
+        "ts": 1779443211260,
+        "text": "Caius Herminus Aenaes sold 60M food to the Roman state for 30T gold. State: +60M food, -30T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794469648049mo5nevijar",
+        "ts": 1779446964804,
+        "text": "The Roman State bought Fishing Boat in Picenum from Horatio Marcellus Agrippa for 39T and 6M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779348151666"
+      },
+      {
+        "id": "1779446966950i9c61sudt7o",
+        "ts": 1779446966950,
+        "text": "The Roman State bought Fishing Boat in Picenum from Horatio Marcellus Agrippa for 39T and 6M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779348151666"
+      },
+      {
+        "id": "1779447055166njqrq9k9pn",
+        "ts": 1779447055166,
+        "text": "The Roman State bought Fishing Boat in Picenum from Horatio Marcellus Agrippa for 39T and 6M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779348151666"
+      },
+      {
+        "id": "1779447339850rjzlggw5b4p",
+        "ts": 1779447339850,
+        "text": "The Roman State bought Fishing Boat in Picenum from Horatio Marcellus Agrippa for 39T and 6M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779348151666"
+      },
+      {
+        "id": "1779457466930a33otv44luv",
+        "ts": 1779457466930,
+        "text": "Quintus Ulpius Silanus sold 20M food to the Roman state for 10T gold. State: +20M food, -10T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779466353198vg5u5d4s0na",
+        "ts": 1779466353198,
+        "text": "The Roman State bought Market Stall in Latium from Paulus Maximus for 33T and 3M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779267672281"
+      },
+      {
+        "id": "1779466354961zrspx6mfup",
+        "ts": 1779466354961,
+        "text": "The Roman State bought Market Stall in Latium from Paulus Maximus for 33T and 3M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779267672281"
+      },
+      {
+        "id": "17794665525477g09s4d45t8",
+        "ts": 1779466552547,
+        "text": "The Roman State bought Small Workshop in Campania from Paulus Maximus for 45T and 4M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779267672281"
+      },
+      {
+        "id": "1779466553431utk3em9grod",
+        "ts": 1779466553431,
+        "text": "The Roman State bought Small Workshop in Campania from Paulus Maximus for 45T and 4M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779267672281"
+      },
+      {
+        "id": "1779466634393xscnc1zi0ia",
+        "ts": 1779466634393,
+        "text": "The Roman State bought Fishing Boat in Calabria from Paulus Maximus for 39T and 6M.",
+        "type": "state-property-buyback",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779267672281"
+      },
+      {
+        "id": "1779466960800n8hj8e2gupi",
+        "ts": 1779466960800,
+        "text": "Lucius Valerius Corvinus transferred 5T gold to Paulus Maximus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779468267672omkhcl20b3",
+        "ts": 1779468267672,
+        "text": "Sextus Praetorio transferred 10T gold to Marcus Falcidius Festus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779468299691iu137xzvj",
+        "ts": 1779468299691,
+        "text": "Publius Cornelius Scipio transferred 5T gold to Marcus Falcidius Festus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779468301412m9p5icr0it",
+        "ts": 1779468301412,
+        "text": "Publius Cornelius Scipio transferred 5T gold to Marcus Falcidius Festus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794689659025c0dpy33iu",
+        "ts": 1779468965902,
+        "text": "Marcus Falcidius Festus sold 20M food to the Roman state for 10T gold. State: +20M food, -10T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794706932415uu0o4u2lgd",
+        "ts": 1779470693241,
+        "text": "Quintus Ulpius Silanus sold 30M food to the Roman state for 15T gold. State: +30M food, -15T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794707840643f5jfgwd6bw",
+        "ts": 1779470784064,
+        "text": "Quintus Ulpius Silanus sold 7M food to the Roman state for 3T gold. State: +7M food, -3T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "restore_current_1779473450966",
+        "ts": 1779473450966,
+        "text": "GM restored 68 properties and applied estimated wealth from latest registry logs. Unmatched asset owners: none. Unmatched wealth owners: none.",
+        "type": "asset-wealth-recovery",
+        "session": "Recovered"
+      },
+      {
+        "id": "1779475438512k0z3nmvqloq",
+        "ts": 1779475438512,
+        "text": "Marcellus Ofilius sold 50M food to the Roman state for 25T gold. State: +50M food, -25T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794774668529qtvtg718a6",
+        "ts": 1779477466852,
+        "text": "Spurius Papinianus Rufus bought 1M food from the Roman state market for 2T gold. State: -1M food, +2T gold.",
+        "type": "market",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779482047240msm4xrnb9y9",
+        "ts": 1779482047240,
+        "text": "Traianus Varinius Collatinus transferred 9M food to Spurius Papinianus Rufus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779482097191vkt1uftxkld",
+        "ts": 1779482097191,
+        "text": "Spurius Papinianus Rufus transferred 10T gold to Traianus Varinius Collatinus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17794824814815lgoafdgfhw",
+        "ts": 1779482481481,
+        "text": "Traianus Varinius Collatinus transferred 1M food to Spurius Papinianus Rufus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779482562495ni7azja0rv",
+        "ts": 1779482562495,
+        "text": "Traianus Varinius Collatinus transferred 8M food to Spurius Papinianus Rufus.",
+        "type": "transfer",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779487485922u2rb4d4pfk",
+        "ts": 1779487485922,
+        "text": "Quintus Ulpius Silanus bought 10M food from the Roman state market for 20T gold. State: -10M food, +20T gold.",
+        "type": "market",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779515344597812a8y2cvge",
+        "ts": 1779515344597,
+        "text": "Publius Cornelius Scipio sold 80M food to the Roman state for 40T gold. State: +80M food, -40T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779515388118cnraitog5y",
+        "ts": 1779515388118,
+        "text": "Publius Cornelius Scipio sold 4M food to the Roman state for 2T gold. State: +4M food, -2T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17795205778535ir3qlcv7yj",
+        "ts": 1779520577853,
+        "text": "Spurius Papinianus Rufus bought Timber Rights in Samnium for the Roman State for 190T gold and 20M food. Quaestor seasonal purchases: 1/4.",
+        "type": "state-property-buy",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779520602685kz0xb55664",
+        "ts": 1779520602685,
+        "text": "Spurius Papinianus Rufus bought Timber Rights in Etruria for the Roman State for 190T gold and 20M food. Quaestor seasonal purchases: 2/4.",
+        "type": "state-property-buy",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779521485993hqo1aob6hhh",
+        "ts": 1779521485993,
+        "text": "Adeodatus Pistorius opened a 48h auction for 🫒 Olive Estate in Campania. Seller: Adeodatus Pistorius. Starting bid: 270T gold.",
+        "type": "property-auction",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779126675530"
+      },
+      {
+        "id": "1779558594938nrtt8vhhyz",
+        "ts": 1779558594938,
+        "text": "Gaius Ursulus Tertius bought 150M food from the Roman state market for 300T gold. State: -150M food, +300T gold.",
+        "type": "market",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "177962030996816248f7rf0a",
+        "ts": 1779620309968,
+        "text": "Spurius Papinianus Rufus proposed treasury action: Set estate taxes to 15% gold and 5% food. Awaiting approval by the other Quaestor.",
+        "type": "quaestor-request",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779632361518uepi12dpqh",
+        "ts": 1779632361519,
+        "text": "Titus Flaminius Vercus approved treasury action: Set estate taxes to 15% gold and 5% food.",
+        "type": "quaestor-approved",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779051260863"
+      },
+      {
+        "id": "1779635510944en5gwubhupi",
+        "ts": 1779635510944,
+        "text": "Titus Manlius Torquatus died. The Roman State inherited 300T gold, 130M food and 0 properties/estates. Global property count preserved: 93.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779052757333"
+      },
+      {
+        "id": "1779637735914di35r9y061",
+        "ts": 1779637735914,
+        "text": "Ioannes Gaius died. The Roman State inherited 150T gold, 80M food and 0 properties/estates. Global property count preserved: 96.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779197057536"
+      },
+      {
+        "id": "1779637765728zenujjzco3n",
+        "ts": 1779637765728,
+        "text": "Crassus romulus  died. The Roman State inherited 320T gold, 90M food and 0 properties/estates. Global property count preserved: 96.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779220877782"
+      },
+      {
+        "id": "1779637809087l5s0eycm9w",
+        "ts": 1779637809087,
+        "text": "LUCIUS AEMILIUS SCAURUS died. The Roman State inherited 320T gold, 130M food and 0 properties/estates. Global property count preserved: 96.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779133728149"
+      },
+      {
+        "id": "17796393978281kduelrrxsn",
+        "ts": 1779639397828,
+        "text": "Tiberius Sempronius  died. The Roman State inherited 400T gold, 130M food and 0 properties/estates. Global property count preserved: 96.",
+        "type": "inheritance-to-state",
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779054131653"
+      },
+      {
+        "id": "1779640977216xlq368ppyq",
+        "ts": 1779640977216,
+        "text": "Nero Avitus Corvus set the Roman food market to 5% of the state stockpile: 28M currently available at 4T per 1M.",
+        "type": "market-control",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "177964102313858repu1dlnl",
+        "ts": 1779641023138,
+        "text": "Nero Avitus Corvus set the Roman food market to 5% of the state stockpile: 28M currently available at 4T per 1M.",
+        "type": "market-control",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642509640b5qvrdo74m6",
+        "ts": 1779642509640,
+        "text": "Lucius Vipsanius proposed: Recruit 🤝 Socii Legion — 5000 men, 325T gold, 275M food. Awaiting approval by the other Consul. Quaestors notified of the potential state spending.",
+        "type": "consul-recruitment-request",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642514379nkppiaq7ain",
+        "ts": 1779642514379,
+        "text": "Lucius Vipsanius proposed: Recruit 🤝 Socii Legion — 5000 men, 325T gold, 275M food. Awaiting approval by the other Consul. Quaestors notified of the potential state spending.",
+        "type": "consul-recruitment-request",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642854391danla27qpdw",
+        "ts": 1779642854391,
+        "text": "Nero Avitus Corvus set the Roman food market to 5% of the state stockpile: 28M available. State sells food at 2T per 1M and buys food at 0.8T per 1M. Food prices are now locked for this season.",
+        "type": "market-control",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642976032oxk5aaeol1o",
+        "ts": 1779642976032,
+        "text": "Quintus Velcha sold 30M food to the Roman state for 24T gold. State: +30M food, -24T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642984727aejj73dpkvd",
+        "ts": 1779642984727,
+        "text": "Gaius Ursulus Tertius sold 250M food to the Roman state for 200T gold. State: +250M food, -200T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779642992711s7tdic4u5m",
+        "ts": 1779642992712,
+        "text": "Lucius Vipsanius sold 70M food to the Roman state for 35T gold. State: +70M food, -35T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779643002827f71dx3viirt",
+        "ts": 1779643002827,
+        "text": "Nero Avitus Corvus sold 32M food to the Roman state for 25T gold. State: +32M food, -25T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779643082339dlm6vo0mxef",
+        "ts": 1779643082339,
+        "text": "Adeodatus Pistorius sold 47M food to the Roman state for 37T gold. State: +47M food, -37T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779643850124jn2p45jkrfs",
+        "ts": 1779643850124,
+        "text": "Publius Cornelius Scipio approved recruitment: Recruit 🤝 Socii Legion — 5000 men, 325T gold, 275M food. Unit created as Socii Legion. Quaestors notified of state spending.",
+        "type": "consul-recruitment-approved",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779643851480zqpx9pbk6tf",
+        "ts": 1779643851480,
+        "text": "Publius Cornelius Scipio approved recruitment: Recruit 🤝 Socii Legion — 5000 men, 325T gold, 275M food. Unit created as Socii Legion. Quaestors notified of state spending.",
+        "type": "consul-recruitment-approved",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779643873659tkqoacofvh",
+        "ts": 1779643873659,
+        "text": "Publius Cornelius Scipio approved recruitment: Recruit 🤝 Socii Legion — 5000 men, 325T gold, 275M food. Unit created as Socii Legion. Quaestors notified of state spending.",
+        "type": "consul-recruitment-approved",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "17796546288088grdwzleamg",
+        "ts": 1779654628808,
+        "text": "Benedictus Vopiscus Cassianus sold 19M food to the Roman state for 9T gold. State: +19M food, -9T gold.",
+        "type": "state-food-sale",
+        "session": "218 BC · Early Summer · Turn 2"
+      },
+      {
+        "id": "1779697743805qa4tfdn6lwg",
+        "ts": 1779697743805,
+        "type": "property-auction",
+        "session": "218 BC · Early Summer · Turn 2",
+        "text": "Auction closed with no bids for 🫒 Olive Estate in Campania."
+      }
+    ],
+    "spqr_donations": [
+      {
+        "id": "1779230015863g6rl3hv88k",
+        "ts": 1779230015863,
+        "kind": "food",
+        "amount": 50,
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779115573224",
+        "playerName": "Gaius Flaminius"
+      }
+    ],
+    "spqr_treasury_actions": [
+      {
+        "id": "ta_1779620309813_2ewhkgchye8",
+        "ts": 1779620309813,
+        "note": "Due to the current threat facing our great city, more gold for more steel will be raised. Decadence in peace is shamful. Decadence in war is deadly.",
+        "type": "tax-change",
+        "amount": 0,
+        "status": "approved",
+        "foodTax": 5,
+        "goldTax": 15,
+        "session": "218 BC · Early Summer · Turn 2",
+        "playerId": "1779051260863",
+        "approvedAt": 1779632361384,
+        "approvedBy": "Titus Flaminius Vercus",
+        "playerName": "Titus Pullo",
+        "proposerId": "1779139298913",
+        "proposerName": "Spurius Papinianus Rufus",
+        "proposerRole": "quaestor_1",
+        "approvedByRole": "quaestor_2"
+      },
+      {
+        "id": "ta_1779288981323_r805qfdtcm",
+        "ts": 1779288981323,
+        "note": "Test 2",
+        "type": "tax-change",
+        "amount": 0,
+        "status": "approved",
+        "foodTax": 5,
+        "goldTax": 10,
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863",
+        "approvedAt": 1779288987241,
+        "approvedBy": "Titus Pullo",
+        "playerName": "Titus Pullo",
+        "proposerId": "1779187254057",
+        "proposerName": "Lucius Vorenus ",
+        "proposerRole": "quaestor_2",
+        "approvedByRole": "quaestor_1"
+      },
+      {
+        "id": "ta_1779288867640_ml82xl666lb",
+        "ts": 1779288867641,
+        "note": "Test ",
+        "type": "tax-change",
+        "amount": 0,
+        "status": "rejected",
+        "foodTax": 5,
+        "goldTax": 10,
+        "session": "218 BC · Summer · Turn 1",
+        "playerId": "1779051260863",
+        "playerName": "Titus Pullo",
+        "proposerId": "1779051260863",
+        "rejectedAt": 1779288954167,
+        "rejectedBy": "Lucius Vorenus ",
+        "proposerName": "Titus Pullo",
+        "proposerRole": "quaestor_1"
+      }
+    ],
+    "spqr_auctions": [
+      {
+        "id": "auc_1779521485704_snomwordca",
+        "bids": [],
+        "endsAt": 1779694285704,
+        "status": "closed_no_bids",
+        "assetId": "restored_current_1779473450966_13",
+        "session": "218 BC · Early Summer · Turn 2",
+        "regionId": "campania",
+        "sellerId": "1779126675530",
+        "assetName": "🫒 Olive Estate",
+        "createdAt": 1779521485704,
+        "openedById": "1779126675530",
+        "regionName": "Campania",
+        "sellerName": "Adeodatus Pistorius",
+        "startingBid": 270,
+        "openedByName": "Adeodatus Pistorius",
+        "resolution": "Auction ended with no bids.",
+        "resolvedAt": 1779697743669
+      },
+      {
+        "id": "auc_1779369873735_6o9wsfztjq3",
+        "bids": [
+          {
+            "ts": 1779369928350,
+            "amount": 502,
+            "bidderId": "1779187254057",
+            "bidderName": "Lucius Vorenus "
+          }
+        ],
+        "endsAt": 1779542673735,
+        "status": "cancelled",
+        "assetId": "17791819289558xdmrxsexrx",
+        "session": "218 BC · Summer · Turn 1",
+        "regionId": "latium",
+        "sellerId": "1779051260863",
+        "assetName": "🧺 Market Stall",
+        "createdAt": 1779369873735,
+        "openedById": "1779051260863",
+        "regionName": "Latium",
+        "resolution": "Property no longer exists.",
+        "resolvedAt": 1779542677197,
+        "sellerName": "Titus Pullo",
+        "startingBid": 500,
+        "openedByName": "Titus Pullo"
+      }
+    ],
+    "spqr_quaestor_property_buys": {
+      "quaestor_1__218 BC · Early Summer · Turn 2": 2
+    },
+    "spqr_consul_recruitment_requests": [
+      {
+        "id": "cr_1779642514084_fbt8yfnbryp",
+        "ts": 1779642514084,
+        "men": 5000,
+        "food": 275,
+        "gold": 325,
+        "note": "Etruscans/Umbrians muster in Arretium",
+        "type": "recruit-unit",
+        "turns": 2,
+        "status": "approved",
+        "session": "218 BC · Early Summer · Turn 2",
+        "forceKind": "legion",
+        "forceName": "Socii Legion",
+        "approvedAt": 1779643872974,
+        "approvedBy": "Publius Cornelius Scipio",
+        "forceEmoji": "🤝",
+        "proposerId": "1779120331147",
+        "forceTypeId": "socii_legion",
+        "proposerName": "Lucius Vipsanius",
+        "proposerRole": "consul_2",
+        "createdUnitId": "unit_12_mpk20g4u",
+        "approvedByRole": "consul_1",
+        "createdUnitName": "Socii Legion"
+      },
+      {
+        "id": "cr_1779642509340_y04pacww03j",
+        "ts": 1779642509340,
+        "men": 5000,
+        "food": 275,
+        "gold": 325,
+        "note": "Etruscans/Umbrians muster in Arretium",
+        "type": "recruit-unit",
+        "turns": 2,
+        "status": "approved",
+        "session": "218 BC · Early Summer · Turn 2",
+        "forceKind": "legion",
+        "forceName": "Socii Legion",
+        "approvedAt": 1779643850545,
+        "approvedBy": "Publius Cornelius Scipio",
+        "forceEmoji": "🤝",
+        "proposerId": "1779120331147",
+        "forceTypeId": "socii_legion",
+        "proposerName": "Lucius Vipsanius",
+        "proposerRole": "consul_2",
+        "createdUnitId": "unit_11_mpk1zz4a",
+        "approvedByRole": "consul_1",
+        "createdUnitName": "Socii Legion"
+      }
+    ]
+  },
+  "counts": {
+    "assets": 100,
+    "wealthPlayers": 47,
+    "reputationPlayers": 13,
+    "wealthLog": 75
+  }
+}
