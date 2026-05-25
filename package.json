@@ -6,15 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0",
-    "start": "sh -c 'cat > dist/env.js <<EOF\nwindow.__ENV__ = { VITE_SUPABASE_URL: \"'\"$VITE_SUPABASE_URL\"'\", VITE_SUPABASE_ANON_KEY: \"'\"$VITE_SUPABASE_ANON_KEY\"'\" };\nEOF\nserve -s dist -l tcp://0.0.0.0:${PORT:-8080}'"
+    "start": "node server.js",
+    "preview": "node server.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
     "vite": "5.4.11",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "serve": "14.2.4"
+    "serve": "14.2.4",
+    "express": "4.19.2",
+    "pg": "8.13.1"
   },
   "devDependencies": {},
   "engines": {
