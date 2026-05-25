@@ -1,0 +1,8 @@
+[phases.install]
+cmds = ["npm ci --include=dev || npm install --include=dev"]
+
+[phases.build]
+cmds = ["npx vite build"]
+
+[start]
+cmd = "node server.js"

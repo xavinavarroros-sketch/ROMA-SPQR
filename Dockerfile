@@ -1,18 +1,20 @@
 FROM node:20-alpine AS build
 WORKDIR /app
+ENV NODE_ENV=development
+ENV NPM_CONFIG_PRODUCTION=false
 COPY package*.json ./
-RUN npm install
+RUN npm ci --include=dev || npm install --include=dev
 COPY . .
-RUN npm run build
+RUN npx vite build
 
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=8080
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm ci --omit=dev || npm install --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server.js ./server.js
 COPY seed ./seed
 EXPOSE 8080
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
