@@ -3,6 +3,6 @@
     "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": ""
+    "startCommand": "node server.js"
   }
 }
