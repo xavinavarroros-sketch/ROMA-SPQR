@@ -1,6 +1,5 @@
 const fs = require('fs');
 const { spawn } = require('child_process');
-const path = require('path');
 
 const envPayload = {
   VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
@@ -22,8 +21,5 @@ console.log('[SPQR] Runtime env.js written:', {
 });
 
 const port = process.env.PORT || '8080';
-const localServe = path.join(__dirname, 'node_modules', '.bin', process.platform === 'win32' ? 'serve.cmd' : 'serve');
-const serveCmd = fs.existsSync(localServe) ? localServe : 'serve';
-const child = spawn(serveCmd, ['-s', 'dist', '-l', `tcp://0.0.0.0:${port}`], { stdio: 'inherit' });
-child.on('error', (err) => { console.error('[SPQR] Failed to start static server:', err); process.exit(1); });
+const child = spawn('serve', ['-s', 'dist', '-l', `tcp://0.0.0.0:${port}`], { stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code ?? 0));
