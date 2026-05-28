@@ -1,0 +1,1 @@
+{"name":"spqr-railway-app-prebuilt","private":true,"version":"1.0.0","type":"module","scripts":{"start":"node start-server.cjs"},"engines":{"node":">=18.20.0"}}
