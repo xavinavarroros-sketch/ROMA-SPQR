@@ -564,6 +564,19 @@ const economySnapshot=(game,regions,legions,cavalry=DEF_CAVALRY,fleets=DEF_FLEET
   const upkeepF=legionFoodUpkeep+cavalryFoodUpkeep+fleetFoodUpkeep;
   return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,legionGoldUpkeep,legionFoodUpkeep,cavalryGoldUpkeep,cavalryFoodUpkeep,fleetGoldUpkeep,fleetFoodUpkeep,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,activeCavalry:cav.length,activeTriremes:triremes,ts:Date.now()};
 };
+
+const econSnapshotKey=snap=>String(snap?.label||`${snap?.year||""}|${snap?.season||""}|${snap?.session||""}`||snap?.ts||"");
+const dedupeEconomyHistory=(history=[])=>{
+  const map=new Map();
+  (history||[]).filter(Boolean).forEach(snap=>{map.set(econSnapshotKey(snap),snap);});
+  return Array.from(map.values()).sort((a,b)=>Number(a.ts||0)-Number(b.ts||0));
+};
+const upsertEconomySnapshot=(history=[],snapshot)=>{
+  const key=econSnapshotKey(snapshot);
+  const clean=dedupeEconomyHistory(history).filter(s=>econSnapshotKey(s)!==key);
+  return [...clean,snapshot].slice(-24);
+};
+
 const roleEntries=()=>Object.entries(POS).map(([key,pos])=>({key,...pos}));
 const getPlayerName=(players,id)=>players.find(p=>p.id===id)?.latinName||"Unknown Senator";
 
@@ -1092,11 +1105,21 @@ function VotingPanel({motions,players,user,game,onRefresh}){
           {concluded.slice().reverse().map(m=>{
             const yeas=Object.values(m.votes||{}).filter(v=>v==="yea").length;
             const nays=Object.values(m.votes||{}).filter(v=>v==="nay").length;
+            const openDetails=selMotion===`reg-${m.id}`;
             return <div key={`reg-${m.id}`} style={{background:T.surf,border:`1px solid ${scol[m.status]||T.border}`,borderLeft:`5px solid ${scol[m.status]||T.border}`,padding:"0.65rem"}}>
               <div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:T.text}}>{m.title}</div>
               <div style={{fontSize:"0.85rem",color:T.mut}}>By {m.byName} · {m.session||""}</div>
               <Badge c={String(m.status||"").toUpperCase()} color={scol[m.status]||T.mut} sm/>
               <div style={{marginTop:"0.35rem",fontSize:"0.9rem",color:T.mut}}>AYE {yeas} · NAY {nays}{m.vetoedByName?` · Vetoed by ${m.vetoedByName}`:""}</div>
+              <button onClick={()=>setSelMotion(openDetails?null:`reg-${m.id}`)} style={{background:"none",border:"none",color:T.blue,fontFamily:"'Cinzel',serif",fontWeight:900,cursor:"pointer",fontSize:"0.82rem",marginTop:"0.35rem"}}>{openDetails?"▲ Hide full motion":"▼ Show full motion"}</button>
+              {openDetails&&<div style={{marginTop:"0.5rem",display:"grid",gap:"0.45rem"}}>
+                <div style={{whiteSpace:"pre-wrap",lineHeight:1.45}}><b>Proposal:</b> {m.body||m.text||"No proposal text recorded."}</div>
+                {m.speech&&<div style={{whiteSpace:"pre-wrap",background:T.card,border:`1px solid ${T.border}`,padding:"0.45rem"}}><b>Senate Speech:</b>
+{m.speech}</div>}
+                {m.effects&&<div style={{whiteSpace:"pre-wrap",background:"#F4FFF0",border:`1px solid ${T.gre}55`,padding:"0.45rem"}}><b>Desired Effects:</b>
+{m.effects}</div>}
+                <VotingGrid motion={m} players={players}/>
+              </div>}
             </div>
           })}
           {concluded.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No concluded motions yet.</div>}
@@ -2984,7 +3007,7 @@ function PlayerApp({user:initUser,onLogout}){
         {tab==="voting"    &&<VotingPanel motions={D.motions} players={D.players} user={user} game={D.game} onRefresh={refresh}/>} 
         {tab==="resources" &&<ResourcesRegionsPanel D={D} editable={false}/>} 
         {tab==="legions"   &&<LegionsPublicPanel D={D}/>} 
-        {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
+        {tab==="magistrates"&&<GMMagistratesPanel D={D} onRefresh={refresh}/>} 
         {tab==="courts"&&<CourtsPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="elections" &&<ElectionsPlayerPanel user={user} D={D} onRefresh={refresh}/>} 
         {tab==="office"    &&pos&&<MyOfficePanel user={user} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={D.players} treasuryActions={D.treasuryActions||[]} motions={D.motions||[]} onRefresh={refresh}/>}
@@ -3468,6 +3491,8 @@ function AResources({D,onRefresh}){
   const [regs,setRegs]=useState(null);
   const [confirmAdv,setConfirmAdv]=useState(false);
   const [msg,setMsg]=useState("");
+  const [advancing,setAdvancing]=useState(false);
+  const advanceLockRef=useRef(false);
   useEffect(()=>{setG({...DEF_GAME,...D.game});setRegs((D.regions||DEF_REGIONS).map(r=>({...r})));},[D.game,D.regions]);
   if(!g||!regs)return null;
   const inc=calcInc(regs,g);
@@ -3483,6 +3508,7 @@ function AResources({D,onRefresh}){
   const addRegion=()=>setRegs(rs=>[...rs,{id:`region_${Date.now()}`,name:"New Province",capital:"New Capital",pop:50000,bG:50,bF:50,s:"roman"}]);
   const delRegion=i=>{if(confirm("Delete this province/region?"))setRegs(rs=>rs.filter((_,j)=>j!==i));};
   const save=async()=>{await db.set("spqr_g",g);await db.set("spqr_r",regs);setMsg("Resources and regions saved.");onRefresh();setTimeout(()=>setMsg(""),2500);};
+  const cleanEconomyHistory=async()=>{const hist=await db.get("spqr_econ")||[];const clean=dedupeEconomyHistory(hist);await db.set("spqr_econ",clean);setMsg(`Cleaned economy history: ${hist.length} rows → ${clean.length} unique seasons.`);onRefresh&&onRefresh();setTimeout(()=>setMsg(""),3500);};
   const applyMaintenance=async()=>{
     if(!confirm(`Apply military maintenance now?\n\nGold: -${upkeepG}T\nFood: -${upkeepF}M\n\nThis subtracts Legion + Cavalry + Fleet upkeep from the current stockpile without advancing the turn.`))return;
     const ng={...g,gold:Math.max(0,Number(g.gold||0)-upkeepG),food:Math.max(0,Number(g.food||0)-upkeepF)};
@@ -3494,6 +3520,16 @@ function AResources({D,onRefresh}){
     onRefresh();setTimeout(()=>setMsg(""),3000);
   };
   const doAdvance=async()=>{
+    if(advanceLockRef.current){setMsg("Season advance already running. Please wait.");return;}
+    advanceLockRef.current=true;
+    setAdvancing(true);
+    try{
+    const fromKey=`${g.year}|${g.season}|${g.session}`;
+    const lastAdvance=await db.get("spqr_last_advance_guard");
+    if(lastAdvance?.fromKey===fromKey){setMsg("This exact season advance was already processed. Reload before trying again.");return;}
+    if(lastAdvance?.inProgressFromKey===fromKey && Date.now()-Number(lastAdvance?.ts||0)<120000){setMsg("This season advance is already being processed in another tab/device. Please wait and refresh.");return;}
+    await db.set("spqr_last_advance_guard",{...(lastAdvance||{}),inProgressFromKey:fromKey,ts:Date.now()});
+    await db.set("spqr_last_advance_backup",{ts:Date.now(),fromKey,game:g,regions:regs,legions:await db.get("spqr_l"),cavalry:await db.get("spqr_cav"),fleets:await db.get("spqr_f"),wealth:await db.get("spqr_wealth"),players:await db.get("spqr_p"),econ:await db.get("spqr_econ")});
     let {year,season,sessionInSeason,session,gold,food,pop,lturns}=g;
     gold=gold+inc.gold-upkeepG;
     food=food+inc.food-upkeepF;
@@ -3508,7 +3544,7 @@ function AResources({D,onRefresh}){
     await addWealthLog({type:"state-provincial-income",affectsState:true,session:sLab(ng),goldIn:inc.gold,foodIn:inc.food,text:`Provincial income added to the treasury: ${inc.gold}T gold and ${inc.food}M food.`});
     await addWealthLog({type:"state-military-upkeep",affectsState:true,session:sLab(ng),goldOut:upkeepG,foodOut:upkeepF,text:`Military upkeep paid: ${upkeepG}T gold and ${upkeepF}M food for legions, cavalry and fleets.`});
     const hist=await db.get("spqr_econ")||[];
-    await db.set("spqr_econ",[...hist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)].slice(-24));
+    await db.set("spqr_econ",upsertEconomySnapshot(hist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)));
     // Pay private estate/business income to senators once per advanced season.
     const businesses=(await db.get("spqr_biz"))||DEF_BUSINESSES;
     const assets=(await db.get("spqr_assets"))||[];
@@ -3573,13 +3609,21 @@ function AResources({D,onRefresh}){
     await addWealthLog({type:"state-economy-cycle",affectsState:true,session:sLab(ng),goldIn:inc.gold+totalTaxGold+stateEstateIncome.gold,foodIn:inc.food+totalTaxFood+stateEstateIncome.food,goldOut:upkeepG,foodOut:upkeepF,text:`Season economy cycle completed. Income: ${inc.gold}T/${inc.food}M provincial, ${totalTaxGold}T/${totalTaxFood}M private taxes, ${stateEstateIncome.gold}T/${stateEstateIncome.food}M state estates. Upkeep: ${upkeepG}T/${upkeepF}M military.`});
     await safeSetWealth(nextWealth,"private wealth update");
     await db.set("spqr_g",ng);
+    await db.set("spqr_last_advance_guard",{fromKey,toKey:`${ng.year}|${ng.season}|${ng.session}`,inProgressFromKey:null,ts:Date.now()});
     const finalHist=await db.get("spqr_econ")||[];
-    if(finalHist.length){await db.set("spqr_econ",[...finalHist.slice(0,-1),economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)].slice(-24));}
+    await db.set("spqr_econ",upsertEconomySnapshot(finalHist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)));
     await db.set("spqr_deadline",null);
     setG(ng);setConfirmAdv(false);setMsg("Session advanced.");
     await pushN("session",`Session Advanced`,`The Senate enters ${newYear} BC ${newSeason} S${newSess}`);
     if(isWinterSeason(newSeason))await pushN("Winter Food Reduction",`The Republic has entered ${newSeason}. Food production from provinces and private estates is reduced by ${Math.round((1-WINTER_FOOD_MOD)*100)}%.`);
     onRefresh();setTimeout(()=>setMsg(""),3000);
+    }catch(err){
+      console.error("Season advance failed",err);
+      setMsg(`Season advance failed: ${err?.message||err}`);
+    }finally{
+      advanceLockRef.current=false;
+      setAdvancing(false);
+    }
   };
   const goBack=async()=>{
     if(!confirm("Go back one session? This changes only the calendar/session counter, not resources."))return;
@@ -3599,14 +3643,14 @@ function AResources({D,onRefresh}){
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
         <Stat label="Session" value={g.session}/><Stat label="Season" value={`${g.season}`}/><Stat label="Year" value={`${g.year} BC`}/><Stat label="Net Gold" value={`${snap.netGold>=0?"+":""}${snap.netGold}T`} color={snap.netGold>=0?T.gre:T.rhi}/><Stat label="Net Food" value={`${snap.netFood>=0?"+":""}${snap.netFood}M`} color={snap.netFood>=0?T.gre:T.rhi}/>
       </div>
-      <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack}>↩ Back One Turn</Btn><Btn v="red" onClick={restartGame}>⟲ Restart Game</Btn></Row>
+      <Row gap="0.5rem" wrap><Btn v="dark" onClick={()=>setConfirmAdv(true)} disabled={advancing}>▶ Advance Session</Btn><Btn v="ghost" onClick={goBack} disabled={advancing}>↩ Back One Turn</Btn><Btn v="gold" onClick={cleanEconomyHistory}>Clean Duplicate Economy Rows</Btn><Btn v="red" onClick={restartGame} disabled={advancing}>⟲ Restart Game</Btn></Row>
     </Card>
     <Card><STit c="Season Effects" sub="Control how each season affects state and private production. 100% means normal production; Winter is set to 75% food by default."/>
       <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",minWidth:"760px"}}><thead><tr style={{background:T.bg,fontFamily:"'Cinzel',serif",color:T.mut}}>{["Season","Gold income %","Food income %","Public note / effect"].map(h=><th key={h} style={{textAlign:"left",padding:"0.45rem",border:`1px solid ${T.border}`}}>{h}</th>)}</tr></thead><tbody>{SEASONS.map(se=>{const eff={...(DEFAULT_SEASON_EFFECTS[se]||{}),...((g.seasonEffects||{})[se]||{})};const setEff=(k,v)=>setG(x=>({...x,seasonEffects:{...(x.seasonEffects||DEFAULT_SEASON_EFFECTS),[se]:{...eff,[k]:v}}}));return <tr key={se}><td style={{padding:"0.45rem",border:`1px solid ${T.border}`,fontWeight:900}}>{seasonInfo({...g,season:se}).emoji} {se}</td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={Math.round(Number(eff.goldMod??1)*100)} onChange={e=>setEff("goldMod",Number(e.target.value)/100)} style={{width:"100px",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input type="number" value={Math.round(Number(eff.foodMod??1)*100)} onChange={e=>setEff("foodMod",Number(e.target.value)/100)} style={{width:"100px",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td><td style={{padding:"0.35rem",border:`1px solid ${T.border}`}}><input value={eff.note||""} onChange={e=>setEff("note",e.target.value)} style={{width:"100%",padding:"0.35rem",border:`1px solid ${T.border}`}}/></td></tr>})}</tbody></table></div>
       <Row gap="0.5rem" wrap><Btn onClick={save}>💾 Save Season Effects</Btn><Btn v="ghost" onClick={()=>setG(x=>({...x,seasonEffects:DEFAULT_SEASON_EFFECTS}))}>Reset Default Effects</Btn></Row>
     </Card>
     <ABackupRestore onRefresh={onRefresh}/>
-    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(seasonIndex(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${totalGoldIncome}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${totalFoodIncome}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+totalGoldIncome-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+totalFoodIncome-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Season advance applies the full economy cycle: state income, military upkeep, private estate income, household upkeep, private taxes, debt/starvation checks, state-owned estate production, auction resolution, and seasonal Quaestor purchase limits by the new season. Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance}>✓ Confirm — Advance Session</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)}>Cancel</Btn></Row></Modal>}
+    {confirmAdv&&<Modal title="ADVANCE SESSION — CONFIRM" onClose={()=>setConfirmAdv(false)}><div style={{marginBottom:"1rem"}}><STit c="Session Summary"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem",marginBottom:"0.75rem"}}><Stat label="Current" value={sLab(g)}/><Stat label="After Advance" value={`${SEASONS[(seasonIndex(g.season)+1)%SEASONS.length]} · Turn ${(g.session||1)+1}`}/><Stat label="Gold Income" value={`+${totalGoldIncome}T`} color={T.gre}/><Stat label="Military Upkeep" value={`-${upkeepG}T`} color={T.rhi}/><Stat label="Food Income" value={`+${totalFoodIncome}M`} color={T.gre}/><Stat label="Military Food" value={`-${upkeepF}M`} color={T.rhi}/><Stat label="Gold After" value={`${fmt(Math.max(0,g.gold+totalGoldIncome-upkeepG))}T`}/><Stat label="Food After" value={`${fmt(Math.max(0,g.food+totalFoodIncome-upkeepF))}M`} color={T.green}/></div><div style={{color:T.mut,fontSize:"0.9rem",fontStyle:"italic"}}>Season advance applies the full economy cycle: state income, military upkeep, private estate income, household upkeep, private taxes, debt/starvation checks, state-owned estate production, auction resolution, and seasonal Quaestor purchase limits by the new season. Raising legions advance by 1 turn. Economy history will be updated.</div></div><Row gap="0.5rem"><Btn v="gold" onClick={doAdvance} disabled={advancing}>{advancing?"Advancing...":"✓ Confirm — Advance Session"}</Btn><Btn v="ghost" onClick={()=>setConfirmAdv(false)} disabled={advancing}>Cancel</Btn></Row></Modal>}
     <ResourcesRegionsPanel D={{...D,game:g,regions:regs}}/>
     <Card><STit c="Military Upkeep Costs" sub="Edit upkeep for legions, cavalry and triremes. These are deducted from stockpiles when you advance the session or apply maintenance manually."/>
       <div className="spqr-stat-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:"0.5rem",marginBottom:"0.75rem"}}>
@@ -3734,6 +3778,147 @@ function AMotions({D,onRefresh}){
   );
 }
 
+function AElections({D,onRefresh}){
+  const elections=D.elections||normalizeElections(null,D.election);
+  const [office,setOffice]=useState("consul_1");
+  const [msg,setMsg]=useState("");
+  const [selected,setSelected]=useState(null);
+  const [showVotes,setShowVotes]=useState({});
+  const players=D.players||[];
+  const active=elections.filter(e=>e&&e.status!=="closed");
+  const [activeElectionId,setActiveElectionId]=useState(null);
+  useEffect(()=>{if(active.length && (!activeElectionId || !active.some(e=>e.id===activeElectionId)))setActiveElectionId(active[0].id);},[active.length,activeElectionId]);
+  const visibleElection=active.find(e=>e.id===activeElectionId)||active[0];
+  const saveElections=async(next)=>{await db.set("spqr_elections",next);await db.set("spqr_election",null);};
+  const start=async()=>{
+    if(active.some(e=>e.office===office&&e.status!=="closed")){setMsg("There is already an active election for this office.");return;}
+    const e={id:Date.now().toString()+"_"+office,status:"candidacy",office,session:sLab(D.game||DEF_GAME),candidates:[],votes:{},round:1,openedAt:new Date().toISOString()};
+    await saveElections([...elections.filter(x=>x.status!=="closed"),e]);
+    await pushN("Election Opened",`Candidacies are now open for ${POS[office]?.title||office}.`);
+    setMsg("Election candidacy phase opened.");onRefresh();
+  };
+  const updateElection=async(id,patch)=>{
+    const all=await db.get("spqr_elections")||active;
+    const updated=all.map(e=>e.id===id?{...e,...patch}:e);
+    await saveElections(updated);onRefresh();
+  };
+  const openVoting=async(election)=>{
+    await updateElection(election.id,{status:"voting",votes:{},eligibleVoters:votingEligiblePlayers(players).map(p=>p.id)});
+    await pushN("Election Voting Open",`Voting has opened for ${POS[election.office]?.title||election.office}.`);
+    setMsg((election.candidates||[]).length?"Voting phase opened.":"Voting phase opened with no candidates. The office may remain vacant if closed empty.");
+  };
+  const deleteCandidate=async(election,playerId)=>{
+    const cand=(election.candidates||[]).find(c=>c.playerId===playerId);
+    if(!confirm(`Delete candidacy for ${cand?.name||"this senator"}?`))return;
+    const votes={...(election.votes||{})};Object.keys(votes).forEach(voter=>{if(votes[voter]===playerId)delete votes[voter];});
+    await updateElection(election.id,{candidates:(election.candidates||[]).filter(c=>c.playerId!==playerId),votes});
+    setMsg("Candidacy deleted.");
+  };
+  const closeVacant=async(election)=>{
+    if(!confirm(`Close ${POS[election.office]?.title||election.office} election as vacant / no candidate?`))return;
+    const closed={...election,status:"closed",winnerId:null,winnerName:"Vacant",closedAt:new Date().toISOString(),vacant:true};
+    await saveElections(active.map(e=>e.id===election.id?closed:e));
+    await pushN("Election Closed Vacant",`${POS[election.office]?.title||election.office} remains vacant. No candidate was elected.`);
+    setMsg("Election closed as vacant.");onRefresh&&onRefresh();
+  };
+  const closeElection=async(election)=>{
+    const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+    const cands=election.candidates||[];
+    if(cands.length===0){await closeVacant(election);return;}
+    const max=Math.max(0,...cands.map(c=>counts[c.playerId]||0));
+    const winners=cands.filter(c=>(counts[c.playerId]||0)===max);
+    if(winners.length!==1 || max===0){
+      const fresh={...election,status:"candidacy",candidates:[],votes:{},round:(election.round||1)+1,draw:true};
+      await saveElections(active.map(e=>e.id===election.id?fresh:e));
+      await pushN("Election Draw",`The election for ${POS[election.office]?.title||election.office} ended in a draw. Candidacies reopen.`);
+      setMsg("Draw or no votes. This election has restarted with a new candidacy phase.");onRefresh();return;
+    }
+    const winner=winners[0];
+    const updatedPlayers=players.map(p=>{
+      if(p.role===election.office&&p.id!==winner.playerId)return{...p,role:null};
+      if(p.id===winner.playerId)return{...p,role:election.office};
+      return p;
+    });
+    await db.set("spqr_p",updatedPlayers);
+    const closed={...election,status:"closed",winnerId:winner.playerId,winnerName:winner.name,closedAt:new Date().toISOString()};
+    await saveElections(active.map(e=>e.id===election.id?closed:e));
+    await pushN("Election Result",`${winner.name} has been elected ${POS[election.office]?.title||election.office}.`);
+    setMsg(`${winner.name} elected and assigned to ${POS[election.office]?.title||election.office}.`);onRefresh();
+  };
+  const cancel=async(election)=>{if(!confirm(`Cancel the election for ${POS[election.office]?.title||election.office}?`))return;await saveElections(active.filter(e=>e.id!==election.id));setMsg("Election cancelled.");onRefresh();};
+  return <div>
+    
+    {msg&&<div style={{padding:"0.55rem 0.8rem",background:"#F4FFF0",border:`1px solid ${T.gre}`,color:T.gre,marginBottom:"0.7rem"}}>{msg}</div>}
+    <Card><STit c="Magistrate Election Control" sub="You can open several elections at the same time, one per magistracy. Each office has its own candidacy, voting and result."/>
+      <Row gap="0.5rem" wrap><select value={office} onChange={e=>setOffice(e.target.value)} style={{background:T.surf,border:`1px solid ${T.border}`,color:T.text,padding:"0.45rem",fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji||"🏛️"} {v.title}</option>)}</select><Btn v="green" onClick={start}>Open Another Candidacy</Btn></Row>
+    </Card>
+    {active.length===0&&<Card><div style={{color:T.mut,fontStyle:"italic"}}>No active elections. Open candidacy for any magistracy above.</div></Card>}
+    {active.length>0&&<ElectionRoleTabs elections={active} selectedId={visibleElection.id} onSelect={setActiveElectionId}/>}
+    {visibleElection&&[visibleElection].map(election=>{
+      const officeInfo=POS[election.office];
+      const counts={};Object.values(election.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);
+      return <Card key={election.id} style={{borderLeft:`6px solid ${officeInfo?.color||T.gold}`,background:officeInfo?.bg||T.card}}>
+        <Row gap="0.5rem" wrap><Badge c={`${officeInfo?.emoji||"🏛️"} ${officeInfo?.title||election.office} — ${election.status.toUpperCase()} — Round ${election.round||1}`} color={officeInfo?.color||T.gold}/>{election.status==="candidacy"&&<Btn onClick={()=>openVoting(election)}>Open Voting Phase</Btn>}{election.status==="voting"&&<Btn v="green" onClick={()=>closeElection(election)}>Close & Assign Winner</Btn>}<Btn v="ghost" onClick={()=>closeVacant(election)}>Close as Vacant</Btn><Btn v="red" onClick={()=>cancel(election)}>Cancel</Btn></Row>
+        <STit c="Candidates" sub="Candidate table with speeches. Vote record is hidden by default and can be expanded."/>
+        {(election.candidates||[]).length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No candidates yet.</div>}
+        {(election.candidates||[]).length>0&&<div style={{overflowX:"auto"}}>
+          <table className="election-table">
+            <thead><tr><th>Candidate</th><th>Class</th><th>Speech</th><th>Tally</th><th>GM</th></tr></thead>
+            <tbody>{(election.candidates||[]).map(c=>{const cp=players.find(p=>p.id===c.playerId);return <tr key={c.playerId}>
+              <td data-label="Candidate"><button onClick={()=>cp&&setSelected(cp)} style={{background:"none",border:"none",padding:0,cursor:cp?"pointer":"default",fontFamily:"'Cinzel',serif",fontWeight:900,color:cp?T.blue:T.text,fontSize:"1rem",textDecoration:cp?"underline":"none"}}>{c.name||getPlayerName(players,c.playerId)}</button>{c.discord&&<div style={{color:"#5865F2",fontSize:"0.82rem"}}>{c.discord}</div>}</td>
+              <td data-label="Class">{cp?<ClassBadge cls={cp.charClass} sm/>:<span style={{color:T.mut}}>{c.charClass||"—"}</span>}</td>
+              <td data-label="Speech"><div className="election-speech" style={{color:T.mut}}>{c.speech||"No speech recorded."}</div></td>
+              <td data-label="Votes"><span style={{fontFamily:"'Cinzel',serif",fontSize:"1.15rem",fontWeight:900,color:T.ghi}}>{counts[c.playerId]||0}</span></td>
+              <td data-label="GM"><Btn sm v="red" onClick={()=>deleteCandidate(election,c.playerId)}>Delete Candidacy</Btn></td>
+            </tr>})}</tbody>
+          </table>
+        </div>}
+        {(election.candidates||[]).length>0&&<div style={{marginTop:"0.55rem"}}><button onClick={()=>setShowVotes({...showVotes,[election.id]:!showVotes[election.id]})} style={{background:"none",border:"none",color:T.blue,fontFamily:"'Cinzel',serif",fontWeight:900,cursor:"pointer",fontSize:"0.9rem"}}>{showVotes[election.id]?"▲ Hide vote record":"▼ Show vote record"}</button>{showVotes[election.id]&&<ElectionVoteRecord election={election} players={players} onSelect={setSelected}/>}</div>}
+        {selected&&<SenatorProfileModal player={selected} onClose={()=>setSelected(null)}/>}
+      </Card>;
+    })}
+    <Card><STit c="Election History & Next Annual Reminder" sub="Closed elections remain here as the record of the year. Elections normally return next year unless the GM calls an extraordinary vote."/>
+      {elections.filter(e=>e.status==="closed").length===0?<div style={{color:T.mut,fontStyle:"italic"}}>No closed elections recorded yet.</div>:<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:"0.55rem"}}>{elections.filter(e=>e.status==="closed").slice().reverse().map(e=>{const o=POS[e.office]||{};const counts={};Object.values(e.votes||{}).forEach(id=>counts[id]=(counts[id]||0)+1);const winner=(e.candidates||[]).slice().sort((a,b)=>(counts[b.playerId]||0)-(counts[a.playerId]||0))[0];return <div key={`hist-${e.id}`} style={{border:`1px solid ${o.color||T.border}`,background:o.bg||T.surf,padding:"0.65rem"}}><div style={{fontFamily:"'Cinzel',serif",fontWeight:900,color:o.color||T.text}}>{o.emoji||"🏛️"} {o.title||e.office}</div><div style={{fontSize:"0.88rem",color:T.mut}}>{e.session||"Current year"} · Round {e.round||1}</div><div style={{marginTop:"0.35rem"}}>Winner: <b>{winner?.name||"Not assigned"}</b>{winner?` (${counts[winner.playerId]||0} votes)`:""}</div></div>})}</div>}
+      <div style={{marginTop:"0.65rem",color:T.gold,fontFamily:"'Cinzel',serif",fontSize:"0.82rem"}}>⏳ Reminder: prepare candidacies and alliances before the next annual elections.</div>
+    </Card>
+  </div>;
+}
+
+/* ══ ADMIN APP ════════════════════════════════════════════════════════════ */
+
+function AParties({D,onRefresh}){
+  D=D||{};
+  const parties=D.parties||[];const players=D.players||[];
+  const save=async(next)=>{await db.set("spqr_parties",next);onRefresh&&onRefresh();};
+  const removeParty=async(id)=>{if(!confirm("Delete this political party?"))return;await save(parties.filter(p=>p.id!==id));};
+  const patchParty=async(id,patch)=>{await save(parties.map(p=>p.id===id?{...p,...patch}:p));};
+  const setLeader=async(pt,pid)=>{const pl=players.find(p=>p.id===pid);if(!pl)return;await patchParty(pt.id,{leaderId:pid,leaderName:pl.latinName});await addHistory(pid,"Party Leadership",`${pl.latinName} was appointed leader of ${pt.name} by the Game Master.`,`party`);};
+  const addMember=async(pt,pid)=>{const pl=players.find(p=>p.id===pid);if(!pl)return;const currentParty=partyOf(parties,pid);let next=parties.map(p=>p.id===pt.id?{...p,members:Array.from(new Set([...(p.members||[]),pid])),invites:(p.invites||[]).filter(x=>x!==pid)}:p);if(currentParty&&currentParty.id!==pt.id){next=next.map(p=>p.id===currentParty.id?{...p,members:(p.members||[]).filter(x=>x!==pid)}:p);}await db.set("spqr_parties",next);await addHistory(pid,"Party Membership",`${pl.latinName} was assigned to ${pt.name} by the Game Master.`,`party`);onRefresh&&onRefresh();};
+  const removeMember=async(pt,pid)=>{const pl=players.find(p=>p.id===pid);let remaining=(pt.members||[]).filter(id=>id!==pid);let patch={members:remaining};if(pt.leaderId===pid){patch.leaderId=remaining[0]||null;patch.leaderName=players.find(p=>p.id===remaining[0])?.latinName||"Vacant";}await patchParty(pt.id,patch);if(pl)await addHistory(pid,"Party Membership",`${pl.latinName} was removed from ${pt.name} by the Game Master.`,`party`);};
+  return <div><Card><STit c="Political Parties — Game Master Control" sub="The Game Master can control all party identity, leaders, members, descriptions, histories and political platforms."/>{parties.length===0&&<div style={{color:T.mut,fontStyle:"italic"}}>No parties yet.</div>}<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:"0.7rem"}}>{parties.map(pt=><Card key={pt.id} style={{border:`1px solid ${pt.color||T.border}`,borderLeft:`6px solid ${pt.color||T.blue}`}}><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:"0.45rem"}}><Inp label="Name" value={pt.name||""} onChange={v=>patchParty(pt.id,{name:v})}/><Inp label="Emoji" value={pt.emoji||"🏛️"} onChange={v=>patchParty(pt.id,{emoji:v})}/><Inp label="Color" value={pt.color||"#A32020"} onChange={v=>patchParty(pt.id,{color:v})}/></div><Inp label="Short Description" value={pt.description||""} onChange={v=>patchParty(pt.id,{description:v})} rows={2}/><Inp label="Platform" value={pt.platform||""} onChange={v=>patchParty(pt.id,{platform:v})} rows={3}/><Inp label="Party History" value={pt.history||""} onChange={v=>patchParty(pt.id,{history:v})} rows={3}/><div style={{color:T.mut,marginBottom:"0.35rem"}}>Founder: {pt.founderName||pt.leaderName||"Unknown"}</div><div><Lbl c="Leader"/><select value={pt.leaderId||""} onChange={e=>setLeader(pt,e.target.value)} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Vacant</option>{(pt.members||[]).map(id=>players.find(p=>p.id===id)).filter(Boolean).map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div><STit c="Members"/><div style={{display:"flex",gap:"0.35rem",flexWrap:"wrap",marginBottom:"0.5rem"}}>{(pt.members||[]).map(id=>players.find(p=>p.id===id)).filter(Boolean).map(p=><span key={p.id} style={{border:`1px solid ${T.border}`,padding:"0.18rem 0.35rem",background:T.bg}}>{p.latinName} <button onClick={()=>removeMember(pt,p.id)} style={{border:"none",background:"transparent",color:T.rhi,cursor:"pointer"}}>×</button></span>)}</div><div><Lbl c="Add Member"/><select defaultValue="" onChange={e=>{if(e.target.value){addMember(pt,e.target.value);e.target.value="";}}} style={{width:"100%",padding:"0.45rem",border:`1px solid ${T.border}`,background:T.card}}><option value="">Choose senator...</option>{players.filter(p=>!(pt.members||[]).includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.latinName}</option>)}</select></div><div style={{marginTop:"0.6rem"}}><Btn v="red" sm onClick={()=>removeParty(pt.id)}>Delete Party</Btn></div></Card>)}</div></Card></div>;
+}
+
+
+
+
+function GMMagistratesPanel({D,onRefresh}){
+  const players=D.players||[];
+  const [role,setRole]=useState("consul_1");
+  const holder=players.find(p=>p.role===role);
+  const pos=POS[role]||{};
+  const spectator=holder||{id:"gm_spectator",latinName:"Game Master",role,username:"gm"};
+  return <div>
+    <Card><STit c="Magistrate Spectator Control" sub="The Game Master can open any magistrate office panel here, even if the office is vacant."/>
+      <div style={{display:"grid",gridTemplateColumns:"minmax(220px,360px) 1fr",gap:"0.6rem",alignItems:"end"}}>
+        <div><Lbl c="Select Magistracy"/><select value={role} onChange={e=>setRole(e.target.value)} style={{width:"100%",padding:"0.55rem",background:T.card,border:`1px solid ${T.border}`,fontFamily:"'Cinzel',serif"}}>{Object.entries(POS).map(([k,v])=><option key={k} value={k}>{v.emoji} {v.title}</option>)}</select></div>
+        <div style={{color:T.mut}}>Viewing: <b>{pos.emoji} {pos.title}</b> · Holder: <b>{holder?.latinName||"Vacant"}</b></div>
+      </div>
+    </Card>
+    <MagistratesPanel players={players}/>
+    <MyOfficePanel user={spectator} game={D.game} legions={D.legions} cavalry={D.cavalry} fleets={D.fleets} players={players} treasuryActions={D.treasuryActions||[]} motions={D.motions||[]} onRefresh={onRefresh}/>
+  </div>;
+}
+
 function ARegistry({D}){
   const [q,setQ]=useState("");
   const [pid,setPid]=useState("all");
@@ -3853,7 +4038,7 @@ function AdminApp({onLogout}){
         {tab==="resources" &&<AResources D={D} onRefresh={refresh}/>} 
         {tab==="regions"   &&<ARegions D={D} onRefresh={refresh}/>} 
         {tab==="legions"   &&<ALegions D={D} onRefresh={refresh}/>} 
-        {tab==="magistrates"&&<MagistratesPanel players={D.players}/>} 
+        {tab==="magistrates"&&<GMMagistratesPanel D={D} onRefresh={refresh}/>} 
         {tab==="courts"&&<CourtsPanel user={{id:"gm",latinName:"Game Master",role:"praetor_1"}} D={D} onRefresh={refresh} isGM/>} 
         {tab==="elections" &&<AElections D={D} onRefresh={refresh}/>} 
         {tab==="motions"   &&<AMotions D={D} onRefresh={refresh}/>} 
