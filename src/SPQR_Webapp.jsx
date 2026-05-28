@@ -34,7 +34,7 @@ a{color:var(--blue);text-decoration:none}
 
 /* ── Topbar ─────────────────────────────────── */
 .spqr-topbar{
-  background:linear-gradient(135deg,#0D0804 0%,#1A0E08 100%);
+  background:linear-gradient(135deg,#3A0808 0%,#1A0E08 55%,#080301 100%);
   border-bottom:2px solid var(--red);
   padding:.5rem 1rem;
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;
@@ -62,6 +62,13 @@ a{color:var(--blue);text-decoration:none}
 }
 .spqr-tab-btn:hover{color:var(--text);background:rgba(185,135,43,.06)}
 .spqr-tab-btn.active{color:var(--gold-hi);border-bottom-color:var(--gold);background:rgba(185,135,43,.1)}
+
+
+.spqr-topbar .spqr-btn-ghost,
+.spqr-topbar button.spqr-btn-ghost{color:#FFF9EE!important;border-color:rgba(240,219,168,.45)!important;background:rgba(255,249,238,.06)!important}
+.spqr-topbar .spqr-btn-ghost:hover{background:rgba(163,32,32,.35)!important;color:#fff!important}
+.spqr-topbar span{ text-shadow:0 1px 2px rgba(0,0,0,.45); }
+@media(max-width:720px){.spqr-logo{font-size:.95rem}.spqr-topbar{background:linear-gradient(135deg,#3A0808,#0D0804)!important}}
 
 /* ── Cards ──────────────────────────────────── */
 .spqr-card{
@@ -851,7 +858,14 @@ const economySnapshot=(game,regions,legions,cavalry=DEF_CAVALRY,fleets=DEF_FLEET
   return {label:sLab(g),gold:g.gold||0,food:g.food||0,goldIncome:inc.gold,foodIncome:inc.food,legionGoldUpkeep,legionFoodUpkeep,cavalryGoldUpkeep,cavalryFoodUpkeep,fleetGoldUpkeep,fleetFoodUpkeep,goldUpkeep:upkeepG,foodUpkeep:upkeepF,netGold:inc.gold-upkeepG,netFood:inc.food-upkeepF,activeLegions:act.length,activeCavalry:cav.length,activeTriremes:triremes,ts:Date.now()};
 };
 
-const econSnapshotKey=snap=>String(snap?.label||`${snap?.year||""}|${snap?.season||""}|${snap?.session||""}`||snap?.ts||"");
+const econSnapshotKey=snap=>{
+  if(!snap) return "";
+  const y=snap.year??"";
+  const season=snap.season??"";
+  const session=snap.session??"";
+  if(y||season||session) return `${y}|${season}|${session}`;
+  return String(snap.label||snap.ts||"");
+};
 const dedupeEconomyHistory=(history=[])=>{
   const map=new Map();
   (history||[]).filter(Boolean).forEach(snap=>{map.set(econSnapshotKey(snap),snap);});
@@ -2180,10 +2194,10 @@ function MapPanel({cfg}){
 
 
 function economyHistoryWithCurrent(history=[],currentSnap=null){
-  const list=Array.isArray(history)?history.filter(Boolean):[];
+  const list=dedupeEconomyHistory(Array.isArray(history)?history.filter(Boolean):[]);
   if(!currentSnap)return list;
-  const curLabel=currentSnap.label||"Current";
-  const idx=list.findIndex(x=>String(x.label||"")===String(curLabel));
+  const curKey=econSnapshotKey(currentSnap);
+  const idx=list.findIndex(x=>econSnapshotKey(x)===curKey);
   if(idx>=0){const copy=[...list];copy[idx]={...copy[idx],...currentSnap,live:true};return copy;}
   return [...list,{...currentSnap,live:true}];
 }
@@ -3194,7 +3208,7 @@ function PlayerApp({user:initUser,onLogout}){
     const allElections=normalizeElections(elections,election);
     const settledAuctions=await resolveExpiredAuctions(players||[],(businesses&&businesses.length)?businesses:DEF_BUSINESSES,game||DEF_GAME);
     setD({players:players||[],game:{...DEF_GAME,...(game||{})},legions:legions||DEF_LEGIONS,regions:regions||DEF_REGIONS,
-      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
+      motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:dedupeEconomyHistory(econ||[]),election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
     if(players){const me=players.find(p=>p.id===user.id);if(me){setUser(me); if(isInactiveSenator(me))setInactivePrompt(true);}}
   },[user.id]);
 
@@ -3246,8 +3260,8 @@ function PlayerApp({user:initUser,onLogout}){
   const activeGroup=GROUPS.find(g=>g.key===group)||GROUPS[0];
   const activeTabs=activeGroup.tabs;
   const jumpTab=(next)=>{setTab(next);const found=GROUPS.find(g=>g.tabs.some(t=>t.k===next));if(found)setGroup(found.key);};
-  const toneColor=tone=>tone==="personal"?"#2563EB":tone==="records"?"#5B21B6":tone==="office"?(pos?.color||T.gold):"#B45309";
-  const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#F3E8FF":tone==="office"?(pos?.bg||T.surf):"#FFF0D6";
+  const toneColor=tone=>tone==="personal"?"#2563EB":tone==="records"?"#7F1D1D":tone==="office"?(pos?.color||T.gold):T.red;
+  const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#FFF1F1":tone==="office"?(pos?.bg||T.surf):"#FFF0D6";
 
   const [mobileOpen,setMobileOpen]=useState(false);
   return(
@@ -3269,15 +3283,15 @@ function PlayerApp({user:initUser,onLogout}){
           </div>
         </div>
       </div>
-      <div className="spqr-topbar" style={{background:pos?`linear-gradient(135deg,${officeBg}88,#0D0804)`:"linear-gradient(135deg,#0D0804,#1A0E08)",borderBottom:`2px solid ${pos?officeAccent:T.red}`}}>
+      <div className="spqr-topbar" style={{background:pos?`linear-gradient(135deg,#3A0808 0%,${officeBg}55 45%,#0D0804 100%)`:"linear-gradient(135deg,#3A0808 0%,#1A0E08 55%,#080301 100%)",borderBottom:`2px solid ${pos?officeAccent:T.red}`}}>
         <Row gap="0.7rem">
           <button className="spqr-hamburger" onClick={()=>setMobileOpen(true)} aria-label="Menu"><span/><span/><span/></button>
           <div className="spqr-logo">SPQR</div>
           {pos&&<span style={{fontFamily:"'Cinzel',serif",fontSize:"0.66rem",fontWeight:700,letterSpacing:"0.08em",color:officeAccent,border:`1px solid ${officeAccent}44`,background:`${officeAccent}12`,padding:"0.14rem 0.4rem",borderRadius:"3px",whiteSpace:"nowrap"}}>{pos.emoji} {pos.abbr}</span>}
         </Row>
         <Row gap=".55rem" wrap className="spqr-desktop-nav">
-          <span style={{color:T.mut,fontSize:"0.7rem",fontFamily:"'Cinzel',serif",letterSpacing:".08em"}}>{seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {D.game.year} BC · T{D.game.session}</span>
-          <span style={{color:T.fnt,fontSize:"0.82rem",fontFamily:"'Cinzel',serif"}}>{user.latinName}</span>
+          <span style={{color:"#F0DBA8",fontSize:"0.7rem",fontFamily:"'Cinzel',serif",letterSpacing:".08em"}}>{seasonInfo(D.game).emoji} {D.game.season||"Winter"} · {D.game.year} BC · T{D.game.session}</span>
+          <span style={{color:"#FFF9EE",fontSize:"0.82rem",fontFamily:"'Cinzel',serif",fontWeight:800}}>{user.latinName}</span>
           <Btn v={away?"green":"gold"} sm onClick={toggleSelfRomeLocation}>{away?"← Return to Rome":"⛺ Leave Rome"}</Btn>
           <NotifBell userId={user.id}/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
@@ -3905,8 +3919,6 @@ function AResources({D,onRefresh}){
     let ng={...g,gold:Math.max(0,gold),food:Math.max(0,food),pop,year:newYear,season:newSeason,sessionInSeason:newSess,session};
     await addWealthLog({type:"state-provincial-income",affectsState:true,session:sLab(ng),goldIn:inc.gold,foodIn:inc.food,text:`Provincial income added to the treasury: ${inc.gold}T gold and ${inc.food}M food.`});
     await addWealthLog({type:"state-military-upkeep",affectsState:true,session:sLab(ng),goldOut:upkeepG,foodOut:upkeepF,text:`Military upkeep paid: ${upkeepG}T gold and ${upkeepF}M food for legions, cavalry and fleets.`});
-    const hist=await db.get("spqr_econ")||[];
-    await db.set("spqr_econ",upsertEconomySnapshot(hist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)));
     // Pay private estate/business income to senators once per advanced season.
     const businesses=(await db.get("spqr_biz"))||DEF_BUSINESSES;
     const assets=(await db.get("spqr_assets"))||[];
@@ -3972,8 +3984,8 @@ function AResources({D,onRefresh}){
     await safeSetWealth(nextWealth,"private wealth update");
     await db.set("spqr_g",ng);
     await db.set("spqr_last_advance_guard",{fromKey,toKey:`${ng.year}|${ng.season}|${ng.session}`,inProgressFromKey:null,ts:Date.now()});
-    const finalHist=await db.get("spqr_econ")||[];
-    await db.set("spqr_econ",upsertEconomySnapshot(finalHist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS)));
+    const finalHist=dedupeEconomyHistory((await db.get("spqr_econ"))||[]);
+    await db.set("spqr_econ",upsertEconomySnapshot(finalHist,economySnapshot(ng,regs,nl,D.cavalry||DEF_CAVALRY,D.fleets||DEF_FLEETS,D.players||[],D.assets||[],D.businesses||DEF_BUSINESSES,D.wealth||{})));
     await db.set("spqr_deadline",null);
     setG(ng);setConfirmAdv(false);setMsg("Session advanced.");
     await pushN("session",`Session Advanced`,`The Senate enters ${newYear} BC ${newSeason} S${newSess}`);
@@ -4351,7 +4363,7 @@ function AdminApp({onLogout}){
     const allElections=normalizeElections(elections,election);
     const settledAuctions=await resolveExpiredAuctions(players||[],(businesses&&businesses.length)?businesses:DEF_BUSINESSES,game||DEF_GAME);
     setD({players:players||[],game:game||DEF_GAME,legions:legions||DEF_LEGIONS,
-      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:econ||[],election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
+      regions:regions||DEF_REGIONS,motions:motions||[],orders:orders||[],deadline:deadline||null,cfg:cfg||{},laws:laws||LAWS,econ:dedupeEconomyHistory(econ||[]),election:election||null,elections:allElections,cavalry:cavalry||DEF_CAVALRY,fleets:fleets||DEF_FLEETS,businesses:(businesses&&businesses.length)?businesses:DEF_BUSINESSES,assets:assets||[],wealth:wealth||{},donations:donations||[],history:history||[],parties:parties||[],wealthlog:wealthlog||[],cemetery:cemetery||[],forceTypes:(forceTypes&&forceTypes.length)?forceTypes:FORCE_TYPES,courts:courts||[],reputation:reputation||{},replog:replog||[],repRules:repRules||DEF_REP_RULES,treasuryActions:treasuryActions||[],auctions:settledAuctions||auctions||[]});
   },[]);
 
   useEffect(()=>{refresh();const t=setInterval(refresh,20000);return()=>clearInterval(t);},[refresh]);
@@ -4371,8 +4383,8 @@ function AdminApp({onLogout}){
   ];
   const activeGroup=GROUPS.find(g=>g.key===group)||GROUPS[0];
   const activeTabs=activeGroup.tabs;
-  const toneColor=tone=>tone==="personal"?"#2563EB":tone==="records"?"#5B21B6":"#B45309";
-  const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#F3E8FF":"#FFF0D6";
+  const toneColor=tone=>tone==="personal"?"#2563EB":tone==="records"?"#7F1D1D":T.red;
+  const toneBg=tone=>tone==="personal"?"#EAF2FF":tone==="records"?"#FFF1F1":"#FFF0D6";
   const chooseGroup=(g)=>{setGroup(g.key); if(!g.tabs.some(t=>t.k===tab))setTab(g.tabs[0].k);};
 
   const [mobileOpen,setMobileOpen]=useState(false);
@@ -4397,7 +4409,7 @@ function AdminApp({onLogout}){
           <Badge c="GM PANEL" color={T.rhi}/>
         </Row>
         <Row gap="0.5rem" wrap>
-          <span style={{color:T.mut,fontSize:"0.72rem",fontFamily:"'Cinzel',serif",letterSpacing:".08em"}}>{D.game.year} BC · Turn {D.game.session}</span>
+          <span style={{color:"#F0DBA8",fontSize:"0.72rem",fontFamily:"'Cinzel',serif",letterSpacing:".08em"}}>{D.game.year} BC · Turn {D.game.session}</span>
           <NotifBell userId="gm"/>
           <Btn v="ghost" sm onClick={refresh}>↺</Btn>
           <Btn v="ghost" sm onClick={onLogout}>Exit</Btn>
@@ -4425,7 +4437,7 @@ function AdminApp({onLogout}){
         {tab==="parties"   &&<AParties D={D} onRefresh={refresh}/>} 
         {tab==="registry"  &&<ARegistry D={D}/>} 
         {tab==="cemetery"&&<CemeteryPanel cemetery={D.cemetery||[]} players={D.players||[]}/>} 
-        {tab==="laws"      &&<ALaws D={D} onRefresh={refresh}/>} 
+        {tab==="laws"      &&<LawsPanel laws={D.laws}/>} 
         {tab==="setup"     &&<ASetup D={D} onRefresh={refresh}/>} 
         </ErrorBoundary>
       </div>
