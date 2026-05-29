@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import * as THREE from "three";
 
 /* ══ GLOBAL CSS ═══════════════════════════════════════════════════════════ */
 const CSS = `
@@ -166,6 +167,18 @@ a{color:var(--blue);text-decoration:none}
 .spqr-badge-wrap{max-width:100%;white-space:normal!important;overflow-wrap:anywhere;text-align:center}
 .spqr-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.55rem}
 .spqr-military-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:.75rem}
+.spqr-map-shell{position:relative;min-height:560px;background:linear-gradient(180deg,#223B52 0%,#38627C 52%,#8BAA9B 100%);border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;box-shadow:inset 0 0 70px rgba(4,16,25,.28)}
+.spqr-map-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.spqr-map-panel{position:absolute;left:.85rem;top:.85rem;z-index:3;max-width:min(330px,calc(100% - 1.7rem));background:rgba(255,249,238,.92);border:1px solid rgba(139,95,22,.35);border-radius:6px;padding:.7rem .8rem;box-shadow:0 12px 30px rgba(0,0,0,.18);backdrop-filter:blur(8px)}
+.spqr-map-title{font-family:'Cinzel',serif;color:var(--gold-hi);font-size:.9rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;line-height:1.25}
+.spqr-map-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.35rem;margin-top:.55rem}
+.spqr-map-kpi{background:rgba(255,255,255,.68);border:1px solid rgba(214,191,163,.75);border-radius:4px;padding:.32rem .4rem;min-width:0}
+.spqr-map-kpi span{display:block;color:var(--muted);font-family:'Cinzel',serif;font-size:.52rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spqr-map-kpi b{display:block;color:var(--text);font-size:.9rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spqr-map-label{position:absolute;z-index:2;transform:translate(-50%,-50%);pointer-events:none;padding:.08rem .28rem;border-radius:3px;background:rgba(255,249,238,.78);border:1px solid rgba(214,191,163,.62);color:#26160F;font-family:'Cinzel',serif;font-size:.54rem;font-weight:800;letter-spacing:.03em;text-shadow:0 1px 0 rgba(255,255,255,.6);box-shadow:0 2px 8px rgba(0,0,0,.12);max-width:7.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spqr-map-legend{position:absolute;right:.85rem;bottom:.85rem;z-index:3;display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end;max-width:min(520px,calc(100% - 1.7rem))}
+.spqr-map-chip{display:inline-flex;align-items:center;gap:.25rem;background:rgba(255,249,238,.9);border:1px solid rgba(214,191,163,.72);border-radius:999px;padding:.16rem .45rem;font-family:'Cinzel',serif;font-size:.56rem;font-weight:800;color:var(--muted);white-space:nowrap}
+.spqr-map-dot{width:.48rem;height:.48rem;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.18)}
 
 /* ── Election table ─────────────────────────── */
 .election-table{width:100%;border-collapse:separate;border-spacing:0 .45rem}
@@ -241,6 +254,11 @@ a{color:var(--blue);text-decoration:none}
   html{font-size:17px}
   body{overflow-x:hidden}
   .spqr-shell{padding:.7rem .75rem!important}
+  .spqr-map-shell{min-height:500px}
+  .spqr-map-panel{left:.55rem;right:.55rem;top:.55rem;max-width:none}
+  .spqr-map-meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .spqr-map-label{font-size:.48rem;max-width:5.7rem}
+  .spqr-map-legend{left:.55rem;right:.55rem;bottom:.55rem;justify-content:flex-start}
   .spqr-topbar{padding:.45rem .75rem}
   .spqr-hamburger{display:flex}
   .spqr-desktop-nav{display:none!important}
@@ -331,7 +349,11 @@ const CLASS_INFO={
 const classKey=cls=>String(cls||"").toLowerCase().replace(/[^a-z]/g,"");
 const getClassInfo=cls=>{const k=classKey(cls);return CLASS_INFO[k]||CLASS_INFO[k.includes("patric")?"patrician":k.includes("pleb")?"plebeian":k.includes("equest")?"equestrian":k.includes("novus")?"novus":k.includes("ally")?"ally":"patrician"];};
 const ClassBadge=({cls,sm})=>{const ci=getClassInfo(cls);return <span style={{display:"inline-block",background:ci.bg,border:`1px solid ${ci.color}`,color:ci.color,padding:sm?"0.04rem 0.35rem":"0.08rem 0.45rem",fontSize:sm?"0.72rem":"0.82rem",fontFamily:"'Cinzel',serif",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{ci.emoji} {ci.label}</span>;};
-const isAwayOnCampaign=p=>!!(p?.awayCampaign||p?.awayFromRome||p?.onCampaign);
+const isAwayOnCampaign=p=>{
+  const rawStatus=String(p?.romeStatus??p?.locationStatus??p?.romeLocation??p?.where??p?.location??p?.status??"").toLowerCase();
+  const knownAwayRegion=rawStatus&&!["rome","roma","in rome","inside rome"].includes(rawStatus.trim())&&["outside","away","campaign","field","camp","not in rome","latium","etruria","campania","apulia","sicilia","sardinia","gallia","samnium","bruttium","lucania","calabria","illyria"].some(x=>rawStatus.includes(x));
+  return !!(p?.awayCampaign||p?.awayFromRome||p?.onCampaign||knownAwayRegion);
+};
 const campaignReason=p=>p?.campaignReason||p?.awayReason||"Away from Rome on campaign";
 const votingEligiblePlayers=players=>(players||[]).filter(p=>!isAwayOnCampaign(p));
 const voteCountFromEligible=(votes={},eligiblePlayers=[])=>{const ids=new Set((eligiblePlayers||[]).map(p=>String(p.id)));return Object.entries(votes||{}).filter(([id])=>ids.has(String(id)));};
@@ -472,6 +494,159 @@ const DEF_REGIONS=[
 ];
 const RS={roman:{l:"Roman Control",c:"#40A030",m:1.0},contested:{l:"Contested",c:"#C8922A",m:0.5},
   sacked:{l:"Sacked",c:"#E05050",m:0.1},devastated:{l:"Devastated",c:"#CC6622",m:0.25},enemy:{l:"🐘 Carthaginian Control",c:"#880020",m:0.0}};
+
+const ITALY_MAP_SHAPES={
+  latium:{label:[-0.72,0.45],points:[[-1.12,1.24],[-0.68,1.35],[-0.36,1.04],[-0.38,0.58],[-0.76,0.18],[-1.18,0.38],[-1.32,0.86]]},
+  etruria:{label:[-0.92,1.82],points:[[-1.56,2.62],[-0.82,2.94],[-0.38,2.46],[-0.36,1.68],[-0.68,1.35],[-1.12,1.24],[-1.52,1.68]]},
+  umbria:{label:[-0.15,1.8],points:[[-0.38,2.46],[0.2,2.28],[0.46,1.66],[0.1,1.08],[-0.36,1.68]]},
+  picenum:{label:[0.6,1.55],points:[[0.2,2.28],[0.92,1.9],[1.04,1.14],[0.56,0.82],[0.1,1.08],[0.46,1.66]]},
+  samnium:{label:[0.1,0.28],points:[[-0.36,1.04],[0.1,1.08],[0.56,0.82],[0.66,0.08],[0.28,-0.54],[-0.24,-0.38],[-0.76,0.18],[-0.38,0.58]]},
+  campania:{label:[-0.42,-0.55],points:[[-0.76,0.18],[-0.24,-0.38],[-0.28,-1.0],[-0.72,-1.28],[-1.08,-0.88],[-1.12,-0.2]]},
+  apulia:{label:[0.98,-0.62],points:[[0.66,0.08],[1.38,-0.18],[1.92,-0.92],[1.82,-1.3],[1.08,-1.14],[0.42,-0.78],[0.28,-0.54]]},
+  lucania:{label:[0.1,-1.35],points:[[-0.28,-1.0],[0.42,-0.78],[1.08,-1.14],[1.0,-1.78],[0.42,-2.24],[-0.24,-2.02],[-0.72,-1.28]]},
+  bruttium:{label:[0.18,-2.7],points:[[-0.24,-2.02],[0.42,-2.24],[0.72,-2.94],[0.52,-3.5],[-0.08,-3.32],[-0.48,-2.78]]},
+  calabria:{label:[1.05,-2.28],points:[[1.0,-1.78],[1.7,-1.86],[2.04,-2.32],[1.64,-2.7],[0.72,-2.94],[0.42,-2.24]]},
+  sicilia:{label:[0.04,-4.04],points:[[-1.36,-3.94],[-0.2,-3.72],[1.26,-3.88],[1.76,-4.24],[0.64,-4.48],[-0.86,-4.42]]},
+  sardinia_corsica:{label:[-2.44,-1.8],points:[[-2.78,0.28],[-2.26,0.08],[-2.16,-0.74],[-2.38,-1.28],[-2.14,-2.18],[-2.48,-3.22],[-2.9,-2.36],[-2.74,-1.28],[-2.98,-0.5]]},
+  gallia_cisalpina:{label:[-0.28,3.35],points:[[-1.76,3.32],[-1.1,3.82],[-0.2,3.96],[0.68,3.68],[0.98,3.1],[0.2,2.28],[-0.38,2.46],[-0.82,2.94]]},
+  illyria:{label:[2.36,1.02],points:[[1.82,3.1],[2.34,2.5],[2.52,1.42],[2.34,0.28],[2.58,-0.74],[2.22,-1.78],[1.82,-1.3],[1.92,-0.92],[1.38,-0.18],[1.04,1.14],[0.92,1.9]]},
+};
+
+function RegionThreeMap({regions=[],game=DEF_GAME}){
+  const hostRef=useRef(null);
+  const hoverRef=useRef(null);
+  const [hoverId,setHoverId]=useState(null);
+  hoverRef.current=hoverId;
+  const regs=(regions&&regions.length?regions:DEF_REGIONS);
+  const hovered=regs.find(r=>r.id===hoverId)||regs.find(r=>r.id==="latium")||regs[0];
+  const hoverState=hovered?(RS[hovered.s]||RS.roman):RS.roman;
+  const maxPop=Math.max(1,...regs.map(r=>Number(r.pop||0)));
+  useEffect(()=>{
+    const host=hostRef.current;
+    if(!host)return;
+    const scene=new THREE.Scene();
+    scene.fog=new THREE.Fog(0x223b52,8,14);
+    const camera=new THREE.OrthographicCamera(-3.7,3.7,4.7,-4.9,0.1,50);
+    camera.position.set(0.08,-0.1,10);
+    camera.lookAt(0,0,0);
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    renderer.setClearColor(0x000000,0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.domElement.className="spqr-map-canvas";
+    host.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xfff1d6,0x163244,2.25));
+    const sun=new THREE.DirectionalLight(0xffe7aa,2.6);
+    sun.position.set(-3,-4,8);
+    scene.add(sun);
+    const sea=new THREE.Mesh(new THREE.PlaneGeometry(9,10.5),new THREE.MeshStandardMaterial({color:0x244a63,roughness:.9,metalness:.05,transparent:true,opacity:.6}));
+    sea.position.z=-0.18;
+    scene.add(sea);
+    const group=new THREE.Group();
+    scene.add(group);
+    const raycaster=new THREE.Raycaster();
+    const pointer=new THREE.Vector2();
+    const meshes=[];
+    const makeShape=points=>{
+      const shape=new THREE.Shape();
+      points.forEach(([x,y],i)=>i?shape.lineTo(x,y):shape.moveTo(x,y));
+      shape.closePath();
+      return shape;
+    };
+    regs.forEach(region=>{
+      const cfg=ITALY_MAP_SHAPES[region.id];
+      if(!cfg)return;
+      const state=RS[region.s]||RS.roman;
+      const height=0.12+Math.min(.42,Number(region.pop||0)/maxPop*.35);
+      const geom=new THREE.ExtrudeGeometry(makeShape(cfg.points),{depth:height,bevelEnabled:true,bevelSize:.035,bevelThickness:.03,bevelSegments:2});
+      geom.computeVertexNormals();
+      const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(state.c),roughness:.55,metalness:.12,emissive:new THREE.Color(state.c),emissiveIntensity:.035});
+      const mesh=new THREE.Mesh(geom,mat);
+      mesh.userData={id:region.id};
+      meshes.push(mesh);
+      group.add(mesh);
+      const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geom,18),new THREE.LineBasicMaterial({color:0x2d170c,transparent:true,opacity:.42}));
+      edges.position.z=.012;
+      mesh.add(edges);
+    });
+    const mountainMat=new THREE.LineBasicMaterial({color:0xf0dba8,transparent:true,opacity:.55});
+    [[[-1.35,2.95],[-.85,3.28],[-.15,3.34],[.58,3.12]],[[.08,2.25],[.34,1.45],[.36,.68],[.55,-.12],[.66,-.88],[.46,-1.66],[.42,-2.55]]].forEach(line=>{
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(line.map(([x,y])=>new THREE.Vector3(x,y,.56))),mountainMat));
+    });
+    const resize=()=>{
+      const rect=host.getBoundingClientRect();
+      const w=Math.max(1,rect.width),h=Math.max(1,rect.height);
+      renderer.setSize(w,h,false);
+      const aspect=w/h,viewH=9.6,viewW=viewH*aspect;
+      camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;
+      camera.updateProjectionMatrix();
+    };
+    const ro=new ResizeObserver(resize);
+    ro.observe(host);
+    resize();
+    const onMove=e=>{
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.x=((e.clientX-rect.left)/rect.width)*2-1;
+      pointer.y=-((e.clientY-rect.top)/rect.height)*2+1;
+      raycaster.setFromCamera(pointer,camera);
+      const hit=raycaster.intersectObjects(meshes,false)[0];
+      const next=hit?.object?.userData?.id||null;
+      setHoverId(next);
+      renderer.domElement.style.cursor=next?"pointer":"default";
+    };
+    const onLeave=()=>{setHoverId(null);renderer.domElement.style.cursor="default";};
+    renderer.domElement.addEventListener("pointermove",onMove);
+    renderer.domElement.addEventListener("pointerleave",onLeave);
+    let raf=0;
+    const clock=new THREE.Clock();
+    const animate=()=>{
+      const t=clock.getElapsedTime();
+      group.rotation.z=Math.sin(t*.45)*.012;
+      const activeId=hoverRef.current;
+      meshes.forEach(mesh=>{
+        const active=mesh.userData.id===activeId;
+        const targetZ=active ? .22 : 0;
+        mesh.position.z+=(targetZ-mesh.position.z)*.12;
+        mesh.material.emissiveIntensity+=((active ? .22 : .035)-mesh.material.emissiveIntensity)*.12;
+      });
+      renderer.render(scene,camera);
+      raf=requestAnimationFrame(animate);
+    };
+    animate();
+    return()=>{
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      renderer.domElement.removeEventListener("pointermove",onMove);
+      renderer.domElement.removeEventListener("pointerleave",onLeave);
+      if(renderer.domElement.parentNode===host)host.removeChild(renderer.domElement);
+      scene.traverse(obj=>{
+        obj.geometry?.dispose?.();
+        if(obj.material)(Array.isArray(obj.material)?obj.material:[obj.material]).forEach(m=>m.dispose?.());
+      });
+      renderer.dispose();
+    };
+  },[regs,maxPop]);
+  const mapBounds={minX:-3.1,maxX:2.65,minY:-4.55,maxY:4.05};
+  const labelFor=region=>{
+    const cfg=ITALY_MAP_SHAPES[region.id];
+    if(!cfg)return null;
+    const [x,y]=cfg.label;
+    return {left:`${((x-mapBounds.minX)/(mapBounds.maxX-mapBounds.minX))*100}%`,top:`${(1-(y-mapBounds.minY)/(mapBounds.maxY-mapBounds.minY))*100}%`};
+  };
+  const controlCounts=regs.reduce((acc,r)=>{acc[r.s]=(acc[r.s]||0)+1;return acc;},{});
+  return <div className="spqr-map-shell" ref={hostRef} aria-label="Three.js map of Roman Italy">
+    <div className="spqr-map-panel">
+      <div className="spqr-map-title">{hovered?.name||"Italia"}</div>
+      <div style={{color:T.mut,fontSize:".82rem",lineHeight:1.35,marginTop:".25rem"}}>{hovered?`${hovered.capital||"Unknown"} · ${hoverState.l}`:"Interactive provincial map"}</div>
+      <div className="spqr-map-meta">
+        <div className="spqr-map-kpi"><span>Population</span><b>{fmt(hovered?.pop||0)}</b></div>
+        <div className="spqr-map-kpi"><span>Gold</span><b style={{color:RES.gold.color}}>+{fmt(effectiveGoldIncome((hovered?.bG||0)*hoverState.m,game))}T</b></div>
+        <div className="spqr-map-kpi"><span>Food</span><b style={{color:RES.food.color}}>+{fmt(effectiveFoodIncome((hovered?.bF||0)*hoverState.m,game))}M</b></div>
+      </div>
+    </div>
+    {regs.map(r=>{const pos=labelFor(r);if(!pos)return null;const st=RS[r.s]||RS.roman;return <div key={r.id} className="spqr-map-label" style={{...pos,borderColor:st.c,color:hoverId===r.id?st.c:"#26160F",zIndex:hoverId===r.id?4:2}}>{r.name}</div>})}
+    <div className="spqr-map-legend">{Object.entries(RS).filter(([k])=>controlCounts[k]).map(([k,v])=><span key={k} className="spqr-map-chip"><span className="spqr-map-dot" style={{background:v.c}}/> {v.l}: {controlCounts[k]}</span>)}</div>
+  </div>;
+}
 
 const DEF_BUSINESSES=[
   // Small / cheap businesses — designed so 35 senators can participate early
@@ -1478,12 +1653,15 @@ function VotingGrid({motion,players}){
       })}
     </div>
     <div style={{display:"flex",gap:"1rem",marginTop:"0.65rem",fontSize:"0.85rem",color:T.mut,flexWrap:"wrap",fontFamily:"'Cinzel',serif"}}>
-      <span style={{color:"#14532D",fontWeight:900}}>✓ AYE: {ayeCount}</span>
-      <span style={{color:"#7F1D1D",fontWeight:900}}>✗ NAY: {nayCount}</span>
-      <span style={{color:T.mut}}>⟳ NOT VOTED: {notCount}</span>
-      <span style={{color:T.text}}>Majority: {Math.floor((players||[]).length/2)+1}</span>
-      <span style={{color:"#14532D",fontWeight:900}}>AYE needs {Math.max(Math.floor((players||[]).length/2)+1-ayeCount,0)} more</span>
-      <span style={{color:"#7F1D1D",fontWeight:900}}>NAY needs {Math.max(Math.floor((players||[]).length/2)+1-nayCount,0)} more</span>
+      {(()=>{const mi=majorityInfoForMotion({votes},players||[]);return <>
+        <span style={{color:"#14532D",fontWeight:900}}>✓ AYE: {mi.ayeCount}</span>
+        <span style={{color:"#7F1D1D",fontWeight:900}}>✗ NAY: {mi.nayCount}</span>
+        <span style={{color:T.mut}}>⟳ NOT VOTED IN ROME: {Math.max(mi.voterCount-mi.ayeCount-mi.nayCount,0)}</span>
+        <span style={{color:T.text}}>Eligible in Rome: {mi.voterCount}</span>
+        <span style={{color:T.text}}>Majority: {mi.majority}</span>
+        <span style={{color:"#14532D",fontWeight:900}}>AYE needs {mi.ayeLeft} more</span>
+        <span style={{color:"#7F1D1D",fontWeight:900}}>NAY needs {mi.nayLeft} more</span>
+      </>})()}
     </div>
   </div>;
 }
@@ -2451,6 +2629,10 @@ function ResourcesRegionsPanel({D,editable=false,onSave,onGameChange,onRegionsCh
         <STit c="Economy Trend" sub="Updated when the Game Master advances the session."/>
         <EconomyGraph history={D.econ||[]} current={snap}/>
         <div style={{display:"flex",gap:"0.8rem",marginTop:"0.5rem",fontSize:"0.9rem",color:T.mut,flexWrap:"wrap"}}><span style={goldStyle}>■ {RES.gold.emoji} Gold net</span><span style={foodStyle}>■ {RES.food.emoji} Food net</span></div>
+      </Card>
+      <Card>
+        <STit c="Map of Italia" sub="Three.js provincial view with control status, population scale and live income details."/>
+        <RegionThreeMap regions={regs} game={g}/>
       </Card>
       <Card>
         <STit c="Provinces and Regional Income" sub="Capital, population, control and effective income are shown for every province."/>
@@ -4139,6 +4321,10 @@ function ARegions({D,onRefresh}){
           <Stat label="Provincial Gold Income" value={`+${fmt(inc.gold)}T`} color={T.gre}/><Stat label="Senator Tax Income" value={`+${fmt(privateTaxes.gold)}T`} color={RES.gold.color}/><Stat label="Total Gold Income" value={`+${fmt(totalGoldIncome)}T`} color={RES.gold.color}/>
           <Stat label="Provincial Food Income" value={`+${fmt(inc.food)}M`} color="#A0D060"/><Stat label="Senator Tax Income" value={`+${fmt(privateTaxes.food)}M`} color={RES.food.color}/><Stat label="Total Food Income" value={`+${fmt(totalFoodIncome)}M`} color={RES.food.color}/>
         </Row>
+      </Card>
+      <Card>
+        <STit c="Map of Italia" sub="Interactive Three.js map. Hover a province to inspect control, capital and projected income."/>
+        <RegionThreeMap regions={regs} game={g}/>
       </Card>
       <STit c="Region Status"/>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:"0.4rem"}}>
